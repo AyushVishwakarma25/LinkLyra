@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account document stored under users/{userId}",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photoURL": { "type": "string" },
+        "username": { "type": "string" },
+        "plan": { "type": "string", "enum": ["free", "pro", "business"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "username"]
+    },
+    "Page": {
+      "title": "Page",
+      "description": "User landing page document stored under pages/{pageId}",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "title": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "themeId": { "type": "string" },
+        "backgroundType": { "type": "string", "enum": ["color", "gradient", "image"] },
+        "backgroundValue": { "type": "string" },
+        "fontFamily": { "type": "string" },
+        "textColor": { "type": "string" },
+        "buttonStyle": { "type": "string", "enum": ["rounded", "square", "pill", "glass"] },
+        "buttonColor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "username", "title"]
+    },
+    "Link": {
+      "title": "Link",
+      "description": "Link item under pages/{pageId}/links/{linkId}",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "linkType": { "type": "string", "enum": ["url", "youtube", "instagram", "linkedin", "twitter", "tiktok", "spotify", "product", "email", "phone"] },
+        "position": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "openInNewTab": { "type": "boolean" },
+        "sectionId": { "type": ["string", "null"] },
+        "clickCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url", "position"]
+    },
+    "SocialLink": {
+      "title": "SocialLink",
+      "description": "Social media link under pages/{pageId}/socialLinks/{socialId}",
+      "type": "object",
+      "properties": {
+        "platform": { "type": "string" },
+        "url": { "type": "string" },
+        "username": { "type": "string" },
+        "icon": { "type": "string" },
+        "position": { "type": "number" },
+        "isVisible": { "type": "boolean" }
+      },
+      "required": ["platform", "url", "position"]
+    },
+    "Section": {
+      "title": "Section",
+      "description": "Section header block under pages/{pageId}/sections/{sectionId}",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "position": { "type": "number" },
+        "isVisible": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "position"]
+    },
+    "Theme": {
+      "title": "Theme",
+      "description": "Pre-built theme preset under themes/{themeId}",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "isPremium": { "type": "boolean" },
+        "config": {
+          "type": "object",
+          "properties": {
+            "backgroundType": { "type": "string" },
+            "backgroundValue": { "type": "string" },
+            "textColor": { "type": "string" },
+            "buttonColor": { "type": "string" },
+            "buttonTextColor": { "type": "string" },
+            "buttonStyle": { "type": "string" },
+            "fontFamily": { "type": "string" }
+          }
+        }
+      },
+      "required": ["name", "config"]
+    },
+    "AnalyticsEvent": {
+      "title": "AnalyticsEvent",
+      "description": "Analytics telemetry event under pages/{pageId}/analytics/{eventId}",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["page_view", "link_click"] },
+        "linkId": { "type": ["string", "null"] },
+        "visitorId": { "type": "string" },
+        "country": { "type": "string" },
+        "device": { "type": "string" },
+        "browser": { "type": "string" },
+        "referrer": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered user profiles and plan information"
+    },
+    "/pages/{pageId}": {
+      "schema": { "$ref": "#/entities/Page" },
+      "description": "Public landing pages"
+    },
+    "/pages/{pageId}/links/{linkId}": {
+      "schema": { "$ref": "#/entities/Link" },
+      "description": "Subcollection of links for a page"
+    },
+    "/pages/{pageId}/socialLinks/{socialId}": {
+      "schema": { "$ref": "#/entities/SocialLink" },
+      "description": "Subcollection of social links for a page"
+    },
+    "/pages/{pageId}/sections/{sectionId}": {
+      "schema": { "$ref": "#/entities/Section" },
+      "description": "Subcollection of category headers/sections for a page"
+    },
+    "/themes/{themeId}": {
+      "schema": { "$ref": "#/entities/Theme" },
+      "description": "Global design and color themes"
+    },
+    "/pages/{pageId}/analytics/{eventId}": {
+      "schema": { "$ref": "#/entities/AnalyticsEvent" },
+      "description": "Subcollection of view and click telemetry events"
+    }
+  }
+}

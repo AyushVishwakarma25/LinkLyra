@@ -1,0 +1,6 @@
+{
+  "name": "LinkCards - Mobile Profile Builder",
+  "description": "Mobile-first card-based Linktree profile builder with customizable colored card stacks, social links, and public profiles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

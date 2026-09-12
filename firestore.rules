@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isPageOwner(pageId) {
+      return signedIn() && (
+        request.auth.uid == pageId ||
+        (exists(/databases/$(database)/documents/pages/$(pageId)) && get(/databases/$(database)/documents/pages/$(pageId)).data.userId == request.auth.uid)
+      );
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // =========================
+    // USERS
+    // =========================
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // =========================
+    // PAGES
+    // =========================
+
+    match /pages/{pageId} {
+      // Public can view and list creator pages
+      allow read: if true;
+
+      // Authenticated user creates their own page
+      allow create: if signedIn() && (
+        request.resource.data.userId == request.auth.uid ||
+        request.auth.uid == pageId
+      );
+
+      // Only owner can update or delete
+      allow update, delete: if isPageOwner(pageId);
+    }
+
+    // =========================
+    // LINKS (Subcollection)
+    // =========================
+
+    match /pages/{pageId}/links/{linkId} {
+      allow read: if true;
+      allow write: if isPageOwner(pageId);
+    }
+
+    // =========================
+    // SOCIAL LINKS (Subcollection)
+    // =========================
+
+    match /pages/{pageId}/socialLinks/{socialId} {
+      allow read: if true;
+      allow write: if isPageOwner(pageId);
+    }
+
+    // =========================
+    // SECTIONS (Subcollection)
+    // =========================
+
+    match /pages/{pageId}/sections/{sectionId} {
+      allow read: if true;
+      allow write: if isPageOwner(pageId);
+    }
+
+    // =========================
+    // THEMES
+    // =========================
+
+    match /themes/{themeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // =========================
+    // ANALYTICS (Subcollection)
+    // =========================
+
+    match /pages/{pageId}/analytics/{eventId} {
+      // Allow anonymous event creation for page views and link clicks
+      allow create: if request.resource.data.type in ["page_view", "link_click"];
+      allow read: if isPageOwner(pageId);
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // PROFILES & USERNAMES & LINKS (Root Collections)
+    // =========================
+
+    match /usernames/{username} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+    
+    match /profiles/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+
+    match /links/{linkId} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    // =========================
+    // DENY EVERYTHING ELSE
+    // =========================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

@@ -24,11 +24,32 @@ service cloud.firestore {
     }
 
     // =========================
-    // USERS
+    // USERS (and Subcollections: subscriptions, payments, credit_transactions)
     // =========================
 
     match /users/{userId} {
       allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/subscriptions/{subId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/payments/{paymentId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/credit_transactions/{txId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Root level subscription and payment fallbacks
+    match /subscriptions/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if signedIn();
     }
 
     // =========================
@@ -77,6 +98,22 @@ service cloud.firestore {
     }
 
     // =========================
+    // LEADS & INQUIRIES (Subcollection & Root Fallback)
+    // =========================
+
+    match /pages/{pageId}/leads/{leadId} {
+      // Public visitors can submit showing bookings, brand inquiries, and valuation requests
+      allow create: if true;
+      // Only the page owner can view and update lead statuses (CRM)
+      allow read, update, delete: if isPageOwner(pageId);
+    }
+
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if signedIn();
+    }
+
+    // =========================
     // THEMES
     // =========================
 
@@ -90,8 +127,10 @@ service cloud.firestore {
     // =========================
 
     match /pages/{pageId}/analytics/{eventId} {
-      // Allow anonymous event creation for page views and link clicks
-      allow create: if request.resource.data.type in ["page_view", "link_click"];
+      // Allow anonymous event creation for page views, link clicks, property views, showing requests, brand inquiries
+      allow create: if request.resource.data.type in [
+        "page_view", "link_click", "property_view", "showing_request", "brand_inquiry", "home_valuation", "media_kit_download"
+      ];
       allow read: if isPageOwner(pageId);
       allow update, delete: if false;
     }
@@ -101,6 +140,11 @@ service cloud.firestore {
     // =========================
 
     match /usernames/{username} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    match /domains/{domain} {
       allow read: if true;
       allow write: if signedIn();
     }

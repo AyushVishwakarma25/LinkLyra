@@ -10,7 +10,7 @@ import { storage, auth } from './firebase';
  */
 export async function uploadImageToStorage(
   file: File,
-  type: 'avatar' | 'page_image' = 'avatar',
+  type: 'avatar' | 'page_image' | 'card_image' = 'avatar',
   targetId?: string
 ): Promise<string> {
   const currentUid = auth.currentUser?.uid || 'anonymous';

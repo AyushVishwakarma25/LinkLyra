@@ -9,6 +9,10 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile as updateAuthProfile,
+  sendPasswordResetEmail,
+  updatePassword as updateAuthPassword,
+  sendEmailVerification,
+  deleteUser as deleteAuthUser,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -28,7 +32,18 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { CardColor, CardTemplateType, SocialLinks, CanvasTheme } from '../types';
+import {
+  CardColor,
+  CardTemplateType,
+  SocialLinks,
+  CanvasTheme,
+  SubscriptionRecord,
+  PaymentInvoiceRecord,
+  CreditTransactionRecord,
+  SubscriptionPlanType,
+  BillingCycle,
+  OnboardingProfile,
+} from '../types';
 
 // Structured Firestore Error Protocol mandated by Skill guidelines
 export enum OperationType {
@@ -77,6 +92,35 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+/**
+ * Recursively strips undefined values from objects/arrays so Firestore doesn't reject them.
+ * Firestore setDoc/updateDoc throws an error if any field (even nested) is undefined.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    (data.constructor === Object || data.constructor === undefined)
+  ) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
 }
 
 // Singleton Firebase Application & Service Initialization
@@ -138,7 +182,7 @@ export interface FirestoreLink {
   description: string;
   icon: string;
   thumbnailUrl: string;
-  linkType: 'url' | 'youtube' | 'instagram' | 'linkedin' | 'twitter' | 'tiktok' | 'spotify' | 'product' | 'email' | 'phone' | 'real_estate' | 'coaching';
+  linkType: 'url' | 'youtube' | 'instagram' | 'linkedin' | 'twitter' | 'tiktok' | 'spotify' | 'product' | 'email' | 'phone' | 'real_estate' | 'coaching' | 'creator_work' | 'creator_stats' | 'creator_packages' | 'featured_work' | 'brand_inquiry' | 'media_kit' | 'recommendation' | 'home_valuation' | 'showing_booking' | 'client_review' | 'lead_form';
   color?: CardColor;
   badgeText?: string;
   position: number;
@@ -148,6 +192,16 @@ export interface FirestoreLink {
   clickCount: number;
   realEstate?: any;
   coaching?: any;
+  creatorStats?: any;
+  creatorWork?: any;
+  featuredWork?: any;
+  creatorPackages?: any;
+  brandInquiry?: any;
+  recommendation?: any;
+  clientReview?: any;
+  music?: any;
+  podcast?: any;
+  isPremium?: boolean;
   customWhatsappPhone?: string;
   createdAt: any;
   updatedAt: any;
@@ -197,6 +251,17 @@ export interface FirestoreAnalyticsEvent {
   timestamp: any;
 }
 
+// Agency & VIP Whitelisted Account Emails
+export const AGENCY_WHITELIST_EMAILS = [
+  'reachtoayush25@gmail.com',
+  'sharma25ayush@gmail.com',
+];
+
+export function isAgencyUserEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return AGENCY_WHITELIST_EMAILS.includes(email.toLowerCase().trim());
+}
+
 // Backward Compatibility Aliases for UI components
 export interface DbProfile {
   id: string;
@@ -211,6 +276,13 @@ export interface DbProfile {
   background_type?: 'color' | 'gradient' | 'image';
   background_value?: string;
   socials?: SocialLinks;
+  plan?: 'free' | 'pro' | 'business' | 'agency';
+  role?: string;
+  has_completed_onboarding?: boolean;
+  onboarding_profile?: OnboardingProfile;
+  page_archetype?: string;
+  custom_domain?: string;
+  accountSettings?: any;
   created_at?: string;
   updated_at?: string;
 }
@@ -232,6 +304,16 @@ export interface DbLink {
   template_type?: CardTemplateType;
   real_estate?: any;
   coaching?: any;
+  creator_stats?: any;
+  creator_work?: any;
+  featured_work?: any;
+  creator_packages?: any;
+  brand_inquiry?: any;
+  recommendation?: any;
+  client_review?: any;
+  music?: any;
+  podcast?: any;
+  is_premium?: boolean;
   custom_whatsapp_phone?: string;
   created_at?: string;
 }
@@ -425,7 +507,7 @@ export const profileService = {
 
   // 2. Email/Password Sign Up
   async signUp(email: string, password: string, fullName: string, username: string) {
-    const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
+    const cleanUsername = (username || '').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
 
     try {
       const usernameDoc = await getDoc(doc(db, 'usernames', cleanUsername));
@@ -513,32 +595,152 @@ export const profileService = {
     await firebaseSignOut(auth);
   },
 
+  // 4b. Send Password Reset Email
+  async sendPasswordReset(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      throw new Error(err.message || 'Failed to send password reset email.');
+    }
+  },
+
+  // 4c. Update Current User Password
+  async updateAccountPassword(newPassword: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('No user is currently authenticated.');
+    try {
+      await updateAuthPassword(auth.currentUser, newPassword);
+    } catch (err: any) {
+      console.error('Update password error:', err);
+      if (err.code === 'auth/requires-recent-login') {
+        throw new Error('This action is sensitive and requires a recent login. Please sign out and sign back in to change your password.');
+      }
+      throw new Error(err.message || 'Failed to update password.');
+    }
+  },
+
+  // 4d. Send Email Verification
+  async sendVerificationEmail(): Promise<void> {
+    if (!auth.currentUser) throw new Error('No user is currently authenticated.');
+    try {
+      await sendEmailVerification(auth.currentUser);
+    } catch (err: any) {
+      console.error('Send email verification error:', err);
+      throw new Error(err.message || 'Failed to send verification email.');
+    }
+  },
+
+  // 4e. Delete User Account & Purge Data
+  async deleteUserAccount(userId: string): Promise<void> {
+    const user = auth.currentUser;
+    try {
+      // 1. Delete Firestore records
+      await deleteDoc(doc(db, 'users', userId)).catch(() => {});
+      await deleteDoc(doc(db, 'profiles', userId)).catch(() => {});
+      await deleteDoc(doc(db, 'pages', userId)).catch(() => {});
+      await deleteDoc(doc(db, 'subscriptions', userId)).catch(() => {});
+      
+      // Delete user's links
+      const linksSnap = await getDocs(collection(db, 'pages', userId, 'links')).catch(() => null);
+      if (linksSnap) {
+        for (const d of linksSnap.docs) {
+          await deleteDoc(doc(db, 'pages', userId, 'links', d.id)).catch(() => {});
+          await deleteDoc(doc(db, 'links', d.id)).catch(() => {});
+        }
+      }
+
+      // 2. Delete Firebase Auth user if authenticated
+      if (user && user.uid === userId) {
+        await deleteAuthUser(user);
+      }
+    } catch (err: any) {
+      console.error('Delete account error:', err);
+      if (err.code === 'auth/requires-recent-login') {
+        throw new Error('Deleting your account requires a recent authentication. Please sign out, sign back in, and try again.');
+      }
+      throw new Error(err.message || 'Failed to delete account.');
+    }
+  },
+
+  // 4f. Full User Data Export (GDPR compliant JSON backup)
+  async exportAllUserData(userId: string) {
+    try {
+      const profile = await this.getProfile(userId);
+      const links = await this.getLinks(userId);
+      const sections = await this.getSections(userId);
+      const subscription = await this.getUserSubscription(userId);
+      const invoices = await this.getPaymentInvoices(userId);
+      const analytics = await this.getAnalyticsSummary(userId);
+
+      const exportBundle = {
+        exportTimestamp: new Date().toISOString(),
+        application: 'LinkLyra Creator Studio',
+        user: {
+          id: userId,
+          email: auth.currentUser?.email || '',
+          displayName: auth.currentUser?.displayName || '',
+          emailVerified: auth.currentUser?.emailVerified || false,
+        },
+        profile,
+        sections,
+        links,
+        subscription,
+        invoices,
+        analyticsSummary: analytics,
+      };
+
+      return exportBundle;
+    } catch (err) {
+      console.error('Export error:', err);
+      throw new Error('Failed to assemble complete account export bundle.');
+    }
+  },
+
   // 5. Get User Profile & Page
   async getProfile(userId: string): Promise<DbProfile | null> {
     try {
       // Check pages/{pageId} first
       const pageSnap = await getDoc(doc(db, 'pages', userId));
+      const profileSnap = await getDoc(doc(db, 'profiles', userId));
+      const userSnap = await getDoc(doc(db, 'users', userId));
+      const profileData = profileSnap.exists() ? (profileSnap.data() as DbProfile) : null;
+      const userData = userSnap.exists() ? userSnap.data() : null;
+
+      const userEmail = auth.currentUser?.email || (userData?.email as string) || '';
+      const isAgency = isAgencyUserEmail(userEmail) || profileData?.plan === 'agency' || profileData?.role === 'agency';
+
       if (pageSnap.exists()) {
         const pageData = pageSnap.data() as FirestorePage;
         return {
           id: userId,
-          username: pageData.username,
-          full_name: pageData.title,
-          bio: pageData.bio || '',
-          avatar_url: pageData.avatarUrl || '',
-          business_phone: pageData.businessPhone,
-          theme: (pageData.themeId as any) || 'warm',
-          font_family: pageData.fontFamily,
-          button_style: pageData.buttonStyle,
-          background_type: pageData.backgroundType,
-          background_value: pageData.backgroundValue,
+          username: pageData.username || profileData?.username || '',
+          full_name: pageData.title || profileData?.full_name || '',
+          bio: pageData.bio || profileData?.bio || '',
+          avatar_url: pageData.avatarUrl || profileData?.avatar_url || '',
+          business_phone: pageData.businessPhone || profileData?.business_phone,
+          theme: (pageData.themeId as any) || profileData?.theme || 'warm',
+          font_family: pageData.fontFamily || profileData?.font_family,
+          button_style: pageData.buttonStyle || profileData?.button_style,
+          background_type: pageData.backgroundType || profileData?.background_type,
+          background_value: pageData.backgroundValue || profileData?.background_value,
+          plan: isAgency ? 'agency' : (profileData?.plan || 'free'),
+          role: isAgency ? 'agency' : (profileData?.role || 'creator'),
+          has_completed_onboarding: profileData?.has_completed_onboarding ?? profileData?.onboarding_profile?.onboardingCompleted ?? false,
+          onboarding_profile: profileData?.onboarding_profile || (pageSnap.data() as any)?.onboarding_profile || undefined,
+          page_archetype: profileData?.page_archetype,
+          socials: profileData?.socials,
+          custom_domain: profileData?.custom_domain || (pageSnap.data() as any)?.customDomain || (pageSnap.data() as any)?.custom_domain || '',
+          accountSettings: profileData?.accountSettings || userData?.accountSettings || undefined,
         };
       }
 
-      // Check profiles/{userId} fallback
-      const snap = await getDoc(doc(db, 'profiles', userId));
-      if (snap.exists()) {
-        return snap.data() as DbProfile;
+      if (profileData) {
+        return {
+          ...profileData,
+          plan: isAgency ? 'agency' : (profileData.plan || 'free'),
+          role: isAgency ? 'agency' : (profileData.role || 'creator'),
+          custom_domain: profileData.custom_domain || '',
+        };
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.GET, `users/${userId}`);
@@ -550,6 +752,7 @@ export const profileService = {
   async getProfileByUsername(
     username: string
   ): Promise<{ profile: DbProfile; links: DbLink[] } | null> {
+    if (!username) return null;
     const cleanUsername = username.toLowerCase().trim();
 
     try {
@@ -585,6 +788,7 @@ export const profileService = {
           button_style: pageData.buttonStyle,
           background_type: pageData.backgroundType,
           background_value: pageData.backgroundValue,
+          custom_domain: (pageDoc.data() as any).customDomain || '',
         };
         const links = await this.getLinks(pageId);
         return { profile, links };
@@ -606,15 +810,148 @@ export const profileService = {
     return null;
   },
 
+  // 6b. Public lookup by Custom Domain Mapping (e.g. bio.ayush.design or links.domain.com)
+  async getProfileByDomain(
+    domain: string
+  ): Promise<{ profile: DbProfile; links: DbLink[] } | null> {
+    if (!domain) return null;
+    const cleanDomain = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+    try {
+      // 1. Check domains routing index collection
+      const domainDocSnap = await getDoc(doc(db, 'domains', cleanDomain));
+      if (domainDocSnap.exists()) {
+        const userId = domainDocSnap.data()?.userId || domainDocSnap.data()?.pageId;
+        if (userId) {
+          const profile = await this.getProfile(userId);
+          if (profile) {
+            const links = await this.getLinks(userId);
+            return { profile, links };
+          }
+        }
+      }
+
+      // 2. Query pages collection where customDomain == cleanDomain
+      const qPages = query(collection(db, 'pages'), where('customDomain', '==', cleanDomain));
+      const pageSnap = await getDocs(qPages);
+      if (!pageSnap.empty) {
+        const pageDoc = pageSnap.docs[0];
+        const profile = await this.getProfile(pageDoc.id);
+        if (profile) {
+          const links = await this.getLinks(pageDoc.id);
+          return { profile, links };
+        }
+      }
+
+      // 3. Query profiles collection where custom_domain == cleanDomain
+      const qProfiles = query(collection(db, 'profiles'), where('custom_domain', '==', cleanDomain));
+      const profSnap = await getDocs(qProfiles);
+      if (!profSnap.empty) {
+        const profDoc = profSnap.docs[0];
+        const profile = await this.getProfile(profDoc.id);
+        if (profile) {
+          const links = await this.getLinks(profDoc.id);
+          return { profile, links };
+        }
+      }
+    } catch (err) {
+      console.warn('Domain lookup query notice:', err);
+    }
+
+    return null;
+  },
+
+  // 6c. Save & Bind Custom Domain to User Account
+  async saveCustomDomain(userId: string, domain: string): Promise<void> {
+    const cleanDomain = (domain || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    try {
+      if (cleanDomain) {
+        await setDoc(
+          doc(db, 'domains', cleanDomain),
+          sanitizeForFirestore({
+            domain: cleanDomain,
+            userId,
+            pageId: userId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }),
+          { merge: true }
+        );
+      }
+
+      await setDoc(
+        doc(db, 'pages', userId),
+        sanitizeForFirestore({
+          customDomain: cleanDomain,
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, 'profiles', userId),
+        sanitizeForFirestore({
+          custom_domain: cleanDomain,
+          updated_at: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `domains/${cleanDomain}`);
+    }
+  },
+
+  // 6d. Save & Persist Account Settings & Preferences
+  async updateAccountSettings(userId: string, settings: any): Promise<void> {
+    try {
+      await setDoc(
+        doc(db, 'users', userId),
+        sanitizeForFirestore({
+          accountSettings: settings,
+          preferences: settings.preferences,
+          emailNotifications: settings.emailNotifications,
+          whatsappNotifications: settings.whatsappNotifications,
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, 'profiles', userId),
+        sanitizeForFirestore({
+          accountSettings: settings,
+          custom_domain: settings.privacy?.customDomain || '',
+          updated_at: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+
+      if (settings.privacy?.customDomain) {
+        await this.saveCustomDomain(userId, settings.privacy.customDomain);
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/preferences`);
+    }
+  },
+
   // 7. Update Profile & Page
   async updateProfile(userId: string, updates: Partial<DbProfile>) {
     try {
       const currentProfile = await this.getProfile(userId);
-      if (updates.username && currentProfile && currentProfile.username !== updates.username) {
-        const cleanOld = currentProfile.username.toLowerCase();
-        const cleanNew = updates.username.toLowerCase();
-        await deleteDoc(doc(db, 'usernames', cleanOld));
-        await setDoc(doc(db, 'usernames', cleanNew), { userId, pageId: userId, username: cleanNew });
+      if (updates.username && currentProfile?.username && currentProfile.username !== updates.username) {
+        const cleanOld = (currentProfile.username || '').toLowerCase();
+        const cleanNew = (updates.username || '').toLowerCase();
+        if (cleanOld) {
+          await deleteDoc(doc(db, 'usernames', cleanOld)).catch(() => {});
+        }
+        if (cleanNew) {
+          await setDoc(doc(db, 'usernames', cleanNew), { userId, pageId: userId, username: cleanNew });
+        }
+      } else if (updates.username && (!currentProfile?.username || currentProfile.username !== updates.username)) {
+        const cleanNew = (updates.username || '').toLowerCase();
+        if (cleanNew) {
+          await setDoc(doc(db, 'usernames', cleanNew), { userId, pageId: userId, username: cleanNew });
+        }
       }
 
       const pageUpdates: Partial<FirestorePage> = {};
@@ -628,20 +965,27 @@ export const profileService = {
       if (updates.button_style !== undefined) pageUpdates.buttonStyle = updates.button_style;
       if (updates.background_type !== undefined) pageUpdates.backgroundType = updates.background_type;
       if (updates.background_value !== undefined) pageUpdates.backgroundValue = updates.background_value;
+      if (updates.custom_domain !== undefined) (pageUpdates as any).customDomain = updates.custom_domain;
       pageUpdates.updatedAt = serverTimestamp();
 
-      await setDoc(doc(db, 'pages', userId), pageUpdates, { merge: true });
+      await setDoc(doc(db, 'pages', userId), sanitizeForFirestore(pageUpdates), { merge: true });
       await setDoc(
         doc(db, 'users', userId),
-        {
+        sanitizeForFirestore({
           ...(updates.full_name ? { displayName: updates.full_name } : {}),
           ...(updates.avatar_url ? { photoURL: updates.avatar_url } : {}),
           ...(updates.username ? { username: updates.username } : {}),
+          ...(updates.plan ? { plan: updates.plan } : {}),
+          ...(updates.accountSettings ? { accountSettings: updates.accountSettings } : {}),
           updatedAt: serverTimestamp(),
-        },
+        }),
         { merge: true }
       );
-      await setDoc(doc(db, 'profiles', userId), { ...updates, id: userId }, { merge: true });
+      await setDoc(doc(db, 'profiles', userId), sanitizeForFirestore({ ...updates, id: userId }), { merge: true });
+
+      if (updates.custom_domain) {
+        await this.saveCustomDomain(userId, updates.custom_domain);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `pages/${userId}`);
     }
@@ -667,13 +1011,23 @@ export const profileService = {
             color: (l.color || 'purple') as CardColor,
             logo_url: l.thumbnailUrl || l.icon || '',
             badge_text: l.badgeText || '',
-            expanded: l.linkType === 'real_estate' || l.linkType === 'coaching',
+            expanded: l.linkType === 'real_estate' || l.linkType === 'coaching' || l.linkType === 'creator_stats' || l.linkType === 'creator_packages' || l.linkType === 'creator_work' || l.linkType === 'featured_work' || l.linkType === 'brand_inquiry' || l.linkType === 'media_kit' || l.linkType === 'recommendation' || l.linkType === 'home_valuation' || l.linkType === 'showing_booking' || l.linkType === 'client_review',
             is_active: l.isActive ?? true,
             clicks: l.clickCount ?? 0,
             display_order: l.position ?? 0,
             template_type: (l.linkType as any) || 'standard',
             real_estate: l.realEstate,
             coaching: l.coaching,
+            creator_stats: l.creatorStats,
+            creator_work: l.creatorWork,
+            featured_work: l.featuredWork,
+            creator_packages: l.creatorPackages,
+            brand_inquiry: l.brandInquiry,
+            recommendation: l.recommendation,
+            client_review: l.clientReview,
+            music: l.music,
+            podcast: l.podcast,
+            is_premium: l.isPremium,
             custom_whatsapp_phone: l.customWhatsappPhone,
           });
         });
@@ -706,35 +1060,46 @@ export const profileService = {
   ): Promise<DbLink> {
     const newLinkId = `link_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-    const firestoreLink: FirestoreLink = {
-      title: link.title,
-      url: link.link_url,
+    const firestoreLink: Record<string, any> = {
+      title: link.title || '',
+      url: link.link_url || 'https://',
       description: link.subtitle || '',
       icon: link.logo_url || 'globe',
       thumbnailUrl: link.logo_url || '',
       linkType: (link.template_type as any) || 'url',
-      color: link.color,
+      color: link.color || 'white',
       badgeText: link.badge_text || '',
       position: link.display_order ?? 0,
       isActive: link.is_active ?? true,
       openInNewTab: true,
       sectionId: link.section_id || null,
       clickCount: 0,
-      realEstate: link.real_estate,
-      coaching: link.coaching,
-      customWhatsappPhone: link.custom_whatsapp_phone,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
-    const rootLink: DbLink = {
+    if (link.real_estate !== undefined) firestoreLink.realEstate = link.real_estate;
+    if (link.coaching !== undefined) firestoreLink.coaching = link.coaching;
+    if (link.creator_stats !== undefined) firestoreLink.creatorStats = link.creator_stats;
+    if (link.creator_work !== undefined) firestoreLink.creatorWork = link.creator_work;
+    if (link.featured_work !== undefined) firestoreLink.featuredWork = link.featured_work;
+    if (link.creator_packages !== undefined) firestoreLink.creatorPackages = link.creator_packages;
+    if (link.brand_inquiry !== undefined) firestoreLink.brandInquiry = link.brand_inquiry;
+    if (link.recommendation !== undefined) firestoreLink.recommendation = link.recommendation;
+    if (link.client_review !== undefined) firestoreLink.clientReview = link.client_review;
+    if (link.music !== undefined) firestoreLink.music = link.music;
+    if (link.podcast !== undefined) firestoreLink.podcast = link.podcast;
+    if (link.is_premium !== undefined) firestoreLink.isPremium = link.is_premium;
+    if (link.custom_whatsapp_phone !== undefined) firestoreLink.customWhatsappPhone = link.custom_whatsapp_phone;
+
+    const rootLink: Record<string, any> = {
       id: newLinkId,
       profile_id: pageId,
       section_id: link.section_id || null,
-      title: link.title,
+      title: link.title || '',
       subtitle: link.subtitle || '',
-      link_url: link.link_url,
-      color: link.color,
+      link_url: link.link_url || 'https://',
+      color: link.color || 'white',
       logo_url: link.logo_url || '',
       badge_text: link.badge_text || '',
       expanded: link.expanded ?? false,
@@ -742,22 +1107,35 @@ export const profileService = {
       clicks: 0,
       display_order: link.display_order ?? 0,
       template_type: link.template_type || 'standard',
-      real_estate: link.real_estate,
-      coaching: link.coaching,
-      custom_whatsapp_phone: link.custom_whatsapp_phone,
       created_at: new Date().toISOString(),
     };
 
+    if (link.real_estate !== undefined) rootLink.real_estate = link.real_estate;
+    if (link.coaching !== undefined) rootLink.coaching = link.coaching;
+    if (link.creator_stats !== undefined) rootLink.creator_stats = link.creator_stats;
+    if (link.creator_work !== undefined) rootLink.creator_work = link.creator_work;
+    if (link.featured_work !== undefined) rootLink.featured_work = link.featured_work;
+    if (link.creator_packages !== undefined) rootLink.creator_packages = link.creator_packages;
+    if (link.brand_inquiry !== undefined) rootLink.brand_inquiry = link.brand_inquiry;
+    if (link.recommendation !== undefined) rootLink.recommendation = link.recommendation;
+    if (link.client_review !== undefined) rootLink.client_review = link.client_review;
+    if (link.music !== undefined) rootLink.music = link.music;
+    if (link.podcast !== undefined) rootLink.podcast = link.podcast;
+    if (link.is_premium !== undefined) rootLink.is_premium = link.is_premium;
+    if (link.custom_whatsapp_phone !== undefined) rootLink.custom_whatsapp_phone = link.custom_whatsapp_phone;
+
     try {
+      const sanitizedFirestoreLink = sanitizeForFirestore(firestoreLink);
+      const sanitizedRootLink = sanitizeForFirestore(rootLink);
       // Write to subcollection: pages/{pageId}/links/{linkId}
-      await setDoc(doc(db, 'pages', pageId, 'links', newLinkId), firestoreLink);
+      await setDoc(doc(db, 'pages', pageId, 'links', newLinkId), sanitizedFirestoreLink);
       // Write to root: links/{linkId}
-      await setDoc(doc(db, 'links', newLinkId), rootLink);
+      await setDoc(doc(db, 'links', newLinkId), sanitizedRootLink);
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, `pages/${pageId}/links/${newLinkId}`);
     }
 
-    return rootLink;
+    return rootLink as DbLink;
   },
 
   // 10. Update Link Card (Flexible signature)
@@ -790,11 +1168,29 @@ export const profileService = {
       if (updates.is_active !== undefined) subUpdates.isActive = updates.is_active;
       if (updates.display_order !== undefined) subUpdates.position = updates.display_order;
       if (updates.section_id !== undefined) subUpdates.sectionId = updates.section_id;
+      if (updates.template_type !== undefined) subUpdates.linkType = updates.template_type;
+      if (updates.real_estate !== undefined) subUpdates.realEstate = updates.real_estate;
+      if (updates.coaching !== undefined) subUpdates.coaching = updates.coaching;
+      if (updates.creator_stats !== undefined) subUpdates.creatorStats = updates.creator_stats;
+      if (updates.creator_work !== undefined) subUpdates.creatorWork = updates.creator_work;
+      if (updates.featured_work !== undefined) subUpdates.featuredWork = updates.featured_work;
+      if (updates.creator_packages !== undefined) subUpdates.creatorPackages = updates.creator_packages;
+      if (updates.brand_inquiry !== undefined) subUpdates.brandInquiry = updates.brand_inquiry;
+      if (updates.recommendation !== undefined) subUpdates.recommendation = updates.recommendation;
+      if (updates.client_review !== undefined) subUpdates.clientReview = updates.client_review;
+      if (updates.music !== undefined) subUpdates.music = updates.music;
+      if (updates.podcast !== undefined) subUpdates.podcast = updates.podcast;
+      if (updates.is_premium !== undefined) subUpdates.isPremium = updates.is_premium;
+      if (updates.custom_whatsapp_phone !== undefined) subUpdates.customWhatsappPhone = updates.custom_whatsapp_phone;
+
+      const sanitizedSubUpdates = sanitizeForFirestore(subUpdates);
+      const sanitizedUpdates = sanitizeForFirestore({ ...updates, updatedAt: serverTimestamp() });
 
       if (pageId) {
-        await setDoc(doc(db, 'pages', pageId, 'links', linkId), subUpdates, { merge: true }).catch(() => {});
+        await setDoc(doc(db, 'pages', pageId, 'links', linkId), sanitizedSubUpdates, { merge: true }).catch(() => {});
       }
-      await updateDoc(doc(db, 'links', linkId), updates);
+      // Use setDoc with merge: true to avoid "No document to update" error if the doc was not previously written to root links
+      await setDoc(doc(db, 'links', linkId), sanitizedUpdates, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `links/${linkId}`);
     }
@@ -879,9 +1275,9 @@ export const profileService = {
       const batch = writeBatch(db);
       linkIds.forEach((id, index) => {
         const subRef = doc(db, 'pages', pageId, 'links', id);
-        batch.update(subRef, { position: index });
+        batch.set(subRef, { position: index, updatedAt: serverTimestamp() }, { merge: true });
         const rootRef = doc(db, 'links', id);
-        batch.update(rootRef, { display_order: index });
+        batch.set(rootRef, { display_order: index }, { merge: true });
       });
       await batch.commit();
     } catch (err) {
@@ -956,25 +1352,45 @@ export const profileService = {
     }
   },
 
-  // 18. Get Real-Time Analytics Summary
+  // 18. Get Real-Time Analytics Summary & Specialized Vertical Metrics
   async getAnalyticsSummary(pageId: string) {
     try {
       const snap = await getDocs(collection(db, 'pages', pageId, 'analytics'));
       let totalViews = 0;
       let totalClicks = 0;
+      let propertyViews = 0;
+      let showingRequests = 0;
+      let homeValuations = 0;
+      let brandInquiries = 0;
+      let mediaKitDownloads = 0;
+      let packageClicks = 0;
+
       const deviceCounts: Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
       const referrerCounts: Record<string, number> = {};
       const linkClickCounts: Record<string, number> = {};
 
       snap.forEach((d) => {
         const data = d.data();
-        if (data.type === 'page_view') {
+        const eventType = data.type;
+        if (eventType === 'page_view') {
           totalViews++;
-        } else if (data.type === 'link_click') {
+        } else if (eventType === 'link_click') {
           totalClicks++;
           if (data.linkId) {
             linkClickCounts[data.linkId] = (linkClickCounts[data.linkId] || 0) + 1;
           }
+        } else if (eventType === 'property_view') {
+          propertyViews++;
+        } else if (eventType === 'showing_request') {
+          showingRequests++;
+        } else if (eventType === 'home_valuation') {
+          homeValuations++;
+        } else if (eventType === 'brand_inquiry') {
+          brandInquiries++;
+        } else if (eventType === 'media_kit_download') {
+          mediaKitDownloads++;
+        } else if (eventType === 'package_booking') {
+          packageClicks++;
         }
 
         const dev = (data.device || 'mobile').toLowerCase();
@@ -994,6 +1410,12 @@ export const profileService = {
         totalViews,
         totalClicks,
         ctr,
+        propertyViews,
+        showingRequests,
+        homeValuations,
+        brandInquiries,
+        mediaKitDownloads,
+        packageClicks,
         deviceCounts,
         referrerCounts,
         linkClickCounts,
@@ -1001,6 +1423,281 @@ export const profileService = {
     } catch (err) {
       console.warn('Could not read analytics collection:', err);
       return null;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 18.1 Leads & Inquiries CRM Management
+  // -------------------------------------------------------------
+
+  // Submit Lead (Public visitor: Showing Request, Brand Inquiry, Home Valuation)
+  async submitLead(
+    pageId: string,
+    lead: {
+      type: 'showing_request' | 'brand_inquiry' | 'home_valuation' | 'general_contact' | 'media_kit_download' | 'package_booking';
+      name: string;
+      email: string;
+      phone?: string;
+      companyOrBrand?: string;
+      campaignType?: string;
+      budgetOrPrice?: string;
+      timelineOrDate?: string;
+      details?: string;
+      propertyTitle?: string;
+      buyerStatus?: string;
+      propertyAddress?: string;
+      propertyCondition?: string;
+      selectedPackageName?: string;
+    }
+  ): Promise<any> {
+    const leadId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const record = sanitizeForFirestore({
+      id: leadId,
+      pageId,
+      ...lead,
+      status: 'new',
+      createdAt: nowIso,
+      serverTimestamp: serverTimestamp(),
+    });
+
+    try {
+      // 1. Write to creator subcollection: pages/{pageId}/leads/{leadId}
+      await setDoc(doc(db, 'pages', pageId, 'leads', leadId), record);
+      // 2. Root fallback collection
+      await setDoc(doc(db, 'leads', leadId), record).catch(() => {});
+      // 3. Record specialized analytics event
+      await setDoc(doc(db, 'pages', pageId, 'analytics', `evt_${leadId}`), {
+        type: lead.type,
+        linkId: null,
+        visitorId: 'lead-visitor',
+        country: 'IN',
+        device: window.innerWidth < 640 ? 'mobile' : 'desktop',
+        referrer: document.referrer || 'direct',
+        timestamp: serverTimestamp(),
+      }).catch(() => {});
+
+      return record;
+    } catch (err) {
+      console.warn('Notice: lead submit write:', err);
+      return record;
+    }
+  },
+
+  // Get all leads for page owner
+  async getLeads(pageId: string): Promise<any[]> {
+    try {
+      // 1. Try subcollection
+      const snap = await getDocs(collection(db, 'pages', pageId, 'leads'));
+      if (!snap.empty) {
+        const leads: any[] = [];
+        snap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
+        return leads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      }
+
+      // 2. Fallback to root collection
+      const q = query(collection(db, 'leads'), where('pageId', '==', pageId));
+      const rootSnap = await getDocs(q);
+      const leads: any[] = [];
+      rootSnap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
+      return leads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    } catch (err) {
+      console.warn('Notice: fetching leads:', err);
+      return [];
+    }
+  },
+
+  // Update lead status in CRM
+  async updateLeadStatus(pageId: string, leadId: string, status: string, notes?: string): Promise<boolean> {
+    try {
+      const updates: any = { status };
+      if (notes !== undefined) updates.notes = notes;
+
+      await updateDoc(doc(db, 'pages', pageId, 'leads', leadId), updates).catch(() => {});
+      await updateDoc(doc(db, 'leads', leadId), updates).catch(() => {});
+      return true;
+    } catch (err) {
+      console.warn('Notice: updating lead status:', err);
+      return false;
+    }
+  },
+
+  // Delete lead
+  async deleteLead(pageId: string, leadId: string): Promise<boolean> {
+    try {
+      await deleteDoc(doc(db, 'pages', pageId, 'leads', leadId)).catch(() => {});
+      await deleteDoc(doc(db, 'leads', leadId)).catch(() => {});
+      return true;
+    } catch (err) {
+      console.warn('Notice: deleting lead:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 19. Subscriptions, Credits & Razorpay Billing Management
+  // -------------------------------------------------------------
+
+  // Get active subscription record
+  async getUserSubscription(userId: string): Promise<SubscriptionRecord | null> {
+    try {
+      const subDoc = await getDoc(doc(db, 'users', userId, 'subscriptions', 'current'));
+      if (subDoc.exists()) {
+        return { id: subDoc.id, ...subDoc.data() } as SubscriptionRecord;
+      }
+
+      // Root level fallback
+      const rootSubDoc = await getDoc(doc(db, 'subscriptions', userId));
+      if (rootSubDoc.exists()) {
+        return { id: rootSubDoc.id, ...rootSubDoc.data() } as SubscriptionRecord;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Notice: subscription record query:', err);
+      return null;
+    }
+  },
+
+  // Save or update subscription record
+  async saveUserSubscription(userId: string, data: Partial<SubscriptionRecord>): Promise<SubscriptionRecord> {
+    const now = new Date().toISOString();
+    const periodEnd = data.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const record: SubscriptionRecord = {
+      id: 'current',
+      userId,
+      plan: data.plan || 'pro',
+      status: data.status || 'active',
+      billingCycle: data.billingCycle || 'monthly',
+      amount: data.amount ?? 499,
+      currency: data.currency || 'INR',
+      startDate: data.startDate || now,
+      currentPeriodStart: data.currentPeriodStart || now,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+      canceledAt: data.canceledAt,
+      razorpaySubscriptionId: data.razorpaySubscriptionId,
+      razorpayPaymentId: data.razorpayPaymentId,
+      razorpayOrderId: data.razorpayOrderId,
+      razorpaySignature: data.razorpaySignature,
+      creditsMonthly: data.creditsMonthly ?? (data.plan === 'business' ? 2500 : 500),
+      creditsRemaining: data.creditsRemaining ?? (data.plan === 'business' ? 2500 : 500),
+      creditsUsed: data.creditsUsed ?? 0,
+      createdAt: data.createdAt || now,
+      updatedAt: now,
+    };
+
+    try {
+      // 1. Write to user subcollection
+      await setDoc(doc(db, 'users', userId, 'subscriptions', 'current'), record);
+      // 2. Write to root collection for fast querying
+      await setDoc(doc(db, 'subscriptions', userId), record).catch(() => {});
+      // 3. Update profile plan
+      await updateDoc(doc(db, 'profiles', userId), { plan: record.plan }).catch(() => {});
+      await updateDoc(doc(db, 'users', userId), { plan: record.plan }).catch(() => {});
+
+      return record;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${userId}/subscriptions/current`);
+      return record;
+    }
+  },
+
+  // Get payment invoice records
+  async getPaymentInvoices(userId: string): Promise<PaymentInvoiceRecord[]> {
+    try {
+      const snap = await getDocs(collection(db, 'users', userId, 'payments'));
+      const invoices: PaymentInvoiceRecord[] = [];
+      snap.forEach((d) => {
+        invoices.push({ id: d.id, ...d.data() } as PaymentInvoiceRecord);
+      });
+
+      return invoices.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+    } catch (err) {
+      console.warn('Notice: fetching invoices:', err);
+      return [];
+    }
+  },
+
+  // Record a payment invoice from Razorpay
+  async recordPaymentInvoice(userId: string, invoice: Omit<PaymentInvoiceRecord, 'id'>): Promise<PaymentInvoiceRecord> {
+    const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const fullInvoice: PaymentInvoiceRecord = {
+      id: invoiceId,
+      ...invoice,
+    };
+
+    try {
+      await setDoc(doc(db, 'users', userId, 'payments', invoiceId), fullInvoice);
+      await setDoc(doc(db, 'payments', invoiceId), fullInvoice).catch(() => {});
+      return fullInvoice;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `users/${userId}/payments/${invoiceId}`);
+      return fullInvoice;
+    }
+  },
+
+  // Get credit transactions
+  async getCreditTransactions(userId: string): Promise<CreditTransactionRecord[]> {
+    try {
+      const snap = await getDocs(collection(db, 'users', userId, 'credit_transactions'));
+      const list: CreditTransactionRecord[] = [];
+      snap.forEach((d) => {
+        list.push({ id: d.id, ...d.data() } as CreditTransactionRecord);
+      });
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (err) {
+      console.warn('Notice: reading credit transactions:', err);
+      return [];
+    }
+  },
+
+  // Add credit transaction and update balance
+  async logCreditTransaction(
+    userId: string,
+    type: 'monthly_grant' | 'top_up' | 'ai_generation' | 'lead_export' | 'custom_domain' | 'bonus',
+    amount: number,
+    description: string,
+    currentBalance: number
+  ): Promise<CreditTransactionRecord> {
+    const txId = `ctx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const newBalance = Math.max(0, currentBalance + amount);
+    const tx: CreditTransactionRecord = {
+      id: txId,
+      userId,
+      type,
+      amount,
+      description,
+      balanceAfter: newBalance,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'users', userId, 'credit_transactions', txId), tx);
+      await updateDoc(doc(db, 'users', userId, 'subscriptions', 'current'), {
+        creditsRemaining: newBalance,
+        ...(amount < 0 ? { creditsUsed: increment(Math.abs(amount)) } : {}),
+      }).catch(() => {});
+      return tx;
+    } catch (err) {
+      console.warn('Notice: logging credit transaction:', err);
+      return tx;
+    }
+  },
+
+  // Cancel subscription
+  async cancelSubscription(userId: string): Promise<boolean> {
+    try {
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, 'users', userId, 'subscriptions', 'current'), {
+        cancelAtPeriodEnd: true,
+        canceledAt: now,
+      });
+      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/subscriptions/current`);
+      return false;
     }
   },
 };

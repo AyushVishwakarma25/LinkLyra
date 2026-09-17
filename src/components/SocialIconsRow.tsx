@@ -1,7 +1,8 @@
 import React from 'react';
 import { SocialLinks } from '../types';
 import { BRAND_LOGOS } from '../data';
-import { Mail, Globe } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Mail01Icon, GlobeIcon } from '@hugeicons/core-free-icons';
 
 export interface SocialIconsRowProps {
   socials?: SocialLinks;
@@ -22,13 +23,13 @@ export const SocialIconsRow: React.FC<SocialIconsRowProps> = ({ socials, isDark 
     {
       key: 'email',
       url: socials.email ? (socials.email.startsWith('mailto:') ? socials.email : `mailto:${socials.email}`) : undefined,
-      icon: <Mail className="w-3.5 h-3.5 text-[#1C1E22]" />,
+      icon: <HugeiconsIcon icon={Mail01Icon} size={14} className="text-[#1C1E22]" />,
       label: 'Email',
     },
     {
       key: 'website',
       url: socials.website,
-      icon: <Globe className="w-3.5 h-3.5 text-[#1C1E22]" />,
+      icon: <HugeiconsIcon icon={GlobeIcon} size={14} className="text-[#1C1E22]" />,
       label: 'Website',
     },
   ];

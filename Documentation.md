@@ -1,126 +1,122 @@
-# 📚 LinkCards — Complete User & Developer Documentation
+# 📚 LinkLyra — Complete User & Developer Documentation
 
-> **What is this document?**  
-> The ultimate handbook for **LinkCards**. It teaches everyday creators how to set up their page and capture business leads, while also providing developers with all technical instructions, code architecture, and database details in plain, easy-to-read language.
-
----
-
-## 📖 Plain Language Summary of Key Jargon
-
-- **Authentication (Auth)**: The secure system that verifies who you are when logging in (via Google or password).
-- **CRUD**: The four basic actions you can do with data: **C**reate, **R**ead, **U**pdate, and **D**elete cards.
-- **Client-Side**: Everything that runs directly inside your web browser on your phone or laptop.
-- **Database / Firestore**: The secure Google Cloud storage room where your profiles and link cards are saved.
-- **URL Parameter / Slug**: The unique username part of a link (e.g., the `@alex` in `linkcards.app/@alex`).
+> **Document Version**: 3.0.0  
+> **Status**: Production Reference Manual  
+> **Target Audience**: Creators, Business Owners, Agencies & Software Engineers  
+> **Last Updated**: September 2026
 
 ---
 
-## 🚀 Part 1: Step-by-Step Guide for Creators & Businesses
+## 📖 Executive Summary & Plain Language Jargon Guide
 
-### Step 1: Create or Sign In to Your Account
-1. Open the LinkCards application.
-2. Click **Sign In** or **Get Started Free**.
-3. Choose **Continue with Google** for 1-click instant login, or enter your name, desired username, email, and password.
-
----
-
-### Step 2: Set Up Your Profile & WhatsApp Number
-1. In the Studio workspace, click the **Profile** tab on the left sidebar.
-2. Enter your **Display Name**, **Bio / City**, and upload your **Profile Photo**.
-3. In the **WhatsApp Lead Routing Engine** box:
-   - Enter your business WhatsApp phone number (e.g. `+91 98765 43210` or `9876543210`).
-   - *Why this is important*: When prospective clients click your Real Estate or Coaching cards, they will be instantly routed to chat with you on WhatsApp with a pre-filled inquiry.
+- **LinkLyra Studio**: The creator workspace where you build, customize, and preview your interactive link showroom in real-time.
+- **"Hire Me" & Vertical Engines**: Conversion modes turning basic links into sales & lead machines for Content Creators, Real Estate Agents, and Coaches.
+- **Account & Settings Hub**: The command center for editing creator identity, updating security credentials, setting notification preferences, and exporting data archives.
+- **Billing Dashboard**: Dedicated financial hub managing Razorpay subscriptions, plan tiers (`Free`, `Pro`, `Business`), live GST tax invoices, and PDF receipts.
+- **WhatsApp Lead Routing**: Automatically directing visitors from specific cards and inquiry modals to pre-filled WhatsApp Business chats.
+- **Firestore Database**: Google Cloud's real-time, secure NoSQL database that safely persists profiles, cards, leads, and billing records.
 
 ---
 
-### Step 3: Add & Customize Your Link Cards
-1. Click **+ Add New Card** in the top left.
-2. Choose your **Card Template**:
-   - 🌐 **Standard Link**: For websites, social channels, YouTube videos, or articles.
-   - 🏢 **Real Estate Template**: Includes dedicated fields for Property Name, Location, Price (e.g. ₹75L - 1.2Cr), and Property Type (e.g. 3 BHK Villa).
-   - 🎓 **Coaching Institute Template**: Includes fields for Course Name, Exam Track (e.g. JEE / NEET), Batch Timing, and Fee Structure.
-3. Choose your favorite **Color Palette** (Purple, Coral, Amber, Sage, or Obsidian).
-4. (Optional) Toggle **Feature / Expand Card** to give it prominent visual emphasis with a large photo and direct action button.
-5. Click **Save Card**.
+## 🚀 Part 1: Creator & Business Owner User Guide
+
+### 1. Account Setup & Studio Tour
+1. **Launch the Application**: Click **Sign In** or **Get Started Free** on the homepage.
+2. **Authentication Options**:
+   - **Google One-Click Sign-In**: Instant setup using your Google Account.
+   - **Email & Password**: Enter your email, desired username handle (e.g. `@alex`), and a secure password.
+3. **Studio Navigation**:
+   - **Top Navigation**: Switch between **Links**, **Profile**, **Theme**, **Stats**, and **Share**.
+   - **Bottom Profile Bar**: Displays avatar, plan tier (`Free` / `Pro`), `@username`, and 1-click **Billing** and **Settings** buttons.
+   - **Interactive Live Stage**: A simulated mobile device rendering your showroom with real-time updates.
 
 ---
 
-### Step 4: Share Your Public Page
-1. Click **Share** at the top right of the screen.
-2. Copy your public link (e.g., `linkcards.app/@yourname`).
-3. Paste this link into your Instagram Bio, WhatsApp Business status, LinkedIn profile, or email signature.
-4. Watch your **Click Analytics** increase in real-time as visitors engage with your cards!
+### 2. Specialized Vertical Cards & Lead Engines
+
+#### A. For Content Creators ("Hire Me" Engine)
+1. **Creator Stats**: Highlight your community size (e.g. `82K Instagram`), engagement rate (`4.8%`), and monthly reach (`1.2M`).
+2. **Collaboration Packages**: Add rate cards for `UGC Video (₹8,000)`, `Instagram Reel (₹15,000)`, and `Reel + Story (₹20,000)`.
+3. **Featured Video Reels**: Showcase visual portfolio work with thumbnail previews and view counters.
+4. **Brand Inquiry Modal**: Allows brand managers to submit campaign details, budget bracket, and timeline directly to your inbox and WhatsApp.
+5. **Interactive Media Kit**: Let brands preview or download your verified media kit and audience demographics.
+6. **Affiliate Recommendations**: Highlight products with affiliate discount coupons and direct buy links.
+
+#### B. For Real Estate Agents
+1. **Property Showcase Cards**: Display property photos, BHK configuration, location pill, and pricing tag.
+2. **Schedule a Showing**: In-app modal enabling prospective buyers to choose a date, time slot, and pre-approval status.
+3. **Free Home Valuation**: Modal capturing property address, square footage, and condition for homeowners seeking to sell.
+4. **Client Reviews & Sold Badges**: Verified testimonials reinforcing local credibility.
+
+#### C. For Coaches & Educators
+1. **Batch Schedules**: Display course title, target exam track (JEE/NEET/UPSC), timings, and fee breakdown.
+2. **1-Tap Admission Chat**: Pre-populated WhatsApp message citing exact batch and course details.
 
 ---
 
-## 💻 Part 2: Developer Architecture & Tech Stack
-
-LinkCards is engineered as a modern, full-stack Single Page Application (SPA) with cloud database persistence.
-
-### Core Technology Stack
-- **Frontend Framework**: React 18 with TypeScript & Vite.
-- **Styling**: Tailwind CSS with custom glassmorphic and tactile elevation utility tokens.
-- **Icons**: `lucide-react` vector glyphs.
-- **Authentication & Database**: Google Firebase Authentication & Google Cloud Firestore.
-- **File & Asset Storage**: Firebase Cloud Storage with resilient base64 fallback.
+### 3. Managing Plans, Invoices & Razorpay Billing
+1. Click **Billing** in the bottom sidebar or open the **Billing Hub**.
+2. **Upgrade to Pro**:
+   - Select **Upgrade to Pro** to unlock custom domains, white-label branding removal, AI bio generation, and priority lead routing.
+   - Complete payment securely via the Razorpay modal.
+3. **View & Print Tax Invoices**:
+   - All past subscription payments appear in the **Invoice History** table.
+   - Click the **Receipt** button next to any transaction to open the interactive invoice viewer.
+   - Click **Print / Save PDF** to generate an official receipt for your accounting or tax filing.
+4. **Custom Razorpay Gateway**:
+   - If you want to accept direct customer payments or client tips on your own merchant account, enter your **Razorpay Key ID** under the Gateway tab.
 
 ---
 
-### 📂 Directory & File Map
+### 4. Security, Custom Domains & Data Portability
+- **Password Updates & Resets**: Update your account password or trigger secure reset emails directly from **Settings** $\rightarrow$ **Security**.
+- **White-Label Custom Domain**: Connect your own domain (e.g. `bio.yourbrand.com`) by adding a standard `CNAME` DNS record pointing to `cname.linklyra.app`.
+- **Full Data Backup**: Click **Export JSON Archive** under **Settings** $\rightarrow$ **Data & Danger Zone** to download your complete profile, card listings, and settings in a single file.
+- **CSV Leads Export**: Download all customer inquiries and lead contacts formatted for Microsoft Excel or Google Sheets.
+
+---
+
+## 💻 Part 2: Developer Architecture & Technical Reference
+
+### Tech Stack Overview
+- **Runtime & Bundler**: React 18+ with TypeScript and Vite.
+- **Styling Architecture**: Tailwind CSS with CSS variables and custom elevation tokens.
+- **State Management**: React state with local storage hydration and optimistic cloud synchronization.
+- **Database & Auth**: Google Cloud Firestore & Firebase Authentication.
+- **Icons**: `lucide-react`.
+
+---
+
+### 📂 Modular Component Architecture
 
 ```
-/
-├── wireframe.md               # Visual wireframes & screen flow
-├── UI_KIT.md                  # Master design tokens, colors & typography
-├── PRD.md                     # Product requirements & business logic
-├── Design.md                  # Aesthetic philosophy & layout rules
-├── Documentation.md           # User & developer handbook (this file)
-│
-├── src/
-│   ├── App.tsx                # Main app router & studio layout controller
-│   ├── types.ts               # TypeScript data definitions
-│   ├── data.ts                # Initial configuration models
-│   │
-│   ├── components/
-│   │   ├── LandingPage.tsx    # High-converting marketing homepage
-│   │   ├── BuilderSidebar.tsx # Left control panel (Card list, profile editor)
-│   │   ├── CardEditorModal.tsx# Popup for creating & editing cards
-│   │   ├── LivePreview.tsx    # Interactive phone stage with real-time test
-│   │   ├── ProfileCard.tsx    # The core tactile card component
-│   │   ├── SocialIconsRow.tsx # Frosted glass social icon pills
-│   │   └── AuthModal.tsx      # Google & Email/Password login modal
-│   │
-│   ├── lib/
-│   │   ├── firebase.ts        # Production Firestore & Auth service layer
-│   │   ├── storage.ts         # Firebase storage photo upload engine
-│   │   ├── ui-kit.ts          # Central source of truth for design tokens
-│   │   └── whatsapp.ts        # WhatsApp lead routing & URL intent generator
-│   │
-│   └── app/
-│       └── [username]/
-│           └── page.tsx       # Fast public profile page for mobile visitors
-│
-├── firestore.rules            # Security rules ensuring user data privacy
-└── firebase-blueprint.json    # Firestore schema & indexing blueprint
+src/components/
+├── AccountSettings.tsx    # User Identity, Credentials, SEO, Preferences & Danger Zone
+├── BillingDashboard.tsx   # Dedicated Razorpay Billing, Invoices & PDF Receipts
+├── BuilderSidebar.tsx     # Studio Sidebar with tab navigation and action triggers
+├── CardEditorModal.tsx    # Vertical Card Creation & Customization Modal
+├── LivePreview.tsx        # Simulated interactive mobile showroom stage
+├── ProfileCard.tsx        # Dynamic tactile card dispatcher & render engine
+├── LandingPage.tsx        # Conversational marketing homepage
+├── AuthModal.tsx          # Google OAuth & Email authentication modal
+├── ProUpgradeModal.tsx    # Razorpay paywall & upgrade flow
+└── SocialIconsRow.tsx     # Frosted glass social link pills
 ```
 
 ---
 
-## 🔒 Part 3: Security & Data Privacy
+## 🚀 Build & Verification Commands
 
-- **Public Profiles**: Anyone can view a creator's public profile page (`/profiles/{userId}` and `/links/{linkId}`) without needing to log in.
-- **Owner-Only Editing**: Firestore security rules verify that `request.auth.uid == userId` before allowing any create, edit, or delete operations.
-- **Atomic Click Increment**: Visitors can increment the click count on cards atomically without having write access to change card titles, links, or colors.
+```bash
+# Install dependencies
+npm install
 
----
+# Start local development server on Port 3000
+npm run dev
 
-## ❓ Part 4: Frequently Asked Questions (FAQ)
+# Run TypeScript and ESLint validation
+npm run lint
 
-**Q1: What happens if a visitor clicks an inquiry card before I add my WhatsApp phone number?**  
-*A: The app displays a gentle, friendly notice asking the creator to enter their number in the Profile settings, and gracefully opens the standard website link so the visitor is never stranded.*
-
-**Q2: Can I reorder my cards?**  
-*A: Yes! Simply use the up/down controls or drag handle in the Studio sidebar to adjust the priority order of your cards instantly.*
-
-**Q3: Does LinkCards work on all mobile devices?**  
-*A: Yes. LinkCards is designed with a strict mobile-first architecture, ensuring buttery-smooth scrolling and responsive layouts across iOS Safari, Android Chrome, and in-app Instagram/TikTok browsers.*
+# Compile production bundle to /dist
+npm run build
+```

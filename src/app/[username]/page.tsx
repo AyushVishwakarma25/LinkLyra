@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { HugeIcon } from '../../components/HugeIcon';
 import {
-  Search,
-  SlidersHorizontal,
-  Share2,
-  Check,
-  Sparkles,
-  AlertCircle,
-  ArrowLeft,
-  X,
-  Link2,
-  MessageCircle,
-} from 'lucide-react';
+  Search01Icon,
+  PreferenceHorizontalIcon,
+  Share01Icon,
+  Tick01Icon,
+  AlertCircleIcon,
+  ArrowLeft01Icon,
+  Cancel01Icon,
+} from '@hugeicons/core-free-icons';
 import { profileService, DbProfile, DbLink, DbSection } from '../../lib/firebase';
 import { ProfileCard } from '../../components/ProfileCard';
 import { SocialIconsRow } from '../../components/SocialIconsRow';
@@ -73,7 +71,22 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const result = await profileService.getProfileByUsername(username);
+        const searchParams = new URLSearchParams(window.location.search);
+        const domainParam = searchParams.get('domain') || searchParams.get('d');
+        
+        let result = null;
+        if (domainParam) {
+          result = await profileService.getProfileByDomain(domainParam);
+        }
+        
+        if (!result) {
+          result = await profileService.getProfileByUsername(username);
+        }
+
+        if (!result && username.includes('.')) {
+          result = await profileService.getProfileByDomain(username);
+        }
+
         if (result && result.profile) {
           setProfile(result.profile);
           setLinks(result.links);
@@ -86,7 +99,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           setSections(secs);
         } else {
           // If no remote profile found, check if this is the current active local session
-          const saved = localStorage.getItem('linkcards_user_profile_v2');
+          const saved = localStorage.getItem('linklyra_user_profile_v2') || localStorage.getItem('linkcards_user_profile_v2');
           if (saved) {
             try {
               const localProfile = JSON.parse(saved);
@@ -236,10 +249,12 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   const activeLinks = links.filter((l) => l.is_active !== false);
 
   const filteredLinks = activeLinks.filter((link) => {
+    const q = (searchQuery || '').trim().toLowerCase();
     const matchesSearch =
-      link.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      link.subtitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      link.badge_text?.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (link.title || '').toLowerCase().includes(q) ||
+      (link.subtitle || '').toLowerCase().includes(q) ||
+      (link.badge_text || '').toLowerCase().includes(q);
     const matchesColor = colorFilter === 'all' || link.color === colorFilter;
     return matchesSearch && matchesColor;
   });
@@ -264,9 +279,9 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           <button
             type="button"
             onClick={onBackToEditor}
-            className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold flex items-center gap-1.5 transition-colors shrink-0"
+            className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <HugeIcon icon={ArrowLeft01Icon} size={14} className="w-3.5 h-3.5" />
             <span>Editor</span>
           </button>
         </div>
@@ -282,7 +297,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
         ) : error || !profile ? (
           <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-black/10 text-center space-y-4 shadow-sm my-auto">
             <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-              <AlertCircle className="w-6 h-6" />
+              <HugeIcon icon={AlertCircleIcon} size={24} className="w-6 h-6" />
             </div>
             <h2 className="text-lg font-bold text-[#1C1E22]">Profile Not Found</h2>
             <p className="text-xs text-[#737882]">
@@ -292,7 +307,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
               <button
                 type="button"
                 onClick={onBackToEditor}
-                className="px-5 py-2.5 rounded-full bg-[#1C1E22] text-white text-xs font-bold hover:bg-black transition-colors"
+                className="px-5 py-2.5 rounded-full bg-[#1C1E22] text-white text-xs font-bold hover:bg-black transition-colors cursor-pointer"
               >
                 Back to Studio Editor
               </button>
@@ -315,7 +330,11 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                 <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-white shadow-xs bg-white shrink-0">
                     <img
-                      src={profile.avatar_url}
+                      src={
+                        profile.avatar_url && profile.avatar_url.trim() !== ''
+                          ? profile.avatar_url
+                          : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+                      }
                       alt=""
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
@@ -350,13 +369,13 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                     type="button"
                     onClick={() => setShowSearch(!showSearch)}
                     aria-label="Search"
-                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-black/10 flex items-center justify-center transition-all shadow-2xs ${
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-black/10 flex items-center justify-center transition-all shadow-2xs cursor-pointer ${
                       showSearch
                         ? 'bg-[#1C1E22] text-white'
                         : 'bg-white text-[#1C1E22] hover:bg-black/5'
                     }`}
                   >
-                    <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+                    <HugeIcon icon={Search01Icon} size={15} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
 
                   {/* Color filters */}
@@ -368,13 +387,13 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                       setColorFilter(availableColors[nextIdx]);
                     }}
                     aria-label="Filter links"
-                    className={`h-8 sm:h-9 px-2.5 sm:px-3 rounded-full border border-black/10 flex items-center gap-1 text-xs font-semibold hover:bg-black/5 active:scale-95 transition-all shadow-2xs ${
+                    className={`h-8 sm:h-9 px-2.5 sm:px-3 rounded-full border border-black/10 flex items-center gap-1 text-xs font-semibold hover:bg-black/5 active:scale-95 transition-all shadow-2xs cursor-pointer ${
                       colorFilter !== 'all'
                         ? 'bg-[#1C1E22] text-white border-transparent'
                         : 'bg-white text-[#1C1E22]'
                     }`}
                   >
-                    <SlidersHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <HugeIcon icon={PreferenceHorizontalIcon} size={13} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     <span className="capitalize hidden sm:inline text-[11px]">
                       {colorFilter === 'all' ? 'Filter' : colorFilter}
                     </span>
@@ -386,12 +405,12 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                     onClick={handleShare}
                     aria-label="Share profile link"
                     title="Copy profile link"
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-black/10 flex items-center justify-center text-[#1C1E22] hover:bg-black/5 active:scale-95 transition-all shadow-2xs"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-black/10 flex items-center justify-center text-[#1C1E22] hover:bg-black/5 active:scale-95 transition-all shadow-2xs cursor-pointer"
                   >
                     {copied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <HugeIcon icon={Tick01Icon} size={14} className="w-3.5 h-3.5 text-emerald-600" />
                     ) : (
-                      <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+                      <HugeIcon icon={Share01Icon} size={14} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     )}
                   </button>
                 </div>
@@ -419,9 +438,9 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737882] hover:text-[#1C1E22]"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737882] hover:text-[#1C1E22] cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <HugeIcon icon={Cancel01Icon} size={14} className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
@@ -558,7 +577,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
               {/* Missing Phone Alert */}
               {missingPhoneAlert && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 animate-fadeIn">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <HugeIcon icon={AlertCircleIcon} size={16} className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold block">WhatsApp Contact Needed</span>
                     <span className="text-[11px] text-amber-800">
@@ -568,9 +587,9 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                   <button
                     type="button"
                     onClick={() => setMissingPhoneAlert(false)}
-                    className="p-1 text-amber-700 hover:text-amber-950 rounded-lg shrink-0"
+                    className="p-1 text-amber-700 hover:text-amber-950 rounded-lg shrink-0 cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <HugeIcon icon={Cancel01Icon} size={14} className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
@@ -579,8 +598,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
             {/* Footer */}
             <footer className="pt-6 pb-1 text-center space-y-2 shrink-0">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-black/10 text-[10px] sm:text-[11px] font-bold text-[#1C1E22] shadow-2xs max-w-full truncate">
-                <Sparkles className="w-3 h-3 text-[#5E4BF7] shrink-0" />
-                <span className="shrink-0">LinkCards</span>
+                <span className="shrink-0 font-extrabold text-[#5E4BF7]">LinkLyra</span>
                 <span className="text-[#737882] font-normal">•</span>
                 <span className="text-[#737882] font-medium truncate">@{profile.username}</span>
               </div>

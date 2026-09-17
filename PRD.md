@@ -1,124 +1,150 @@
-# 📄 LinkCards — Product Requirements Document (PRD)
+# 📄 LinkLyra — Product Requirements Document (PRD)
 
-> **What is this document?**  
-> The master guide that explains **why** LinkCards was created, **who** it is built for, **what** features it contains, and **how** it operates. Written in plain English so team members, stakeholders, and clients can easily understand the product.
+> **Document Version**: 3.0.0  
+> **Status**: Production Ready  
+> **Target Platform**: Responsive Web (Desktop Studio + Mobile Showroom)  
+> **Last Updated**: September 2026
 
 ---
 
-## 📖 Plain Language Summary of Key Jargon
+## 📖 Executive Summary & Plain Language Jargon Guide
 
-- **PRD (Product Requirements Document)**: A blueprint document describing what a software product does and how it should behave.
-- **Persona**: A realistic example profile of the typical person using the app (e.g. a realtor or coaching teacher).
-- **CTA (Call to Action)**: A prominent button that asks the user to take an immediate action (e.g., "Inquire on WhatsApp" or "Sign Up Free").
-- **Lead Capture**: The process of collecting contact inquiries from potential buyers or students.
-- **MVP (Minimum Viable Product)**: The core version of a product containing all essential features needed to deliver maximum value.
-- **Latency / Speed**: How quickly a page opens when someone clicks a link.
+- **PRD (Product Requirements Document)**: The master architectural blueprint specifying what the application does, who it serves, its functional requirements, database schema, and operational standards.
+- **Link-in-Bio Showroom**: An interactive, card-based mobile destination replacing flat text lists with tactile, high-converting multimedia cards.
+- **"Hire Me" & High-Intent Modes**: Specialized vertical layouts converting simple link pages into lead machines for Content Creators, Real Estate Agents, and Coaches.
+- **Account & Settings Hub**: A decoupled command center for public identity, security credentials, preferences, SEO/domains, and data exports.
+- **Billing Dashboard**: A dedicated financial center managing Razorpay subscriptions, GST-compliant tax invoices, PDF receipts, and custom merchant keys.
+- **Lead Capture & Routing Engine**: In-app inquiry modals (Brand Deals, Showing Requests, Home Valuations) with automatic Firestore logging and 1-tap WhatsApp dispatch.
 
 ---
 
 ## 🎯 1. Product Vision & Problem Statement
 
 ### The Problem
-Traditional "link-in-bio" tools (like Linktree or standard bio link apps) present a plain, lifeless vertical list of text buttons. 
-- **Low Engagement**: Flat text links don't show photos, prices, or key selling points.
-- **Lost Local Leads**: Local businesses (real estate brokers, tutors, coaching centers, consultants) lose 80%+ of prospective clients because users don't want to fill out long web forms.
-- **Zero Industry Context**: Generic buttons cannot display property configurations (e.g. 3 BHK, ₹75L) or coaching course schedules (e.g. JEE Batch, Morning).
+Traditional "link-in-bio" tools (Linktree, Beacons, Bio.fm) treat every creator identically with a plain vertical stack of rectangular text buttons:
+1. **Content Creators**: Don't just need link clicks—they need brand deals, sponsorships, and proof of work. Brand managers bounce when forced to search through 10 generic links instead of seeing niche stats, engagement rates, rate cards, and a direct inquiry form.
+2. **Real Estate Agents**: Listing links get lost among personal social buttons. Realtors need to generate qualified buyer showings and seller home valuation requests, with instant WhatsApp notifications and lead tracking.
+3. **Coaches & Educators**: Require structured course batch schedules, exam tracks (JEE, NEET, UPSC), and transparent fee breakdowns with frictionless 1-tap admissions inquiries.
+4. **Disjointed Settings & Billing**: Monolithic dashboards mix personal preferences with financial transactions, causing slow load times and confusing user flows.
 
-### The Solution: LinkCards
-**LinkCards** turns the bio link into an interactive, high-converting, card-based mobile showroom with instant 1-tap WhatsApp lead generation.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    OLD WAY vs. LINKCARDS                    │
-├──────────────────────────────┬──────────────────────────────┤
-│ ❌ Generic Bio Links         │  LinkCards                  │
-├──────────────────────────────┼──────────────────────────────┤
-│ • Flat, boring text buttons  │ • Tactile, vivid card blocks │
-│ • Long web forms with dropoff│ • Instant pre-filled WhatsApp│
-│ • No photos, badges, prices  │ • Badges, photos, price tags │
-│ • No industry-specific data  │ • Real Estate & Coaching kit │
-└──────────────────────────────┴──────────────────────────────┘
-```
+### The Solution: LinkLyra Vertical Engine
+**LinkLyra** transforms generic bio links into specialized conversion pages:
+- **Creators ("Hire Me" Engine)**: Live audience reach stats, video reel showcases, rate cards (UGC, Reels, Story), Media Kit PDF previews, and instant Brand Inquiry forms.
+- **Real Estate Engine**: Property cards with location and pricing tags, direct Showing Booking modal, and Seller Home Valuation forms.
+- **Coaching Engine**: Course cards with batch timings, fee structures, and WhatsApp direct enrollment.
+- **Decoupled Architecture**: Independent, optimized `<AccountSettings />` and `<BillingDashboard />` modules.
 
 ---
 
-## 👥 2. Target User Personas
+## 👥 2. Target User Personas & Use Cases
 
-| Persona | Who They Are | What They Need Most | How LinkCards Helps |
+| Persona | Role / Industry | Primary Goal | LinkLyra Specialized Feature |
 | :--- | :--- | :--- | :--- |
-| **🏢 Realtor Rajesh** | Independent real estate agent in metro cities | Show luxury villa listings with prices and get WhatsApp buyer chats | Real Estate card template with price bracket, location pill & 1-tap WhatsApp lead chat |
-| **🎓 Teacher Anjali** | Founder of a competitive coaching academy | Announce new batch timings and enroll students quickly | Coaching Institute template with exam tracks, fee structure, and direct enrollment chat |
-| **📸 Creator Maya** | YouTuber and Instagram content creator | Showcase video channels, affiliate products, and brand portfolio | High-energy cards with custom badges, video embeds, and social bar |
-| **💼 Freelancer Leo** | UI/UX Designer and consultant | Share portfolio case studies and book client consultations | Clean portfolio cards with live click counter to track engagement |
+| **📸 Creator Maya** | Influencer / UGC Creator (82K Instagram) | Secure brand sponsorships & paid UGC campaigns | **Creator Stats**, **Featured Video Reels**, **Collaboration Rate Packages**, and **Brand Inquiry Modal** |
+| **🏢 Realtor Rajesh** | Luxury Real Estate Broker | Capture qualified home buyer and seller leads | **Property Cards**, **Schedule Showing Modal**, and **Free Home Valuation Modal** |
+| **🎓 Coach Anjali** | Founder of Competitive Academy | Fill upcoming batch seats and answer admission queries | **Coaching Program Cards** with exam tracks, timings, fee badges, and 1-tap WhatsApp enrollment |
+| **💼 Consultant Leo** | Executive Design & Growth Consultant | Book paid discovery audits and white-label their bio page | **Pro Plan Custom Domain**, zero LinkLyra branding, and automated GST tax invoices |
 
 ---
 
-## 🚀 3. Core Feature Requirements
+## 🚀 3. Functional Requirements & Specifications
 
-### Feature 1: Tactile Card Builder
-- **Description**: Visual drag-and-drop builder enabling creators to create, reorder, edit, and style link cards.
-- **Color Palettes**: 5 high-contrast palettes (Electric Purple, Coral Orange, Warm Amber, Sage Mint, Obsidian Dark).
-- **Expandable / Featured Cards**: Ability to mark high-priority cards as "expanded" (larger photo, prominent description, and primary CTA button).
+### 3.1. Vertical Feature Set
 
-### Feature 2: Industry-Specific Business Templates
-- **Real Estate Template**:
-  - Property Name (e.g. *Prestige Palm Residences*)
-  - Location (e.g. *Whitefield, Bengaluru*)
-  - Price Bracket (e.g. *₹75L - 1.2Cr*)
-  - Property Type (e.g. *3 BHK Apartment / Villa*)
-- **Coaching Institute Template**:
-  - Course Name (e.g. *NEET Super 30 Intensive*)
-  - Exam Track (e.g. *Medical / JEE / UPSC*)
-  - Batch Timing (e.g. *Morning 7:00 AM - 10:00 AM*)
-  - Fee Structure (e.g. *₹15,000 / term*)
+#### A. Content Creators ("Hire Me" Engine)
+1. **Creator Stats Card**: Highlight verified metrics (Follower count, Engagement rate %, Monthly impressions/reach).
+2. **Featured Work Reels**: Interactive visual video/reel cards with play modal and metric badges.
+3. **Collaboration Packages**: Clear rate cards (UGC Video, Instagram Reel, Reel + Story combo, Dedicated Review) with instant booking CTA.
+4. **Brand Inquiry Modal**: Mini-form capturing Brand Name, Campaign Type, Budget Bracket (₹10K-₹50K+), Timeline, and Contact Email—saved to Firestore and routed to WhatsApp.
+5. **Interactive Media Kit**: Downloadable/viewable creator portfolio modal with audience demographics.
+6. **Affiliate Recommendations**: Product showcase cards with affiliate tag and discounted coupon badge.
 
-### Feature 3: Dynamic WhatsApp Lead Routing Engine
-- **Description**: Whenever a visitor clicks an industry card, LinkCards automatically constructs an intelligent WhatsApp chat link (`https://wa.me/...`).
-- **Pre-filled Message Format**:
-  > *"Hi, I am interested in [Card Title] ([Location / Price / Timing]). Please share more details."*
-- **Fail-safe Alert**: If a creator hasn't configured a WhatsApp phone number yet, the app alerts them cleanly without crashing or blocking standard web links.
+#### B. Real Estate Agents
+1. **Property Showcase Cards**: High-res property photo, BHK configuration, location tag, and pricing bracket.
+2. **Schedule a Showing Modal**: Captures buyer name, phone, preferred date, time slot, and pre-approval status.
+3. **Free Home Valuation Modal**: Captures property address, square footage, property type, and timeline for sellers.
+4. **Client Reviews & Sold Badges**: Verified testimonials reinforcing realtor authority.
 
-### Feature 4: Cloud Authentication & Multi-Account Support
-- **Google One-Click Sign-In**: Instant registration with Google accounts.
-- **Email & Password Authentication**: Complete sign-up, sign-in, and username reservation engine.
-- **Protected Data**: User cards and personal settings are strictly protected so only the account owner can edit them.
-
-### Feature 5: Public Sharing (`/[username]`) & Live Real-Time Analytics
-- **Public Profile URLs**: Shareable links like `linkcards.app/@alex` accessible by anyone without login.
-- **Atomic Click Counter**: Every card click increments an analytics counter in real-time.
-- **Live Search & Filter**: Visitors can search or filter cards by category or color tag on the public page.
+#### C. Coaching & Educators
+1. **Course / Batch Cards**: Course title, target exam track (JEE / NEET / SAT), batch timings, and fee structure.
+2. **1-Tap Admission Chat**: Pre-populated WhatsApp inquiry mentioning exact course and batch details.
 
 ---
 
-## 🗄️ 4. Data Storage & Structure (In Plain English)
+### 3.2. Decoupled Account & Billing Architecture
 
-The app stores data in three organized collections:
+1. **User Account Settings (`/src/components/AccountSettings.tsx`)**:
+   - **Profile & Identity**: Name, `@username`, Headline, avatar upload to Cloud Storage, Business Phone.
+   - **Security & Credentials**: Google OAuth badge, email verification, in-app password update, reset email.
+   - **Preferences**: Notification toggles (Leads, Analytics, Invoices), currency (`INR ₹`, `USD $`), timezone.
+   - **Privacy & SEO**: Googlebot indexing toggle, GDPR cookie banner, Pro white-label branding removal, custom domain setup.
+   - **Data Portability**: Full JSON account archive download, CSV leads export, and account deletion.
 
-1. **Profiles (`/profiles/{userId}`)**:
-   - `username`: Unique handle (e.g. `alex`).
-   - `full_name`: Creator's display name.
-   - `bio`: Short headline or location.
-   - `avatar_url`: Link to profile picture.
-   - `business_phone`: Phone number used for WhatsApp lead routing.
-   - `theme`: Chosen visual theme (`warm`, `cream`, `clay`, `dark`).
-
-2. **Usernames Registry (`/usernames/{username}`)**:
-   - Ensures no two users can claim the same profile URL.
-
-3. **Link Cards (`/links/{linkId}`)**:
-   - `profile_id`: ID of the owner.
-   - `title`: Main card text.
-   - `subtitle`: Secondary info.
-   - `link_url`: Target website or action.
-   - `color`: Card color identifier.
-   - `clicks`: Number of times visitors clicked this card.
-   - `template_type`: `standard`, `real_estate`, or `coaching_institute`.
-   - `real_estate` / `coaching`: Specialized metadata blocks.
+2. **Dedicated Billing Dashboard (`/src/components/BillingDashboard.tsx`)**:
+   - **Plan Management**: Active tier (`Free`, `Pro`, `Business`), renewal date, billing cycle.
+   - **Pro Paywall Modal**: Razorpay checkout integration with instant UPI, NetBanking, and Card support.
+   - **Invoices & Receipts**: Paginated history of tax invoices with status badges.
+   - **PDF Receipt Generator**: Full-page interactive receipt modal with 1-click **Print / Save as PDF**.
+   - **Custom Razorpay Gateway**: Creators can save their own Razorpay Key ID for collecting client tips and direct payments.
 
 ---
 
-## 🔒 5. Quality & Security Standards
+## 🗄️ 4. Data Architecture & Firestore Schema
 
-- **Mobile First**: 90%+ of visitors arrive via mobile phones; cards and buttons must feel responsive and effortless on touchscreens (minimum touch target size of 44px).
-- **Fast Load Times**: Pages must load under 1.5 seconds even on mobile 4G networks.
-- **Zero Data Loss**: Changes in the builder auto-sync to the cloud immediately with real-time feedback indicator.
+```
+firestore-root/
+│
+├── users/{userId}                          # Core auth & plan record
+│   ├── email: string
+│   ├── plan: 'free' | 'pro' | 'business'
+│   └── createdAt: timestamp
+│
+├── profiles/{userId}                       # Public creator profile
+│   ├── username: string
+│   ├── full_name: string
+│   ├── bio: string
+│   ├── avatar_url: string
+│   ├── business_phone: string
+│   ├── theme: string
+│   └── account_settings: map
+│
+├── pages/{userId}/links/{linkId}           # Modular vertical cards
+│   ├── title: string
+│   ├── url: string
+│   ├── linkType: CardTemplateType
+│   ├── realEstate: map                     # Property name, location, price, type
+│   ├── coaching: map                       # Course name, exam track, batch, fees
+│   ├── creatorStats: map                   # Followers, engagement, monthly reach
+│   ├── creatorPackages: array              # Rates, deliverables, pricing
+│   ├── brandInquiry: map                   # Minimum budget, deliverables
+│   ├── clickCount: number
+│   └── position: number
+│
+├── pages/{userId}/leads/{leadId}           # Captured visitor inquiries
+│   ├── leadType: 'brand' | 'showing' | 'valuation' | 'coaching'
+│   ├── contactName: string
+│   ├── email: string
+│   ├── phone: string
+│   ├── details: map
+│   └── createdAt: timestamp
+│
+├── subscriptions/{userId}                  # Razorpay plan subscription state
+│   ├── plan: 'free' | 'pro' | 'business'
+│   ├── status: 'active' | 'canceled'
+│   └── currentPeriodEnd: string
+│
+└── invoices/{userId}/items/{invId}         # Tax invoice receipts
+    ├── invoiceNumber: string
+    ├── amount: number
+    ├── status: 'paid'
+    └── paymentId: string
+```
+
+---
+
+## 🛡️ 5. Non-Functional Requirements & Security
+
+1. **Firestore Security Rules**: Strict RBAC ensuring creators can only write to their own profile, links, and leads.
+2. **WhatsApp Safe Routing**: Fallback notifications when no phone number is provided to prevent dead-click UX.
+3. **Performance**: Under 150KB initial JS bundle and sub-second page loads.
+4. **Accessibility (WCAG AA)**: Clear color contrast ratios and keyboard-navigable modals.

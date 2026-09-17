@@ -10,6 +10,8 @@
         "photoURL": { "type": "string" },
         "username": { "type": "string" },
         "plan": { "type": "string", "enum": ["free", "pro", "business"] },
+        "hasCompletedOnboarding": { "type": "boolean" },
+        "onboardingProfile": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -48,7 +50,7 @@
         "description": { "type": "string" },
         "icon": { "type": "string" },
         "thumbnailUrl": { "type": "string" },
-        "linkType": { "type": "string", "enum": ["url", "youtube", "instagram", "linkedin", "twitter", "tiktok", "spotify", "product", "email", "phone"] },
+        "linkType": { "type": "string", "enum": ["url", "youtube", "instagram", "linkedin", "twitter", "tiktok", "spotify", "product", "email", "phone", "real_estate", "showing_booking", "home_valuation", "open_house", "client_reviews", "work_with_me", "creator_stats", "featured_work", "creator_packages", "brand_inquiry", "media_kit", "recommendation", "coaching"] },
         "position": { "type": "number" },
         "isActive": { "type": "boolean" },
         "openInNewTab": { "type": "boolean" },
@@ -57,7 +59,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["title", "url", "position"]
+      "required": ["title", "position"]
     },
     "SocialLink": {
       "title": "SocialLink",
@@ -86,6 +88,26 @@
       },
       "required": ["title", "position"]
     },
+    "Lead": {
+      "title": "Lead",
+      "description": "Captured lead or booking under pages/{pageId}/leads/{leadId}",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["showing_request", "brand_inquiry", "home_valuation", "general_contact", "media_kit_download", "package_booking"] },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "companyOrBrand": { "type": "string" },
+        "campaignType": { "type": "string" },
+        "budgetOrPrice": { "type": "string" },
+        "timelineOrDate": { "type": "string" },
+        "details": { "type": "string" },
+        "propertyTitle": { "type": "string" },
+        "status": { "type": "string", "enum": ["new", "contacted", "qualified", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "name", "email"]
+    },
     "Theme": {
       "title": "Theme",
       "description": "Pre-built theme preset under themes/{themeId}",
@@ -113,7 +135,7 @@
       "description": "Analytics telemetry event under pages/{pageId}/analytics/{eventId}",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["page_view", "link_click"] },
+        "type": { "type": "string", "enum": ["page_view", "link_click", "property_view", "showing_request", "brand_inquiry", "home_valuation", "media_kit_download"] },
         "linkId": { "type": ["string", "null"] },
         "visitorId": { "type": "string" },
         "country": { "type": "string" },
@@ -123,6 +145,19 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["type"]
+    },
+    "Domain": {
+      "title": "Domain",
+      "description": "Custom domain mapping index document under domains/{domain}",
+      "type": "object",
+      "properties": {
+        "domain": { "type": "string" },
+        "userId": { "type": "string" },
+        "pageId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["domain", "userId", "pageId"]
     }
   },
   "firestore": {
@@ -133,6 +168,10 @@
     "/pages/{pageId}": {
       "schema": { "$ref": "#/entities/Page" },
       "description": "Public landing pages"
+    },
+    "/domains/{domain}": {
+      "schema": { "$ref": "#/entities/Domain" },
+      "description": "Global custom domain routing index"
     },
     "/pages/{pageId}/links/{linkId}": {
       "schema": { "$ref": "#/entities/Link" },
@@ -145,6 +184,10 @@
     "/pages/{pageId}/sections/{sectionId}": {
       "schema": { "$ref": "#/entities/Section" },
       "description": "Subcollection of category headers/sections for a page"
+    },
+    "/pages/{pageId}/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Subcollection of showing requests, brand inquiries and valuation leads"
     },
     "/themes/{themeId}": {
       "schema": { "$ref": "#/entities/Theme" },

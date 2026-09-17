@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { Search, SlidersHorizontal, Share2, Check, Sparkles, Smartphone, Monitor, AlertCircle, MessageCircle, X } from 'lucide-react';
+import { HugeIcon } from './HugeIcon';
+import {
+  Search01Icon,
+  FilterIcon,
+  Share01Icon,
+  Tick01Icon,
+  SmartPhone01Icon,
+  ComputerIcon,
+  AlertCircleIcon,
+  Cancel01Icon,
+} from '@hugeicons/core-free-icons';
+import { Button, ButtonGroup } from './ui';
 import { UserProfile, ProfileCardData } from '../types';
 import { ProfileCard } from './ProfileCard';
 import { SocialIconsRow } from './SocialIconsRow';
@@ -29,10 +40,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   const activeCards = profile.cards.filter((c) => c.isActive !== false);
 
   const filteredCards = activeCards.filter((card) => {
+    const q = (searchQuery || '').trim().toLowerCase();
     const matchesSearch =
-      card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      card.subtitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      card.badgeText?.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (card.title || '').toLowerCase().includes(q) ||
+      (card.subtitle || '').toLowerCase().includes(q) ||
+      (card.badgeText || '').toLowerCase().includes(q);
     const matchesColor = colorFilter === 'all' || card.color === colorFilter;
     return matchesSearch && matchesColor;
   });
@@ -78,49 +91,19 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   const bgClass = themeConfig.bgClass;
   const isDarkTheme = themeConfig.isDark;
 
-  return (
-    <div className="flex flex-col h-full w-full items-center justify-start p-2.5 sm:p-5 select-none overflow-y-auto">
-      {/* Device Viewport Selector Toggle */}
-      <div className="mb-3 sm:mb-4 flex items-center gap-1 bg-white/80 backdrop-blur-md p-1 rounded-2xl border border-black/10 shadow-2xs shrink-0">
-        <button
-          type="button"
-          onClick={() => setPreviewWidth('mobile')}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-            previewWidth === 'mobile'
-              ? 'bg-[#1C1E22] text-white shadow-xs'
-              : 'text-[#737882] hover:text-[#1C1E22]'
-          }`}
-        >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>Mobile (420px)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewWidth('full')}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-            previewWidth === 'full'
-              ? 'bg-[#1C1E22] text-white shadow-xs'
-              : 'text-[#737882] hover:text-[#1C1E22]'
-          }`}
-        >
-          <Monitor className="w-3.5 h-3.5" />
-          <span>Fluid Web</span>
-        </button>
-      </div>
-
-      {/* The Clean Preview Canvas */}
-      <div
-        className={`w-full max-w-full transition-all duration-300 ${
-          previewWidth === 'mobile' ? 'max-w-[420px]' : 'max-w-2xl'
-        } ${bgClass} rounded-[28px] sm:rounded-[32px] p-4 sm:p-7 shadow-md border border-black/10 flex flex-col justify-between min-h-[580px] overflow-hidden`}
-      >
-        <div className="space-y-4 max-w-full">
+  const canvasContent = (
+    <>
+      <div className="space-y-4 max-w-full">
           {/* Header Row: Avatar, Name, Handle, Quick Filter/Share */}
           <div className="flex items-center justify-between gap-2.5 min-w-0">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
               <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white shadow-xs bg-white shrink-0">
                 <img
-                  src={profile.avatarUrl}
+                  src={
+                    profile.avatarUrl && profile.avatarUrl.trim() !== ''
+                      ? profile.avatarUrl
+                      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+                  }
                   alt=""
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -148,56 +131,52 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              {/* Search Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowSearch(!showSearch)}
-                aria-label="Search links"
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-black/10 flex items-center justify-center transition-all shadow-2xs ${
-                  showSearch
-                    ? 'bg-[#1C1E22] text-white'
-                    : 'bg-white text-[#1C1E22] hover:bg-black/5'
-                }`}
-              >
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
-              </button>
+            {/* Quick Actions ButtonGroup */}
+            <div className="shrink-0">
+              <ButtonGroup variant="secondary" size="sm" className="bg-white rounded-lg border border-black/10 shadow-2xs">
+                {/* Search Toggle */}
+                <Button
+                  isIconOnly
+                  onClick={() => setShowSearch(!showSearch)}
+                  aria-label="Search links"
+                  isSelected={showSearch}
+                  title="Search links"
+                >
+                  <HugeIcon icon={Search01Icon} size={15} className="w-3.5 h-3.5 stroke-[2.2]" />
+                </Button>
 
-              {/* Color filter */}
-              <button
-                type="button"
-                onClick={() => {
-                  const nextIdx =
-                    (availableColors.indexOf(colorFilter) + 1) % availableColors.length;
-                  setColorFilter(availableColors[nextIdx]);
-                }}
-                className={`h-8 sm:h-9 px-2.5 sm:px-3 rounded-full border border-black/10 flex items-center gap-1 sm:gap-1.5 text-xs font-semibold hover:bg-black/5 active:scale-95 transition-all shadow-2xs ${
-                  colorFilter !== 'all'
-                    ? 'bg-[#1C1E22] text-white border-transparent'
-                    : 'bg-white text-[#1C1E22]'
-                }`}
-              >
-                <SlidersHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span className="capitalize hidden sm:inline text-[11px]">
-                  {colorFilter === 'all' ? 'Filter' : colorFilter}
-                </span>
-              </button>
+                {/* Color filter */}
+                <Button
+                  onClick={() => {
+                    const nextIdx =
+                      (availableColors.indexOf(colorFilter) + 1) % availableColors.length;
+                    setColorFilter(availableColors[nextIdx]);
+                  }}
+                  isSelected={colorFilter !== 'all'}
+                  title="Filter by color"
+                >
+                  <ButtonGroup.Separator />
+                  <HugeIcon icon={FilterIcon} size={14} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span className="capitalize hidden sm:inline text-[11px]">
+                    {colorFilter === 'all' ? 'Filter' : colorFilter}
+                  </span>
+                </Button>
 
-              {/* Share button */}
-              <button
-                type="button"
-                onClick={handleShare}
-                aria-label="Share profile"
-                title="Copy profile link"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-black/10 flex items-center justify-center text-[#1C1E22] hover:bg-black/5 active:scale-95 transition-all shadow-2xs"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                ) : (
-                  <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
-                )}
-              </button>
+                {/* Share button */}
+                <Button
+                  isIconOnly
+                  onClick={handleShare}
+                  aria-label="Share profile"
+                  title="Copy profile link"
+                >
+                  <ButtonGroup.Separator />
+                  {copied ? (
+                    <HugeIcon icon={Tick01Icon} size={14} className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <HugeIcon icon={Share01Icon} size={15} className="w-3.5 h-3.5 stroke-[2.2]" />
+                  )}
+                </Button>
+              </ButtonGroup>
             </div>
           </div>
 
@@ -245,7 +224,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                       setSearchQuery('');
                       setColorFilter('all');
                     }}
-                    className="mt-3 px-3 py-1 rounded-full bg-black/10 text-xs font-semibold text-[#1C1E22]"
+                    className="mt-3 px-3 py-1 rounded-full bg-black/10 text-xs font-semibold text-[#1C1E22] cursor-pointer"
                   >
                     Clear Filter
                   </button>
@@ -382,7 +361,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         {/* Missing Phone Feedback Toast / Banner */}
         {missingPhoneNotice && (
           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <HugeIcon icon={AlertCircleIcon} size={16} className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <span className="font-bold block">WhatsApp Phone Missing</span>
               <span className="text-[11px] text-amber-800">
@@ -392,9 +371,9 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
             <button
               type="button"
               onClick={() => setMissingPhoneNotice(false)}
-              className="p-1 text-amber-700 hover:text-amber-950 rounded-lg shrink-0"
+              className="p-1 text-amber-700 hover:text-amber-950 rounded-lg shrink-0 cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
+              <HugeIcon icon={Cancel01Icon} size={14} className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -402,8 +381,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         {/* Clean Footer */}
         <div className="pt-6 pb-1 text-center shrink-0">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-black/10 text-[10px] sm:text-[11px] font-bold text-[#1C1E22] shadow-2xs max-w-full truncate">
-            <Sparkles className="w-3 h-3 text-[#5E4BF7] shrink-0" />
-            <span className="shrink-0">LinkCards</span>
+            <span className="shrink-0">LinkLyra</span>
             <span className="text-[#737882] font-normal">•</span>
             <span className="text-[#737882] font-medium truncate">@{profile.username}</span>
           </div>
@@ -413,6 +391,41 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
             </div>
           )}
         </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col flex-1 h-full w-full items-center justify-start p-2.5 sm:p-5 overflow-y-auto overflow-x-hidden">
+      {/* Device Viewport Selector ButtonGroup */}
+      <div className="mb-3 sm:mb-4 shrink-0 z-10 sticky top-0">
+        <ButtonGroup variant="secondary" size="sm" className="bg-white/95 backdrop-blur-md p-0.5 rounded-xl border border-black/10 shadow-sm">
+          <Button
+            onClick={() => setPreviewWidth('mobile')}
+            isSelected={previewWidth === 'mobile'}
+            className="rounded-lg text-xs"
+          >
+            <HugeIcon icon={SmartPhone01Icon} size={14} className="w-3.5 h-3.5" />
+            <span>Mobile (420px)</span>
+          </Button>
+          <Button
+            onClick={() => setPreviewWidth('full')}
+            isSelected={previewWidth === 'full'}
+            className="rounded-lg text-xs"
+          >
+            <ButtonGroup.Separator />
+            <HugeIcon icon={ComputerIcon} size={14} className="w-3.5 h-3.5" />
+            <span>Fluid Web</span>
+          </Button>
+        </ButtonGroup>
+      </div>
+
+      {/* The Clean Preview Canvas (Device shell removed, fully scrollable) */}
+      <div
+        className={`w-full transition-all duration-300 ${
+          previewWidth === 'mobile' ? 'max-w-[420px]' : 'max-w-2xl'
+        } ${bgClass} rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-sm border border-black/10 flex flex-col justify-between my-2 overflow-visible`}
+      >
+        {canvasContent}
       </div>
     </div>
   );

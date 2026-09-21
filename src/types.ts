@@ -586,6 +586,12 @@ export interface PaymentInvoiceRecord {
   paidAt: string;
   receiptUrl?: string;
   notes?: string;
+  seller?: {
+    legalName?: string;
+    address?: string;
+    gstin?: string;
+    taxRatePercent?: number;
+  };
 }
 
 export interface CreditTransactionRecord {

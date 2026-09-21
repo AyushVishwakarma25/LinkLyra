@@ -10,10 +10,9 @@ import {
   CheckmarkCircle01Icon,
   Building01Icon,
 } from '@hugeicons/core-free-icons';
-import { UserProfile, SubscriptionPlanType, BillingCycle, SubscriptionRecord, PaymentInvoiceRecord } from '../types';
+import { UserProfile, SubscriptionPlanType, BillingCycle, PaymentInvoiceRecord } from '../types';
 import { Button, ButtonGroup } from './ui';
 import { PLANS_CONFIG, initiateRazorpaySubscriptionCheckout } from '../lib/razorpay';
-import { profileService } from '../lib/firebase';
 import { User } from 'firebase/auth';
 
 export interface ProUpgradeModalProps {
@@ -72,18 +71,14 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
         userName: profile.name || currentUser?.displayName || 'Creator',
         userEmail: currentUser?.email || 'creator@linklyra.com',
         userPhone: profile.businessPhone || '',
-        onSuccess: async (paymentData) => {
+        onSuccess: (paymentData) => {
           const now = new Date();
           const startDate = now.toISOString();
-          const periodEnd = new Date(
-            now.getTime() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000
-          ).toISOString();
-          const invoiceNum = `INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
           const invoice: PaymentInvoiceRecord = {
-            id: `inv_${Date.now()}`,
+            id: paymentData.razorpay_payment_id,
             userId: currentUser?.uid || profile.id || 'anonymous_user',
-            invoiceNumber: invoiceNum,
+            invoiceNumber: paymentData.invoiceNumber || `INV-${now.getFullYear()}`,
             planName: currentPlanConfig.name,
             billingCycle,
             amount: paymentData.amountPaid,
@@ -93,29 +88,8 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
             razorpayOrderId: paymentData.razorpay_order_id,
             paymentMethod: 'Razorpay (Cards / UPI / NetBanking)',
             paidAt: startDate,
-            receiptUrl: `https://linklyra.com/receipts/${invoiceNum}`,
-            notes: `Activated ${currentPlanConfig.name} with full unlimited access`,
+            notes: `Activated ${currentPlanConfig.name}`,
           };
-
-          const subscription: Partial<SubscriptionRecord> = {
-            userId: currentUser?.uid || profile.id || 'anonymous_user',
-            plan: selectedPlan,
-            status: 'active',
-            billingCycle,
-            amount: paymentData.amountPaid,
-            currency: paymentData.currency,
-            startDate,
-            currentPeriodStart: startDate,
-            currentPeriodEnd: periodEnd,
-            cancelAtPeriodEnd: false,
-            razorpayPaymentId: paymentData.razorpay_payment_id,
-            razorpayOrderId: paymentData.razorpay_order_id,
-          };
-
-          if (currentUser?.uid) {
-            await profileService.saveUserSubscription(currentUser.uid, subscription);
-            await profileService.recordPaymentInvoice(currentUser.uid, invoice);
-          }
 
           setIsProcessing(false);
           setSuccessReceipt(invoice);

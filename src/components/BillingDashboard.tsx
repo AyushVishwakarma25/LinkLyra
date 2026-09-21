@@ -25,7 +25,8 @@ import {
   PaymentInvoiceRecord,
   SubscriptionPlanType,
 } from '../types';
-import { profileService, isAgencyUserEmail } from '../lib/firebase';
+import { profileService } from '../lib/firebase';
+import { usePlan } from '../hooks/usePlan';
 import { PLANS_CONFIG } from '../lib/razorpay';
 import { User } from 'firebase/auth';
 import { Button, ButtonGroup } from './ui';
@@ -112,13 +113,12 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
     }
   };
 
-  const userEmail = currentUser?.email || profile.email || '';
-  const isAgency = isAgencyUserEmail(userEmail) || profile.plan === 'agency' || profile.role === 'agency';
-  const currentPlan: SubscriptionPlanType = isAgency
+  const { plan: userPlan, isAgency: isAgencyHook, isPro: isProHook } = usePlan();
+  const currentPlan: SubscriptionPlanType = isAgencyHook
     ? 'agency'
-    : ((subscription?.plan || profile.plan || 'free') as SubscriptionPlanType);
+    : ((subscription?.plan || userPlan || profile.plan || 'free') as SubscriptionPlanType);
   const planInfo = PLANS_CONFIG[currentPlan] || PLANS_CONFIG.free;
-  const isPro = isAgency || currentPlan === 'pro' || currentPlan === 'business';
+  const isPro = isProHook || isAgencyHook || currentPlan === 'pro' || currentPlan === 'business';
 
   const formatDate = (isoStr?: string) => {
     if (!isoStr) return 'N/A';
@@ -550,6 +550,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                 <span className="text-[#737882]">Payment Status</span>
                 <span className="font-extrabold text-emerald-600">Captured & Confirmed</span>
               </div>
+              {selectedInvoiceModal.seller?.legalName && (
+                <div className="pt-2 border-t border-black/5 text-[10px] text-[#737882] space-y-0.5">
+                  <div className="font-semibold text-[#1C1E22]">{selectedInvoiceModal.seller.legalName}</div>
+                  {selectedInvoiceModal.seller.gstin && <div>GSTIN: {selectedInvoiceModal.seller.gstin}</div>}
+                  {selectedInvoiceModal.seller.address && <div>{selectedInvoiceModal.seller.address}</div>}
+                </div>
+              )}
             </div>
 
             <div className="pt-3 border-t border-black/10">

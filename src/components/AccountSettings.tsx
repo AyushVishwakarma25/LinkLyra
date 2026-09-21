@@ -39,7 +39,8 @@ import {
   SubscriptionPlanType,
 } from '../types';
 import { User } from 'firebase/auth';
-import { profileService, auth, isAgencyUserEmail } from '../lib/firebase';
+import { profileService, auth } from '../lib/firebase';
+import { usePlan } from '../hooks/usePlan';
 import { uploadImageToStorage } from '../lib/storage';
 import { PLANS_CONFIG } from '../lib/razorpay';
 import { BillingDashboard } from './BillingDashboard';
@@ -401,10 +402,10 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   };
 
   const userEmail = currentUser?.email || profile.email || 'user@example.com';
-  const isAgency = isAgencyUserEmail(userEmail) || profile.plan === 'agency' || profile.role === 'agency';
-  const currentPlan = isAgency ? 'agency' : (profile.plan || 'free');
+  const { plan: userPlan, isAgency, isPro: isProHook } = usePlan();
+  const currentPlan = isAgency ? 'agency' : (userPlan || profile.plan || 'free');
   const planInfo = PLANS_CONFIG[currentPlan as SubscriptionPlanType] || PLANS_CONFIG.free;
-  const isPro = isAgency || currentPlan === 'pro' || currentPlan === 'business';
+  const isPro = isProHook || isAgency || currentPlan === 'pro' || currentPlan === 'business';
   const isGoogleUser = currentUser?.providerData?.some((p) => p.providerId === 'google.com');
 
   const formatDate = (isoStr?: string) => {

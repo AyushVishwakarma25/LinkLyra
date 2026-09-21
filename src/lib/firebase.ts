@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -160,6 +161,7 @@ function createFirestoreInstance() {
 
 export const db = createFirestoreInstance();
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
@@ -279,16 +281,7 @@ export interface FirestoreAnalyticsEvent {
   timestamp: any;
 }
 
-// Agency & VIP Whitelisted Account Emails
-export const AGENCY_WHITELIST_EMAILS = [
-  'reachtoayush25@gmail.com',
-  'sharma25ayush@gmail.com',
-];
 
-export function isAgencyUserEmail(email?: string | null): boolean {
-  if (!email) return false;
-  return AGENCY_WHITELIST_EMAILS.includes(email.toLowerCase().trim());
-}
 
 // Backward Compatibility Aliases for UI components
 export interface DbProfile {
@@ -755,8 +748,8 @@ export const profileService = {
       }
       const profileData = profileSnap.exists() ? (profileSnap.data() as DbProfile) : null;
 
-      const userEmail = auth.currentUser?.email || (userData?.email as string) || '';
-      const isAgency = isAgencyUserEmail(userEmail) || profileData?.plan === 'agency' || profileData?.role === 'agency';
+      const effectivePlan = (userData?.plan || profileData?.plan || 'free') as 'free' | 'pro' | 'business' | 'agency';
+      const isAgency = effectivePlan === 'agency';
 
       if (pageSnap.exists()) {
         const pageData = pageSnap.data() as FirestorePage;
@@ -780,7 +773,7 @@ export const profileService = {
           button_color: (pageData as any).buttonColor || profileData?.button_color,
           stickers: (pageData as any).stickers || profileData?.stickers || [],
           footer_settings: (pageData as any).footerSettings || profileData?.footer_settings,
-          plan: isAgency ? 'agency' : (profileData?.plan || 'free'),
+          plan: effectivePlan,
           role: isAgency ? 'agency' : (profileData?.role || 'creator'),
           has_completed_onboarding: profileData?.has_completed_onboarding ?? profileData?.onboarding_profile?.onboardingCompleted ?? false,
           onboarding_profile: profileData?.onboarding_profile || (pageSnap.data() as any)?.onboarding_profile || undefined,
@@ -794,7 +787,7 @@ export const profileService = {
       if (profileData) {
         return {
           ...profileData,
-          plan: isAgency ? 'agency' : (profileData.plan || 'free'),
+          plan: effectivePlan,
           role: isAgency ? 'agency' : (profileData.role || 'creator'),
           custom_domain: profileData.custom_domain || '',
         };
@@ -1730,18 +1723,30 @@ export const profileService = {
     }
   },
 
-  // Cancel subscription
-  async cancelSubscription(userId: string): Promise<boolean> {
+  // Cancel subscription (server-side callable)
+  async cancelSubscription(_userId?: string): Promise<boolean> {
     try {
-      const now = new Date().toISOString();
-      await updateDoc(doc(db, 'users', userId, 'subscriptions', 'current'), {
-        cancelAtPeriodEnd: true,
-        canceledAt: now,
-      });
+      const cancelFn = httpsCallable(functions, 'cancelSubscription');
+      await cancelFn();
       return true;
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/subscriptions/current`);
+      console.error('Error cancelling subscription via Cloud Functions:', err);
       return false;
+    }
+  },
+
+  // Consume credits (server-side callable)
+  async consumeCredits(amount: number, reason: string): Promise<{ success: boolean; creditsRemaining: number }> {
+    try {
+      const consumeFn = httpsCallable<{ amount: number; reason: string }, { success: boolean; creditsRemaining: number }>(
+        functions,
+        'consumeCredits'
+      );
+      const res = await consumeFn({ amount, reason });
+      return res.data;
+    } catch (err: any) {
+      console.error('Error consuming credits via Cloud Functions:', err);
+      throw new Error(err.message || 'Failed to consume credits.');
     }
   },
 };

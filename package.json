@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
     "lint": "tsc --noEmit",
-    "test:rules": "vitest run tests/rules.test.ts"
+    "grant-plan": "node scripts/grant-plan.js",
+    "test:rules": "vitest run tests/rules.test.ts",
+    "test:billing": "vitest run tests/billing.test.ts"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "4.3.3",

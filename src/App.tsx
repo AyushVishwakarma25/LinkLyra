@@ -25,7 +25,8 @@ import { PublicProfilePage } from './app/[username]/page';
 import { AccountSettings, AccountSubTab } from './components/AccountSettings';
 import { OnboardingModal } from './components/OnboardingModal';
 import { Button, ButtonGroup, SegmentedControl } from './components/ui';
-import { profileService, DbProfile, isAgencyUserEmail } from './lib/firebase';
+import { profileService, DbProfile } from './lib/firebase';
+import { usePlan } from './hooks/usePlan';
 import { checkUserOnboardingEligibility } from './lib/onboardingService';
 import { User } from 'firebase/auth';
 
@@ -51,7 +52,7 @@ function createFreshUserProfile(user: User, claimedHandle?: string | null): User
     socials: {},
     sections: [],
     cards: [], // Fresh account: zero cards, strictly isolated from previous accounts
-    plan: isAgencyUserEmail(user.email) ? 'agency' : 'free',
+    plan: 'free',
   };
 }
 
@@ -139,6 +140,14 @@ export default function App() {
     return DEFAULT_STARTER_PROFILE;
   });
 
+  const { plan: hookPlan } = usePlan();
+
+  useEffect(() => {
+    if (hookPlan) {
+      setProfile((prev) => (prev.plan !== hookPlan ? { ...prev, plan: hookPlan } : prev));
+    }
+  }, [hookPlan]);
+
   // Card editor modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<ProfileCardData | null>(null);
@@ -152,21 +161,8 @@ export default function App() {
     setIsProModalOpen(true);
   };
 
-  const handleUpgradeToPro = async (plan: 'pro') => {
-    setProfile((prev) => ({
-      ...prev,
-      plan: 'pro',
-    }));
-
-    if (currentUser) {
-      try {
-        await profileService.updateProfile(currentUser.uid, {
-          plan: 'pro',
-        });
-      } catch (err) {
-        console.error('Error updating plan to pro in Firestore:', err);
-      }
-    }
+  const handleUpgradeToPro = (_plan?: any) => {
+    // Plan is granted and verified on the server; usePlan hook will automatically update state.
   };
 
   // Sync profile changes to user-scoped localStorage
@@ -194,7 +190,7 @@ export default function App() {
           const eligibility = await checkUserOnboardingEligibility(user.uid, dbProf, dbLinks?.length || 0);
 
           if (dbProf) {
-            const isAgency = isAgencyUserEmail(user.email) || dbProf.plan === 'agency' || dbProf.role === 'agency';
+            const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
             
             setProfile({
               id: dbProf.id,
@@ -664,7 +660,7 @@ export default function App() {
       const eligibility = await checkUserOnboardingEligibility(user.uid, dbProf, dbLinks?.length || 0);
 
       if (dbProf) {
-        const isAgency = isAgencyUserEmail(user.email) || dbProf.plan === 'agency' || dbProf.role === 'agency';
+        const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
         setProfile({
           id: dbProf.id,
           name: dbProf.full_name || 'My Page',

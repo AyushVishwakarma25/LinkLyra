@@ -1,11 +1,19 @@
 import * as crypto from 'crypto';
+import * as dns from 'dns';
 import * as admin from 'firebase-admin';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { defineSecret } from 'firebase-functions/params';
 import Razorpay from 'razorpay';
 import { SERVER_PLANS, SELLER_CONFIG } from './config';
-import { CreateOrderRequest, VerifyPaymentRequest, ConsumeCreditsRequest } from './types';
+import {
+  CreateOrderRequest,
+  VerifyPaymentRequest,
+  ConsumeCreditsRequest,
+  ClaimDomainRequest,
+  ReleaseDomainRequest,
+} from './types';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -14,6 +22,7 @@ const db = admin.firestore();
 const razorpayKeyId = defineSecret('RAZORPAY_KEY_ID');
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
 const razorpayWebhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
+const emailApiKey = defineSecret('EMAIL_API_KEY');
 
 function getRazorpayInstance(): Razorpay {
   return new Razorpay({
@@ -528,3 +537,530 @@ export const consumeCredits = onCall(async (request) => {
     creditsRemaining: updatedBalance,
   };
 });
+
+// -------------------------------------------------------------
+// 7. Callable: deleteAccount
+// -------------------------------------------------------------
+export const deleteAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be signed in to delete their account.');
+  }
+
+  const uid = request.auth.uid;
+
+  try {
+    // 1. Delete Firestore user-owned root documents and recursive subcollections
+    // users/{uid} (leads, subscriptions, invoices, credit_transactions, etc.)
+    await db.recursiveDelete(db.doc(`users/${uid}`));
+    // pages/{uid} (leads, analytics, links, sections, etc.)
+    await db.recursiveDelete(db.doc(`pages/${uid}`));
+    // profiles/{uid}
+    await db.recursiveDelete(db.doc(`profiles/${uid}`));
+
+    // 2. Delete claimed usernames
+    const usernamesSnap = await db.collection('usernames').where('uid', '==', uid).get();
+    for (const doc of usernamesSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // 3. Delete claimed custom domains
+    const domainsSnap = await db.collection('domains').where('uid', '==', uid).get();
+    for (const doc of domainsSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // 4. Delete Storage files
+    try {
+      const bucket = admin.storage().bucket();
+      await bucket.deleteFiles({ prefix: `users/${uid}/` });
+      await bucket.deleteFiles({ prefix: `pages/${uid}/` });
+    } catch (storageErr) {
+      console.warn(`Storage cleanup error for user ${uid}:`, storageErr);
+    }
+
+    // 5. Delete Firebase Auth user record
+    await admin.auth().deleteUser(uid);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error(`Account deletion failed for ${uid}:`, err);
+    throw new HttpsError('internal', err?.message || 'Failed to completely delete account.');
+  }
+});
+
+// -------------------------------------------------------------
+// 8. Callable: claimCustomDomain
+// -------------------------------------------------------------
+export const claimCustomDomain = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be signed in to claim a custom domain.');
+  }
+
+  const uid = request.auth.uid;
+  const { domain: rawDomain } = (request.data || {}) as ClaimDomainRequest;
+
+  if (!rawDomain || typeof rawDomain !== 'string') {
+    throw new HttpsError('invalid-argument', 'A valid domain name is required.');
+  }
+
+  // Normalize domain
+  const cleanDomain = rawDomain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '');
+
+  const DOMAIN_REGEX = /^(?!:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+  if (!DOMAIN_REGEX.test(cleanDomain)) {
+    throw new HttpsError('invalid-argument', 'Invalid domain name format.');
+  }
+
+  // Disallow platform domains
+  if (
+    cleanDomain === 'linklyra.com' ||
+    cleanDomain.endsWith('.linklyra.com') ||
+    cleanDomain === 'linklyra.app' ||
+    cleanDomain.endsWith('.linklyra.app') ||
+    cleanDomain.endsWith('.web.app') ||
+    cleanDomain.endsWith('.firebaseapp.com') ||
+    cleanDomain === 'localhost'
+  ) {
+    throw new HttpsError('invalid-argument', 'Platform domains cannot be claimed as custom domains.');
+  }
+
+  // 1. Verify user's subscription / plan
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.data() || {};
+  const plan = userData.plan || 'free';
+
+  if (plan !== 'pro' && plan !== 'business' && plan !== 'agency') {
+    throw new HttpsError('permission-denied', 'Custom domains are available on Pro, Business, or Agency plans.');
+  }
+
+  // 2. Verify DNS CNAME record
+  const cnameTarget = (process.env.CUSTOM_DOMAIN_CNAME_TARGET || 'cname.linklyra.app')
+    .toLowerCase()
+    .replace(/\.$/, '');
+
+  if (process.env.NODE_ENV !== 'test' && process.env.SKIP_DNS_CHECK !== 'true') {
+    try {
+      const records = await dns.promises.resolveCname(cleanDomain);
+      const isConfigured = records.some((r) => r.toLowerCase().replace(/\.$/, '') === cnameTarget);
+      if (!isConfigured) {
+        throw new HttpsError(
+          'failed-precondition',
+          `CNAME record for ${cleanDomain} does not point to ${cnameTarget}. Found: ${records.join(', ')}`
+        );
+      }
+    } catch (dnsErr: any) {
+      if (dnsErr instanceof HttpsError) throw dnsErr;
+      throw new HttpsError(
+        'failed-precondition',
+        `DNS CNAME verification failed. Please ensure a CNAME record pointing to ${cnameTarget} is set up.`
+      );
+    }
+  }
+
+  // 3. Check for collisions
+  const domainRef = db.doc(`domains/${cleanDomain}`);
+  const domainSnap = await domainRef.get();
+  if (domainSnap.exists) {
+    const existingData = domainSnap.data();
+    if (existingData?.uid && existingData.uid !== uid) {
+      throw new HttpsError('already-exists', 'This domain is already claimed by another account.');
+    }
+  }
+
+  // 4. Batch commit
+  const batch = db.batch();
+  batch.set(domainRef, {
+    domain: cleanDomain,
+    uid,
+    status: 'verified',
+    createdAt: domainSnap.exists ? domainSnap.data()?.createdAt || new Date().toISOString() : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  batch.set(db.doc(`pages/${uid}`), { customDomain: cleanDomain }, { merge: true });
+  batch.set(db.doc(`profiles/${uid}`), { custom_domain: cleanDomain }, { merge: true });
+
+  await batch.commit();
+
+  return { success: true, domain: cleanDomain };
+});
+
+// -------------------------------------------------------------
+// 9. Callable: releaseCustomDomain
+// -------------------------------------------------------------
+export const releaseCustomDomain = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be signed in to release a domain.');
+  }
+
+  const uid = request.auth.uid;
+  const { domain: rawDomain } = (request.data || {}) as ReleaseDomainRequest;
+
+  if (rawDomain && typeof rawDomain === 'string') {
+    const cleanDomain = rawDomain.trim().toLowerCase();
+    const domainRef = db.doc(`domains/${cleanDomain}`);
+    const domainSnap = await domainRef.get();
+
+    if (domainSnap.exists && domainSnap.data()?.uid === uid) {
+      await domainRef.delete();
+    }
+  } else {
+    // Release all domains owned by this user
+    const domainsSnap = await db.collection('domains').where('uid', '==', uid).get();
+    for (const d of domainsSnap.docs) {
+      await d.ref.delete();
+    }
+  }
+
+  // Remove customDomain field from page and profile
+  const batch = db.batch();
+  batch.set(
+    db.doc(`pages/${uid}`),
+    { customDomain: admin.firestore.FieldValue.delete() },
+    { merge: true }
+  );
+  batch.set(
+    db.doc(`profiles/${uid}`),
+    { custom_domain: admin.firestore.FieldValue.delete() },
+    { merge: true }
+  );
+  await batch.commit();
+
+  return { success: true };
+});
+
+// -------------------------------------------------------------
+// 10. Firestore Trigger: onLeadCreated
+// -------------------------------------------------------------
+interface EmailProvider {
+  sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<boolean>;
+}
+
+class RestEmailProvider implements EmailProvider {
+  constructor(private apiKey: string) {}
+
+  async sendEmail(params: { to: string; subject: string; html: string; text: string }): Promise<boolean> {
+    if (!this.apiKey) {
+      console.log('[EmailProvider] EMAIL_API_KEY unset; skipping email.');
+      return false;
+    }
+
+    try {
+      if (this.apiKey.startsWith('re_') || this.apiKey.startsWith('resend_')) {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'LinkLyra Inquiries <notifications@linklyra.com>',
+            to: [params.to],
+            subject: params.subject,
+            html: params.html,
+            text: params.text,
+          }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('[EmailProvider] Resend API error:', res.status, errText);
+          return false;
+        }
+        return true;
+      } else if (this.apiKey.startsWith('SG.')) {
+        const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: params.to }] }],
+            from: { email: 'notifications@linklyra.com', name: 'LinkLyra Inquiries' },
+            subject: params.subject,
+            content: [
+              { type: 'text/plain', value: params.text },
+              { type: 'text/html', value: params.html },
+            ],
+          }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('[EmailProvider] SendGrid API error:', res.status, errText);
+          return false;
+        }
+        return true;
+      } else {
+        console.log(`[EmailProvider] Generic API key configured; simulated email sent to ${params.to}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('[EmailProvider] Delivery exception:', err);
+      return false;
+    }
+  }
+}
+
+export const onLeadCreated = onDocumentCreated(
+  {
+    document: 'pages/{pageId}/leads/{leadId}',
+    secrets: [emailApiKey],
+  },
+  async (event) => {
+    const { pageId, leadId } = event.params;
+    const snap = event.data;
+    if (!snap) {
+      console.log(`[onLeadCreated] No data snapshot for lead ${leadId}`);
+      return;
+    }
+
+    const leadData = snap.data();
+    if (!leadData) return;
+
+    // 1. Resolve owner userId
+    let ownerUid = pageId;
+    const pageSnap = await db.doc(`pages/${pageId}`).get();
+    if (pageSnap.exists) {
+      const pageData = pageSnap.data();
+      if (pageData?.userId) {
+        ownerUid = pageData.userId;
+      }
+    }
+
+    // 2. Resolve owner user email and notification preferences
+    const userSnap = await db.doc(`users/${ownerUid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : null;
+
+    let ownerEmail = userData?.email;
+    if (!ownerEmail) {
+      try {
+        const authUser = await admin.auth().getUser(ownerUid);
+        ownerEmail = authUser.email;
+      } catch (e) {
+        console.warn(`[onLeadCreated] Could not fetch Auth user for uid ${ownerUid}:`, e);
+      }
+    }
+
+    if (!ownerEmail) {
+      console.log(`[onLeadCreated] No destination email for user ${ownerUid}; skipping email notification.`);
+      return;
+    }
+
+    // 3. Check notification settings
+    const accountSettings = userData?.accountSettings;
+    const emailNotifs = accountSettings?.emailNotifications || userData?.emailNotifications;
+    if (emailNotifs && emailNotifs.newLeads === false) {
+      console.log(`[onLeadCreated] User ${ownerUid} has disabled newLeads email notifications.`);
+      return;
+    }
+
+    // 4. Throttle bursts (30s window per user)
+    const throttleRef = db.doc(`users/${ownerUid}/private_meta/lead_email_throttle`);
+    const throttleSnap = await throttleRef.get();
+    const lastSentAtMs = throttleSnap.exists ? (throttleSnap.data()?.lastSentAtMs || 0) : 0;
+    const nowMs = Date.now();
+
+    if (nowMs - lastSentAtMs < 30000) {
+      console.log(`[onLeadCreated] Burst throttle active for user ${ownerUid} (${nowMs - lastSentAtMs}ms < 30000ms); skipping email.`);
+      return;
+    }
+
+    // Update throttle timestamp
+    await throttleRef.set({ lastSentAtMs: nowMs }, { merge: true });
+
+    // 5. Check EMAIL_API_KEY secret
+    let apiKey = '';
+    try {
+      apiKey = emailApiKey.value() || '';
+    } catch {
+      // secret unset
+    }
+
+    if (!apiKey) {
+      console.log(`[onLeadCreated] EMAIL_API_KEY secret is unset or empty; notification for lead ${leadId} logged but not emailed.`);
+      return;
+    }
+
+    // 6. Send email via provider
+    const provider = new RestEmailProvider(apiKey);
+    const leadTypeLabel = leadData.type ? String(leadData.type).replace(/_/g, ' ').toUpperCase() : 'NEW INQUIRY';
+    const subject = `[LinkLyra] New Lead: ${leadData.name || 'New Client'} (${leadTypeLabel})`;
+
+    const textContent = `
+New Inbound Inquiry on LinkLyra
+
+Name: ${leadData.name || 'N/A'}
+Email: ${leadData.email || 'N/A'}
+Phone: ${leadData.phone || 'N/A'}
+Company / Brand: ${leadData.companyOrBrand || 'N/A'}
+Type: ${leadTypeLabel}
+Budget / Price: ${leadData.budgetOrPrice || 'N/A'}
+Timeline / Date: ${leadData.timelineOrDate || 'N/A'}
+Package / Deliverable: ${leadData.selectedPackageName || leadData.campaignType || leadData.propertyTitle || 'N/A'}
+
+Details / Message:
+${leadData.details || 'No message provided.'}
+
+View and manage all your leads in your LinkLyra Studio CRM:
+https://linklyra.web.app
+    `.trim();
+
+    const htmlContent = `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1C1E22; background-color: #ffffff; border: 1px solid #e5e5e5; border-radius: 16px;">
+  <div style="border-bottom: 2px solid #5E4BF7; padding-bottom: 16px; margin-bottom: 20px;">
+    <span style="font-size: 11px; font-weight: 800; color: #5E4BF7; letter-spacing: 0.1em; text-transform: uppercase;">LINKLYRA INBOUND LEAD</span>
+    <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 700; color: #1C1E22;">New ${leadTypeLabel}</h2>
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882; width: 140px;">Contact Name:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1E22;">${leadData.name || 'N/A'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882;">Email Address:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600;"><a href="mailto:${leadData.email}" style="color: #5E4BF7; text-decoration: none;">${leadData.email || 'N/A'}</a></td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882;">Phone Number:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1E22;">${leadData.phone || 'N/A'}</td>
+    </tr>
+    ${leadData.companyOrBrand ? `
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882;">Company / Brand:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1E22;">${leadData.companyOrBrand}</td>
+    </tr>` : ''}
+    ${leadData.budgetOrPrice ? `
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882;">Budget / Value:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1E22;">${leadData.budgetOrPrice}</td>
+    </tr>` : ''}
+    ${leadData.timelineOrDate ? `
+    <tr>
+      <td style="padding: 8px 0; font-size: 13px; color: #737882;">Timeline / Date:</td>
+      <td style="padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1E22;">${leadData.timelineOrDate}</td>
+    </tr>` : ''}
+  </table>
+
+  ${leadData.details ? `
+  <div style="background-color: #FAF8F5; border: 1px solid #eaeaea; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+    <span style="font-size: 10px; font-weight: 700; color: #737882; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Inquiry Message & Brief</span>
+    <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #1C1E22; white-space: pre-wrap;">${leadData.details}</p>
+  </div>` : ''}
+
+  <div style="text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f0f0f0;">
+    <a href="https://linklyra.web.app" style="display: inline-block; background-color: #1C1E22; color: #ffffff; padding: 12px 24px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none;">Open Inquiries CRM</a>
+  </div>
+</div>
+    `.trim();
+
+    await provider.sendEmail({
+      to: ownerEmail,
+      subject,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    console.log(`[onLeadCreated] Successfully processed notification for lead ${leadId} to ${ownerEmail}`);
+  }
+);
+
+// -------------------------------------------------------------
+// 10. Firestore Trigger: aggregateAnalyticsEvent
+// Aggregates raw analytics events into daily summary documents
+// pages/{pageId}/stats/{yyyy-mm-dd}
+// -------------------------------------------------------------
+export const aggregateAnalyticsEvent = onDocumentCreated(
+  'pages/{pageId}/analytics/{eventId}',
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const data = snap.data();
+    if (!data) return;
+
+    const pageId = event.params.pageId;
+    if (!pageId) return;
+
+    // Determine YYYY-MM-DD from timestamp or fallback to current UTC date
+    let dateKey: string;
+    try {
+      const ts = data.timestamp
+        ? typeof data.timestamp.toDate === 'function'
+          ? data.timestamp.toDate()
+          : new Date(data.timestamp)
+        : new Date();
+      dateKey = ts.toISOString().split('T')[0];
+    } catch {
+      dateKey = new Date().toISOString().split('T')[0];
+    }
+
+    const statsRef = db.doc(`pages/${pageId}/stats/${dateKey}`);
+    const updates: Record<string, any> = {
+      date: dateKey,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const eventType = data.type;
+    if (eventType === 'page_view') {
+      updates.views = admin.firestore.FieldValue.increment(1);
+    } else if (eventType === 'link_click') {
+      updates.clicks = admin.firestore.FieldValue.increment(1);
+      if (data.linkId && typeof data.linkId === 'string') {
+        const cleanLinkId = data.linkId.replace(/[\.\/\[\]]/g, '_').slice(0, 100);
+        updates[`linkClicks.${cleanLinkId}`] = admin.firestore.FieldValue.increment(1);
+      }
+    } else if (eventType) {
+      // Conversion / lead event
+      updates.conversions = admin.firestore.FieldValue.increment(1);
+      const cleanType = String(eventType).replace(/[\.\/\[\]]/g, '_').slice(0, 50);
+      updates[`eventTypes.${cleanType}`] = admin.firestore.FieldValue.increment(1);
+    }
+
+    if (data.device && typeof data.device === 'string') {
+      const dev = ['mobile', 'desktop', 'tablet'].includes(data.device.toLowerCase())
+        ? data.device.toLowerCase()
+        : 'mobile';
+      updates[`devices.${dev}`] = admin.firestore.FieldValue.increment(1);
+    }
+
+    if (data.browser && typeof data.browser === 'string') {
+      const cleanBrowser = data.browser.replace(/[\.\/\[\]]/g, '_').slice(0, 40);
+      updates[`browsers.${cleanBrowser}`] = admin.firestore.FieldValue.increment(1);
+    }
+
+    if (data.referrer && typeof data.referrer === 'string') {
+      let ref = data.referrer;
+      try {
+        if (ref.startsWith('http')) {
+          ref = new URL(ref).hostname.replace(/^www\./, '');
+        }
+      } catch {}
+      const cleanRef = ref.replace(/[\.\/\[\]]/g, '_').slice(0, 60) || 'direct';
+      updates[`referrers.${cleanRef}`] = admin.firestore.FieldValue.increment(1);
+    }
+
+    if (data.country && typeof data.country === 'string') {
+      const cleanCountry = data.country.replace(/[\.\/\[\]]/g, '_').slice(0, 10);
+      updates[`countries.${cleanCountry}`] = admin.firestore.FieldValue.increment(1);
+    }
+
+    try {
+      await statsRef.set(updates, { merge: true });
+      console.log(`[aggregateAnalyticsEvent] Aggregated event ${event.params.eventId} for page ${pageId} on ${dateKey}`);
+    } catch (err) {
+      console.error(`[aggregateAnalyticsEvent] Error aggregating event for page ${pageId}:`, err);
+    }
+  }
+);
+
+

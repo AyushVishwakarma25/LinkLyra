@@ -47,7 +47,7 @@ export const PLANS_CONFIG: Record<SubscriptionPlanType, PlanPricingConfig> = {
       '100% White-Label (Remove all LinkLyra branding)',
       'Verified Gold/Blue badge on your profile header',
       'Unlimited theme customization & typography styling',
-      'Advanced Traffic Analytics (Referrers, Geolocation, Device)',
+      'Advanced Traffic Analytics (Referrers, Top Links, Device & Browser Breakdown)',
       'Priority 24/7 Creator Support via WhatsApp',
     ],
   },

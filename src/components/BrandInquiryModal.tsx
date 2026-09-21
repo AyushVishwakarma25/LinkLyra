@@ -23,6 +23,7 @@ export interface BrandInquiryModalProps {
   creatorPhone?: string;
   selectedPackage?: CollaborationPackageItem | null;
   cardData?: ProfileCardData | null;
+  isPreview?: boolean;
 }
 
 const CAMPAIGN_TYPES = [
@@ -59,6 +60,7 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   creatorPhone = '',
   selectedPackage = null,
   cardData = null,
+  isPreview = false,
 }) => {
   const [brandName, setBrandName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -72,21 +74,36 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   );
   const [timeline, setTimeline] = useState<string>('Within 1 - 2 Weeks');
   const [details, setDetails] = useState('');
+  const [hp, setHp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hp) return;
+
     if (!brandName.trim() || !email.trim() || !contactName.trim()) {
-      alert('Please fill in your Brand Name, Contact Name, and Work Email.');
+      setErrorMessage('Please fill in your Brand Name, Contact Name, and Work Email.');
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await profileService.submitLead(pageId || 'public_page', {
+      if (isPreview) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setSubmitted(true);
+        return;
+      }
+
+      if (!pageId) {
+        throw new Error('Creator page ID is missing. Please refresh and try again.');
+      }
+
+      await profileService.submitLead(pageId, {
         type: 'brand_inquiry',
         name: contactName.trim(),
         email: email.trim(),
@@ -100,10 +117,9 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
       });
 
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting brand inquiry:', err);
-      // Fallback display success anyway
-      setSubmitted(true);
+      setErrorMessage(err?.message || 'Failed to submit inquiry. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -121,11 +137,13 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
 
   const handleResetAndClose = () => {
     setSubmitted(false);
+    setErrorMessage(null);
     setBrandName('');
     setContactName('');
     setEmail('');
     setPhone('');
     setDetails('');
+    setHp('');
     onClose();
   };
 
@@ -203,6 +221,37 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isPreview && (
+                <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>Preview: submissions aren't saved</span>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+                  <span>{errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Honeypot field for bot protection */}
+              <input
+                type="text"
+                name="_hp"
+                value={hp}
+                onChange={(e) => setHp(e.target.value)}
+                style={{ display: 'none' }}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
+
               {/* Brand & Contact Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

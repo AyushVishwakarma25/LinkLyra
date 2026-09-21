@@ -17,9 +17,12 @@ import {
   PlusSignIcon,
   ColorsIcon,
   WhatsappIcon,
+  Cancel01Icon,
+  ViewIcon,
 } from '@hugeicons/core-free-icons';
 import { LeadRecord, LeadType, LeadStatus, UserProfile } from '../types';
 import { profileService } from '../lib/firebase';
+import { downloadLeadsCsv } from '../lib/csvExport';
 import { User } from 'firebase/auth';
 
 export interface LeadsDashboardProps {
@@ -69,17 +72,41 @@ const LEAD_TYPE_LABELS: Record<LeadType, { label: string; icon: any; colorClass:
     icon: Download01Icon,
     colorClass: 'bg-[#FAF8F5] text-[#1C1E22] border-black/10',
   },
+  showing: {
+    label: 'Property Showing',
+    icon: Building01Icon,
+    colorClass: 'bg-[#FAF8F5] text-[#1C1E22] border-black/10',
+  },
+  brand: {
+    label: 'Brand Partnership',
+    icon: Building01Icon,
+    colorClass: 'bg-[#FAF8F5] text-[#1C1E22] border-black/10',
+  },
+  valuation: {
+    label: 'Home Valuation',
+    icon: TrendingUpIcon,
+    colorClass: 'bg-[#FAF8F5] text-[#1C1E22] border-black/10',
+  },
+  coaching: {
+    label: 'Coaching Session',
+    icon: ColorsIcon,
+    colorClass: 'bg-[#FAF8F5] text-[#1C1E22] border-black/10',
+  },
 };
 
-const STATUS_BADGES: Record<LeadStatus, { label: string; badgeClass: string }> = {
+const STATUS_CONFIG: Record<LeadStatus, { label: string; badgeClass: string }> = {
   new: { label: 'New', badgeClass: 'bg-[#1C1E22] text-white border-[#1C1E22]' },
-  contacted: { label: 'Contacted', badgeClass: 'bg-stone-100 text-[#1C1E22] border-black/15' },
-  qualified: { label: 'Qualified', badgeClass: 'bg-stone-100 text-[#1C1E22] border-black/15' },
-  in_progress: { label: 'In Discussion', badgeClass: 'bg-stone-100 text-[#1C1E22] border-black/15' },
-  closed: { label: 'Closed / Won', badgeClass: 'bg-stone-100 text-[#1C1E22] border-black/15' },
-  booked: { label: 'Booked', badgeClass: 'bg-stone-100 text-[#1C1E22] border-black/15' },
-  archived: { label: 'Archived', badgeClass: 'bg-stone-50 text-[#737882] border-black/10' },
+  contacted: { label: 'Contacted', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
+  won: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  lost: { label: 'Lost', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
+  qualified: { label: 'Qualified', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
+  in_progress: { label: 'In Discussion', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  closed: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  booked: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  archived: { label: 'Lost', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
 };
+
+const PAGE_SIZE = 10;
 
 export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   profile,
@@ -90,13 +117,14 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [tempNotes, setTempNotes] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const pageId = currentUser?.uid || profile.username || 'public_page';
+  const pageId = profile.id || currentUser?.uid || profile.username || '';
   const localKey = `linklyra_leads_${pageId}`;
 
   const showToast = (msg: string) => {
@@ -106,9 +134,12 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
   // Fetch leads from Firestore + local cache
   const fetchLeads = async () => {
+    if (!pageId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      // 1. Check local backup cache first
       let localLeads: LeadRecord[] = [];
       try {
         const cached = localStorage.getItem(localKey);
@@ -117,18 +148,10 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         console.error('Error reading leads cache', e);
       }
 
-      // 2. Fetch from Firestore for this user/page
       const remoteLeads = await profileService.getLeads(pageId);
-      
-      // Also query fallback if user was previously anonymous
-      let publicLeads: any[] = [];
-      if (pageId !== 'public_page') {
-        publicLeads = await profileService.getLeads('public_page').catch(() => []);
-      }
 
-      // Merge and deduplicate
       const combinedMap = new Map<string, LeadRecord>();
-      [...localLeads, ...publicLeads, ...remoteLeads].forEach((item) => {
+      [...localLeads, ...remoteLeads].forEach((item) => {
         if (item && item.id) {
           combinedMap.set(item.id, item);
         }
@@ -155,32 +178,48 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
     fetchLeads();
   }, [pageId]);
 
+  // Reset pagination when search query or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter, statusFilter]);
+
   // Status update
   const handleUpdateStatus = async (leadId: string, newStatus: LeadStatus) => {
+    if (!pageId) return;
     setIsUpdatingStatus(leadId);
     try {
       await profileService.updateLeadStatus(pageId, leadId, newStatus);
       const updated = leads.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l));
       setLeads(updated);
+      if (selectedLead?.id === leadId) {
+        setSelectedLead({ ...selectedLead, status: newStatus });
+      }
       try {
         localStorage.setItem(localKey, JSON.stringify(updated));
       } catch (e) {
         console.error('Error writing leads cache', e);
       }
-      showToast(`Lead marked as ${STATUS_BADGES[newStatus]?.label || newStatus}`);
+      showToast(`Lead marked as ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
     } catch (err) {
       console.error('Error updating status:', err);
+      showToast('Failed to update lead status');
     } finally {
       setIsUpdatingStatus(null);
     }
   };
 
   // Notes update
-  const handleSaveNotes = async (leadId: string) => {
+  const handleSaveNotes = async (leadId: string, notesText?: string) => {
+    if (!pageId) return;
+    const finalNotes = notesText !== undefined ? notesText : tempNotes;
     try {
-      await profileService.updateLeadStatus(pageId, leadId, leads.find((l) => l.id === leadId)?.status || 'new', tempNotes);
-      const updated = leads.map((l) => (l.id === leadId ? { ...l, notes: tempNotes } : l));
+      const targetLead = leads.find((l) => l.id === leadId);
+      await profileService.updateLeadStatus(pageId, leadId, targetLead?.status || 'new', finalNotes);
+      const updated = leads.map((l) => (l.id === leadId ? { ...l, notes: finalNotes } : l));
       setLeads(updated);
+      if (selectedLead?.id === leadId) {
+        setSelectedLead({ ...selectedLead, notes: finalNotes });
+      }
       try {
         localStorage.setItem(localKey, JSON.stringify(updated));
       } catch (e) {
@@ -190,12 +229,14 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
       showToast('Internal notes saved');
     } catch (err) {
       console.error('Error saving notes:', err);
+      showToast('Failed to save notes');
     }
   };
 
   // Delete lead
   const handleDeleteLead = async (leadId: string) => {
-    if (!confirm('Are you sure you want to delete this lead?')) return;
+    if (!pageId) return;
+    if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
     try {
       await profileService.deleteLead(pageId, leadId);
       const updated = leads.filter((l) => l.id !== leadId);
@@ -209,64 +250,31 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
       showToast('Lead deleted');
     } catch (err) {
       console.error('Error deleting lead:', err);
+      showToast('Failed to delete lead');
     }
   };
 
   // Export CSV
   const handleExportCSV = () => {
     if (leads.length === 0) {
-      alert('No leads available to export yet.');
+      alert('No inbound inquiries available to export yet.');
       return;
     }
 
-    const headers = [
-      'ID',
-      'Date',
-      'Type',
-      'Status',
-      'Name',
-      'Email',
-      'Phone',
-      'Company / Brand',
-      'Budget / Price',
-      'Timeline / Date',
-      'Campaign / Event / Property',
-      'Package',
-      'Inquiry Details',
-      'Internal Notes',
-    ];
-
-    const rows = leads.map((l) => [
-      l.id,
-      new Date(l.createdAt || Date.now()).toLocaleDateString(),
-      LEAD_TYPE_LABELS[l.type]?.label || l.type,
-      l.status,
-      `"${(l.name || '').replace(/"/g, '""')}"`,
-      `"${(l.email || '').replace(/"/g, '""')}"`,
-      `"${(l.phone || '').replace(/"/g, '""')}"`,
-      `"${(l.companyOrBrand || '').replace(/"/g, '""')}"`,
-      `"${(l.budgetOrPrice || '').replace(/"/g, '""')}"`,
-      `"${(l.timelineOrDate || '').replace(/"/g, '""')}"`,
-      `"${(l.campaignType || l.propertyTitle || l.propertyAddress || '').replace(/"/g, '""')}"`,
-      `"${(l.selectedPackageName || '').replace(/"/g, '""')}"`,
-      `"${(l.details || '').replace(/"/g, '""')}"`,
-      `"${(l.notes || '').replace(/"/g, '""')}"`,
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `linklyra_leads_${profile.username}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Exported leads to CSV');
+    const exportDataset = filteredLeads.length > 0 ? filteredLeads : leads;
+    downloadLeadsCsv(exportDataset, profile.username || 'creator', {
+      statusFilter: statusFilter !== 'all' ? (statusFilter as LeadStatus) : undefined,
+    });
+    showToast(`Exported ${exportDataset.length} leads to CSV`);
   };
 
-  // Add realistic test inquiry based on creator profile
+  // Add realistic test inquiry
   const handleAddSampleInquiry = async () => {
+    if (!pageId) {
+      alert('Cannot create sample lead: Missing page ID');
+      return;
+    }
+
     let sampleLead: any = {
       name: 'Sahil Mehta',
       email: 'sahil.mehta@nexusagency.com',
@@ -330,10 +338,11 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
       showToast('Sample inquiry generated!');
     } catch (err) {
       console.error('Error creating sample lead:', err);
+      showToast('Failed to create sample lead');
     }
   };
 
-  // Filtered Leads
+  // Filtered Leads (Newest first)
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       // Type Filter
@@ -342,9 +351,9 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
       // Status Filter
       if (statusFilter !== 'all') {
         if (statusFilter === 'new' && lead.status !== 'new') return false;
-        if (statusFilter === 'in_progress' && lead.status !== 'in_progress' && lead.status !== 'qualified') return false;
-        if (statusFilter === 'closed' && lead.status !== 'closed' && lead.status !== 'booked') return false;
-        if (statusFilter === 'archived' && lead.status !== 'archived') return false;
+        if (statusFilter === 'contacted' && lead.status !== 'contacted' && lead.status !== 'in_progress' && lead.status !== 'qualified') return false;
+        if (statusFilter === 'won' && lead.status !== 'won' && lead.status !== 'closed' && lead.status !== 'booked') return false;
+        if (statusFilter === 'lost' && lead.status !== 'lost' && lead.status !== 'archived') return false;
       }
 
       // Search Query
@@ -352,24 +361,33 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         const q = searchQuery.toLowerCase();
         const matchesName = (lead.name || '').toLowerCase().includes(q);
         const matchesEmail = (lead.email || '').toLowerCase().includes(q);
+        const matchesPhone = (lead.phone || '').toLowerCase().includes(q);
         const matchesCompany = (lead.companyOrBrand || '').toLowerCase().includes(q);
         const matchesDetails = (lead.details || '').toLowerCase().includes(q);
         const matchesBudget = (lead.budgetOrPrice || '').toLowerCase().includes(q);
-        return matchesName || matchesEmail || matchesCompany || matchesDetails || matchesBudget;
+        const matchesPkg = (lead.selectedPackageName || '').toLowerCase().includes(q);
+        return matchesName || matchesEmail || matchesPhone || matchesCompany || matchesDetails || matchesBudget || matchesPkg;
       }
 
       return true;
     });
   }, [leads, typeFilter, statusFilter, searchQuery]);
 
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
+  const paginatedLeads = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredLeads.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredLeads, currentPage]);
+
   // High-level KPI metrics
   const totalInquiries = leads.length;
   const newInquiriesCount = leads.filter((l) => l.status === 'new').length;
-  const inProgressCount = leads.filter((l) => l.status === 'in_progress' || l.status === 'qualified' || l.status === 'contacted').length;
-  const closedCount = leads.filter((l) => l.status === 'closed' || l.status === 'booked').length;
+  const inProgressCount = leads.filter((l) => l.status === 'contacted' || l.status === 'in_progress' || l.status === 'qualified').length;
+  const wonCount = leads.filter((l) => l.status === 'won' || l.status === 'closed' || l.status === 'booked').length;
 
   return (
-    <div className="space-y-4 max-w-full">
+    <div className="space-y-4 max-w-full text-left">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-[#1C1E22] text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold animate-fadeIn border border-white/10">
@@ -380,7 +398,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
       {/* Header with Title & Direct Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-black/5">
-        <div className="text-left">
+        <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base sm:text-lg font-bold text-[#1C1E22] tracking-tight">
               Inquiries & Leads CRM
@@ -392,7 +410,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             )}
           </div>
           <p className="text-xs text-[#737882] mt-0.5">
-            Incoming booking requests, brand sponsorship deals, and client lead submissions.
+            Incoming booking requests, brand sponsorship deals, showing appointments, and inquiries.
           </p>
         </div>
 
@@ -420,9 +438,9 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         </div>
       </div>
 
-      {/* CRM Stats Metric Bar - Exact Design UI (Clean cards, no colored overlays, no dot signals) */}
+      {/* CRM Stats Metric Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between text-left transition-all hover:border-black/20">
+        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
           <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
             Total Leads
           </span>
@@ -432,7 +450,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between text-left transition-all hover:border-black/20">
+        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
           <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
             Unread / New
           </span>
@@ -442,23 +460,23 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between text-left transition-all hover:border-black/20">
+        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
           <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            In Discussion
+            Contacted
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
             <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{inProgressCount}</span>
-            <span className="text-[10px] font-medium text-[#737882]">Active Pipeline</span>
+            <span className="text-[10px] font-medium text-[#737882]">In Pipeline</span>
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between text-left transition-all hover:border-black/20">
+        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
           <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            Booked / Won
+            Won / Converted
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
-            <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{closedCount}</span>
-            <span className="text-[10px] font-medium text-[#737882]">Converted</span>
+            <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{wonCount}</span>
+            <span className="text-[10px] font-medium text-[#737882]">Closed Deals</span>
           </div>
         </div>
       </div>
@@ -472,7 +490,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, company, budget or email..."
+              placeholder="Search by name, company, email, or brief..."
               className="w-full pl-9 pr-8 py-2 bg-white border border-black/10 rounded-xl text-xs font-medium text-[#1C1E22] placeholder:text-[#737882] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] transition-all"
             />
             <div className="absolute left-3 top-2.5 text-[#737882] pointer-events-none">
@@ -515,9 +533,8 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             <option value="all">All Statuses</option>
             <option value="new">New</option>
             <option value="contacted">Contacted</option>
-            <option value="in_progress">In Discussion</option>
-            <option value="closed">Booked / Won</option>
-            <option value="archived">Archived</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
           </select>
         </div>
       </div>
@@ -550,13 +567,12 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             </button>
           </div>
         ) : (
-          filteredLeads.map((lead) => {
+          paginatedLeads.map((lead) => {
             const typeConfig = LEAD_TYPE_LABELS[lead.type] || LEAD_TYPE_LABELS.general_contact;
-            const statusConfig = STATUS_BADGES[lead.status] || STATUS_BADGES.new;
+            const statusConfig = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new;
             const TypeIcon = typeConfig.icon;
             const isEditingNotes = editingNotesId === lead.id;
 
-            // Formatted date
             const createdDate = lead.createdAt
               ? new Date(lead.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
@@ -569,7 +585,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             return (
               <div
                 key={lead.id}
-                className="p-4 sm:p-5 bg-white rounded-2xl border border-black/10 hover:border-black/25 shadow-2xs hover:shadow-xs transition-all flex flex-col gap-3.5 text-left"
+                className="p-4 sm:p-5 bg-white rounded-2xl border border-black/10 hover:border-black/25 shadow-2xs hover:shadow-xs transition-all flex flex-col gap-3.5"
               >
                 {/* Lead Header */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -581,19 +597,18 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       <span>{typeConfig.label}</span>
                     </span>
 
-                    {/* Status Dropdown - Clean without dot signals */}
+                    {/* Status Select Switcher */}
                     <div className="relative">
                       <select
-                        value={lead.status}
+                        value={lead.status === 'booked' || lead.status === 'closed' ? 'won' : lead.status === 'archived' ? 'lost' : lead.status === 'in_progress' || lead.status === 'qualified' ? 'contacted' : lead.status}
                         disabled={isUpdatingStatus === lead.id}
                         onChange={(e) => handleUpdateStatus(lead.id, e.target.value as LeadStatus)}
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors ${statusConfig.badgeClass}`}
                       >
                         <option value="new">New</option>
                         <option value="contacted">Contacted</option>
-                        <option value="in_progress">In Discussion</option>
-                        <option value="booked">Booked / Won</option>
-                        <option value="archived">Archived</option>
+                        <option value="won">Won</option>
+                        <option value="lost">Lost</option>
                       </select>
                     </div>
                   </div>
@@ -604,10 +619,13 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                   </span>
                 </div>
 
-                {/* Lead Identity & Company */}
+                {/* Lead Identity & Actions */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-bold text-[#1C1E22] flex items-center gap-1.5 truncate">
+                  <div
+                    className="min-w-0 flex-1 cursor-pointer"
+                    onClick={() => setSelectedLead(lead)}
+                  >
+                    <h4 className="text-sm font-bold text-[#1C1E22] flex items-center gap-1.5 truncate hover:underline">
                       <HugeiconsIcon icon={UserIcon} size={15} className="text-[#737882] shrink-0" />
                       <span className="truncate">{lead.name}</span>
                     </h4>
@@ -619,8 +637,17 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                     )}
                   </div>
 
-                  {/* Direct Contact Shortcuts */}
+                  {/* Direct Contact & Detail Actions */}
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLead(lead)}
+                      className="p-2 rounded-xl bg-[#FAF8F5] border border-black/10 text-[#1C1E22] hover:bg-black hover:text-white transition-all shadow-2xs flex items-center justify-center shrink-0 cursor-pointer"
+                      title="View full lead details drawer"
+                    >
+                      <HugeiconsIcon icon={ViewIcon} size={14} className="shrink-0" />
+                    </button>
+
                     {lead.email && (
                       <a
                         href={`mailto:${lead.email}?subject=${encodeURIComponent(
@@ -657,7 +684,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 </div>
 
                 {/* Lead Attributes / Deal Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs text-left">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs">
                   {lead.budgetOrPrice && (
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#737882] block tracking-wider">
@@ -694,7 +721,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
                 {/* Inquiry Details Message */}
                 {lead.details && (
-                  <div className="p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs text-[#1C1E22] leading-relaxed text-left">
+                  <div className="p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs text-[#1C1E22] leading-relaxed">
                     <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider mb-1">
                       Inquiry Note & Brief
                     </span>
@@ -705,7 +732,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 {/* Internal Private Notes Section */}
                 <div className="pt-2 border-t border-black/5">
                   {isEditingNotes ? (
-                    <div className="space-y-2 text-left">
+                    <div className="space-y-2">
                       <label className="text-[11px] font-bold text-[#1C1E22] block">
                         Creator Private Notes:
                       </label>
@@ -734,7 +761,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-2 text-left">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="text-[11px] text-[#737882] truncate flex-1 min-w-0">
                         {lead.notes ? (
                           <span className="text-[#1C1E22] truncate block">
@@ -761,7 +788,213 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             );
           })
         )}
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-3 pb-1 border-t border-black/5 text-xs text-[#737882]">
+            <span>
+              Showing {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of {filteredLeads.length} leads
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-[#FAF8F5] disabled:opacity-40 font-semibold cursor-pointer shadow-2xs"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-bold text-[#1C1E22]">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-[#FAF8F5] disabled:opacity-40 font-semibold cursor-pointer shadow-2xs"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Detail Drawer Modal */}
+      {selectedLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div 
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="p-5 sm:p-6 bg-[#1C1E22] text-white relative">
+              <button
+                type="button"
+                onClick={() => setSelectedLead(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={20} />
+              </button>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-stone-300 uppercase tracking-wider mb-2">
+                {LEAD_TYPE_LABELS[selectedLead.type]?.label || selectedLead.type}
+              </span>
+              <h3 className="text-xl font-bold tracking-tight">{selectedLead.name}</h3>
+              {selectedLead.companyOrBrand && (
+                <p className="text-xs text-stone-400 mt-0.5 font-medium">{selectedLead.companyOrBrand}</p>
+              )}
+            </div>
+
+            {/* Drawer Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs text-[#1C1E22]">
+              {/* Status Selector & Date */}
+              <div className="flex items-center justify-between p-3 bg-[#FAF8F5] rounded-2xl border border-black/5">
+                <div>
+                  <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider mb-1">
+                    Lead Status
+                  </span>
+                  <select
+                    value={selectedLead.status === 'booked' || selectedLead.status === 'closed' ? 'won' : selectedLead.status === 'archived' ? 'lost' : selectedLead.status === 'in_progress' || selectedLead.status === 'qualified' ? 'contacted' : selectedLead.status}
+                    onChange={(e) => handleUpdateStatus(selectedLead.id, e.target.value as LeadStatus)}
+                    className="text-xs font-bold px-3 py-1 rounded-xl border border-black/10 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1C1E22]"
+                  >
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="won">Won</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider mb-1">
+                    Received On
+                  </span>
+                  <span className="font-semibold text-stone-700">
+                    {selectedLead.createdAt
+                      ? new Date(selectedLead.createdAt).toLocaleString('en-US')
+                      : 'Recently'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact Information Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-[#FAF8F5] rounded-2xl border border-black/5">
+                <div>
+                  <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Email Address</span>
+                  <a href={`mailto:${selectedLead.email}`} className="font-bold text-[#5E4BF7] hover:underline break-all mt-0.5 block">
+                    {selectedLead.email || 'N/A'}
+                  </a>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Phone / WhatsApp</span>
+                  <span className="font-bold text-[#1C1E22] mt-0.5 block">
+                    {selectedLead.phone || 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Deal & Requirement Specifics */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-[#FAF8F5] rounded-2xl border border-black/5">
+                {selectedLead.budgetOrPrice && (
+                  <div>
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Budget / Price</span>
+                    <span className="font-bold text-[#1C1E22] mt-0.5 block">{selectedLead.budgetOrPrice}</span>
+                  </div>
+                )}
+                {selectedLead.timelineOrDate && (
+                  <div>
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Timeline / Date</span>
+                    <span className="font-semibold text-[#1C1E22] mt-0.5 block">{selectedLead.timelineOrDate}</span>
+                  </div>
+                )}
+                {(selectedLead.campaignType || selectedLead.selectedPackageName || selectedLead.propertyTitle) && (
+                  <div>
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Deliverable / Item</span>
+                    <span className="font-semibold text-[#1C1E22] mt-0.5 block truncate">
+                      {selectedLead.selectedPackageName || selectedLead.campaignType || selectedLead.propertyTitle}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Full Details Message */}
+              {selectedLead.details && (
+                <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-black/5 space-y-1">
+                  <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">
+                    Full Submission Brief
+                  </span>
+                  <p className="text-xs text-stone-800 leading-relaxed whitespace-pre-wrap">{selectedLead.details}</p>
+                </div>
+              )}
+
+              {/* Internal Notes Editor */}
+              <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-black/5 space-y-2">
+                <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">
+                  Internal Creator Notes
+                </span>
+                <textarea
+                  defaultValue={selectedLead.notes || ''}
+                  placeholder="Record private deal progress, phone discussion notes, or next steps..."
+                  className="w-full p-2.5 text-xs bg-white border border-black/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1C1E22]"
+                  rows={3}
+                  id="drawer-lead-notes"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('drawer-lead-notes') as HTMLTextAreaElement | null;
+                    if (el) handleSaveNotes(selectedLead.id, el.value);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#1C1E22] text-white text-xs font-bold hover:bg-black transition-all cursor-pointer shadow-2xs"
+                >
+                  Save Internal Note
+                </button>
+              </div>
+
+              {/* Quick Actions Footer */}
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteLead(selectedLead.id)}
+                  className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <HugeiconsIcon icon={Delete01Icon} size={14} />
+                  <span>Delete Lead</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {selectedLead.phone && (
+                    <a
+                      href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Hi ${selectedLead.name}, thank you for reaching out via my LinkLyra page!`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <HugeiconsIcon icon={WhatsappIcon} size={14} className="text-white" />
+                      <span>WhatsApp</span>
+                    </a>
+                  )}
+                  {selectedLead.email && (
+                    <a
+                      href={`mailto:${selectedLead.email}?subject=${encodeURIComponent(
+                        `Re: Inquiry from ${profile.name || 'LinkLyra'}`
+                      )}`}
+                      className="px-3.5 py-2 rounded-xl bg-[#1C1E22] hover:bg-black text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <HugeiconsIcon icon={Mail01Icon} size={14} />
+                      <span>Send Email</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export const LeadsPanel = LeadsDashboard;

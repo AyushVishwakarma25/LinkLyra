@@ -1027,7 +1027,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <HugeiconsIcon icon={Tick01Icon} size={16} className="text-[#F8BA38] shrink-0" />
-                  <span><strong>Advanced Geo Analytics</strong></span>
+                  <span><strong>Advanced Traffic & Referrer Analytics</strong></span>
                 </div>
               </div>
             </div>

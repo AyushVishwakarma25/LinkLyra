@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HugeIcon } from './HugeIcon';
 import {
   Cancel01Icon,
@@ -14,7 +14,33 @@ import {
   Settings01Icon,
 } from '@hugeicons/core-free-icons';
 import { profileService, auth } from '../lib/firebase';
+import { validateUsername, checkUsernameAvailability } from '../lib/username';
 import { User } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+function getUnauthorizedDomainError(): string {
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const projectId = firebaseConfig.projectId;
+  const is127 = currentHost === '127.0.0.1';
+  const isHostingSite = currentHost.includes('linklyra') || currentHost.includes('web.app');
+
+  let msg = `Domain not authorized for "${currentHost}".`;
+  msg += `\n\nTo fix in Firebase Console:`;
+  msg += `\n1. Open project "${projectId}" (verify you are in "${projectId}", not another project):`;
+  msg += `\n   https://console.firebase.google.com/project/${projectId}/authentication/settings`;
+  msg += `\n2. Go to "Settings" -> "Authorized domains" -> click "Add domain".`;
+  msg += `\n3. Add "${currentHost}" (type only the domain, without "http://" or port numbers).`;
+
+  if (is127) {
+    msg += `\n\n💡 Tip: You are currently accessing via 127.0.0.1. Firebase treats 127.0.0.1 and localhost as separate domains. Either add "127.0.0.1" to Authorized Domains, or switch to http://localhost:3000.`;
+  } else if (isHostingSite) {
+    msg += `\n\n💡 Tip: Newly created hosting sites (like "${currentHost}") are not auto-authorized in Firebase Auth. Add "${currentHost}" to the Authorized Domains list.`;
+  } else if (currentHost === 'localhost') {
+    msg += `\n\n💡 Tip: Verify you added "localhost" to project "${projectId}" (not "linklyra"), and that it was saved as "localhost" without "http://" or ":3000".`;
+  }
+
+  return msg;
+}
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -38,9 +64,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
+  const [usernameFeedback, setUsernameFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== 'signup' || !username.trim()) {
+      setUsernameStatus('idle');
+      setUsernameFeedback(null);
+      return;
+    }
+
+    const clean = username.trim().toLowerCase();
+    const validation = validateUsername(clean);
+    if (!validation.valid) {
+      setUsernameStatus('unavailable');
+      setUsernameFeedback(validation.reason || 'Invalid username format.');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    const timer = setTimeout(async () => {
+      const result = await checkUsernameAvailability(clean);
+      if (result.available) {
+        setUsernameStatus('available');
+        setUsernameFeedback(`@${clean} is available!`);
+      } else {
+        setUsernameStatus('unavailable');
+        setUsernameFeedback(result.reason || `@${clean} is unavailable.`);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [username, mode]);
 
   if (!isOpen) return null;
 
@@ -59,7 +117,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error('Google sign in error:', err);
       let msg = err.message || 'Failed to sign in with Google. Please try again.';
       if (msg.includes('auth/unauthorized-domain')) {
-        msg = 'Domain not authorized: Please add "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+        msg = getUnauthorizedDomainError();
       } else if (msg.includes('auth/popup-closed-by-user')) {
         msg = 'Sign-in popup was closed before completing. Please try again.';
       } else if (msg.includes('auth/popup-blocked')) {
@@ -128,7 +186,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else if (msg.includes('auth/user-not-found')) {
         msg = 'No account found with this email. Please click "Create Account" below.';
       } else if (msg.includes('auth/unauthorized-domain')) {
-        msg = 'Domain not authorized: Please add "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+        msg = getUnauthorizedDomainError();
       } else if (msg.includes('auth/network-request-failed')) {
         msg = 'Network connection failed. Please check your internet connection.';
       }
@@ -182,9 +240,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-4 overflow-y-auto">
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2 text-xs text-red-700">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-700">
               <HugeIcon icon={AlertCircleIcon} size={16} className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+              <div className="flex-1 whitespace-pre-line leading-relaxed font-normal">
+                {errorMsg}
+                {typeof window !== 'undefined' && window.location.hostname === '127.0.0.1' && (
+                  <div className="mt-2.5 pt-2 border-t border-red-200/60 flex items-center justify-between">
+                    <span className="text-[11px] text-red-600 font-medium">Quick fix:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hostname = 'localhost';
+                      }}
+                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] font-semibold transition-colors shadow-xs"
+                    >
+                      Switch to localhost:3000
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -325,9 +399,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-[#1C1E22] block mb-1">
-                        Handle / Username
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-[#1C1E22]">
+                          Handle / Username
+                        </label>
+                        {usernameStatus === 'checking' && (
+                          <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+                            Checking...
+                          </span>
+                        )}
+                        {usernameStatus === 'available' && (
+                          <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                            <HugeIcon icon={CheckmarkCircle01Icon} size={12} className="w-3 h-3 text-emerald-600" />
+                            Available
+                          </span>
+                        )}
+                        {usernameStatus === 'unavailable' && (
+                          <span className="text-[11px] text-red-500 font-semibold flex items-center gap-1">
+                            <HugeIcon icon={AlertCircleIcon} size={12} className="w-3 h-3 text-red-500" />
+                            Unavailable
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center">
                         <span className="px-3 py-2.5 bg-black/5 border border-r-0 border-black/10 rounded-l-2xl text-xs font-bold text-[#737882]">
                           @
@@ -337,10 +431,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           required
                           placeholder="username"
                           value={username}
-                          onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                          className="flex-1 px-3 py-2.5 bg-white rounded-r-2xl border border-black/10 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#5E4BF7]"
+                          onChange={(e) => setUsername(e.target.value.toLowerCase().trim().replace(/[^a-z0-9_]/g, ''))}
+                          className={`flex-1 px-3 py-2.5 bg-white rounded-r-2xl border text-xs font-medium focus:outline-none focus:ring-2 ${
+                            usernameStatus === 'available'
+                              ? 'border-emerald-300 focus:ring-emerald-500'
+                              : usernameStatus === 'unavailable'
+                              ? 'border-red-300 focus:ring-red-500'
+                              : 'border-black/10 focus:ring-[#5E4BF7]'
+                          }`}
                         />
                       </div>
+                      {usernameFeedback && usernameStatus === 'unavailable' && (
+                        <p className="text-[11px] text-red-500 mt-1 pl-1">{usernameFeedback}</p>
+                      )}
                     </div>
                   </>
                 )}
@@ -377,8 +480,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-3 px-4 bg-[#1C1E22] hover:bg-black text-white text-xs font-bold rounded-2xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 mt-2"
+                  disabled={loading || (mode === 'signup' && (usernameStatus === 'unavailable' || usernameStatus === 'checking'))}
+                  className="w-full py-3 px-4 bg-[#1C1E22] hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-2xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 mt-2"
                 >
                   {mode === 'signin' ? <HugeIcon icon={Login01Icon} size={16} className="w-4 h-4" /> : <HugeIcon icon={UserAdd01Icon} size={16} className="w-4 h-4" />}
                   <span>{loading ? 'Processing...' : mode === 'signin' ? 'Sign In' : 'Create Free Account'}</span>

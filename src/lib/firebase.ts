@@ -31,8 +31,22 @@ import {
   increment,
   writeBatch,
   serverTimestamp,
+  runTransaction,
+  Timestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import {
+  normalizeUsername,
+  validateUsername,
+  checkUsernameAvailability,
+  suggestAvailableUsername,
+} from './username';
+import {
+  parseUserAgent,
+  getVisitorId,
+  isBot,
+  shouldRecordPageView,
+} from './analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 import {
   CardColor,
@@ -48,6 +62,9 @@ import {
   CardStyleType,
   WallpaperMode,
   FooterSettings,
+  LeadType,
+  LeadRecord,
+  SpecializedAnalyticsSummary,
 } from '../types';
 
 // Structured Firestore Error Protocol mandated by Skill guidelines
@@ -463,7 +480,108 @@ export const profileService = {
     return auth.currentUser;
   },
 
-  // 1. Google One-Click Login
+  // 1. Account Provisioning (Used by both Email Sign-up and Google Sign-in)
+  async provisionAccount(user: User, desiredUsername?: string): Promise<{ profile: DbProfile; username: string }> {
+    const rawCandidate = desiredUsername || user.displayName || user.email?.split('@')[0] || 'creator';
+
+    // Suggest available username (handles normalization, transliteration, reserved check, numeric suffixes)
+    const finalUsername = await suggestAvailableUsername(
+      rawCandidate,
+      async (candidate) => {
+        const snap = await getDoc(doc(db, 'usernames', candidate));
+        return !snap.exists();
+      },
+      user.uid
+    );
+
+    const validation = validateUsername(finalUsername);
+    if (!validation.valid) {
+      throw new Error(validation.reason || 'Invalid username generated.');
+    }
+
+    const fullName = user.displayName || 'Creator';
+    const avatarUrl =
+      user.photoURL ||
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80';
+
+    const newProfile: DbProfile = {
+      id: user.uid,
+      username: finalUsername,
+      full_name: fullName,
+      bio: '',
+      avatar_url: avatarUrl,
+      theme: 'warm',
+      socials: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Atomic transaction: claim username doc and create core documents
+    await runTransaction(db, async (tx) => {
+      const usernameRef = doc(db, 'usernames', finalUsername);
+      const usernameSnap = await tx.get(usernameRef);
+      if (usernameSnap.exists()) {
+        const data = usernameSnap.data();
+        if (data?.uid && data.uid !== user.uid) {
+          throw new Error(`Username @${finalUsername} is already taken. Please choose another.`);
+        }
+      }
+
+      // Claim username
+      tx.set(usernameRef, {
+        userId: user.uid,
+        uid: user.uid,
+        pageId: user.uid,
+        username: finalUsername,
+        createdAt: serverTimestamp(),
+      });
+
+      // 1. users/{uid}
+      tx.set(
+        doc(db, 'users', user.uid),
+        sanitizeForFirestore({
+          displayName: fullName,
+          email: user.email || '',
+          photoURL: avatarUrl,
+          username: finalUsername,
+          plan: 'free',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
+
+      // 2. pages/{uid}
+      tx.set(
+        doc(db, 'pages', user.uid),
+        sanitizeForFirestore({
+          userId: user.uid,
+          username: finalUsername,
+          title: fullName,
+          bio: '',
+          avatarUrl: avatarUrl,
+          isPublished: true,
+          themeId: 'warm',
+          backgroundType: 'color',
+          backgroundValue: '#ECE7DC',
+          fontFamily: 'Plus Jakarta Sans',
+          textColor: '#1C1E22',
+          buttonStyle: 'rounded',
+          buttonColor: '#5E4BF7',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
+
+      // 3. profiles/{uid}
+      tx.set(doc(db, 'profiles', user.uid), sanitizeForFirestore(newProfile), { merge: true });
+    });
+
+    return { profile: newProfile, username: finalUsername };
+  },
+
+  // 1b. Google One-Click Login
   async signInWithGoogle(): Promise<{ user: User; profile: DbProfile }> {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -476,65 +594,8 @@ export const profileService = {
     }
 
     if (!profile) {
-      const generatedUsername = (user.displayName || user.email?.split('@')[0] || 'creator')
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, '');
-
-      profile = {
-        id: user.uid,
-        username: generatedUsername,
-        full_name: user.displayName || 'Creator',
-        bio: '',
-        avatar_url:
-          user.photoURL ||
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        theme: 'warm',
-        socials: {},
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      try {
-        // 1. Save to users/{userId}
-        await setDoc(doc(db, 'users', user.uid), {
-          displayName: profile.full_name,
-          email: user.email || '',
-          photoURL: profile.avatar_url,
-          username: generatedUsername,
-          plan: 'free',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        // 2. Save to pages/{pageId} (pageId = user.uid)
-        await setDoc(doc(db, 'pages', user.uid), {
-          userId: user.uid,
-          username: generatedUsername,
-          title: profile.full_name,
-          bio: profile.bio,
-          avatarUrl: profile.avatar_url,
-          isPublished: true,
-          themeId: 'warm',
-          backgroundType: 'color',
-          backgroundValue: '#ECE7DC',
-          fontFamily: 'Plus Jakarta Sans',
-          textColor: '#1C1E22',
-          buttonStyle: 'rounded',
-          buttonColor: '#5E4BF7',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        // 3. Backward compatibility collections
-        await setDoc(doc(db, 'profiles', user.uid), profile);
-        await setDoc(doc(db, 'usernames', generatedUsername), {
-          userId: user.uid,
-          pageId: user.uid,
-          username: generatedUsername,
-        });
-      } catch (err) {
-        console.warn('Initial Firestore record initialization notice:', err);
-      }
+      const provisioned = await this.provisionAccount(user);
+      profile = provisioned.profile;
     }
 
     return { user, profile };
@@ -542,78 +603,34 @@ export const profileService = {
 
   // 2. Email/Password Sign Up
   async signUp(email: string, password: string, fullName: string, username: string) {
-    const cleanUsername = (username || '').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
+    const cleanUsername = (username || '').toLowerCase().trim();
+    const validation = validateUsername(cleanUsername);
+    if (!validation.valid) {
+      throw new Error(validation.reason || 'Invalid username.');
+    }
 
-    try {
-      const usernameDoc = await getDoc(doc(db, 'usernames', cleanUsername));
-      if (usernameDoc.exists()) {
-        throw new Error(`Username @${cleanUsername} is already taken. Please choose another.`);
-      }
-    } catch (err: any) {
-      if (err.message && err.message.includes('already taken')) {
-        throw err;
-      }
-      handleFirestoreError(err, OperationType.GET, `usernames/${cleanUsername}`);
+    // Check availability upfront before user creation
+    const avail = await checkUsernameAvailability(cleanUsername);
+    if (!avail.available) {
+      throw new Error(avail.reason || `Username @${cleanUsername} is already taken.`);
     }
 
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const user = cred.user;
 
-    await updateAuthProfile(user, { displayName: fullName });
-
-    const newProfile: DbProfile = {
-      id: user.uid,
-      username: cleanUsername,
-      full_name: fullName,
-      bio: '',
-      avatar_url:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      theme: 'warm',
-      socials: {},
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
     try {
-      // 1. users/{userId}
-      await setDoc(doc(db, 'users', user.uid), {
-        displayName: fullName,
-        email: email,
-        photoURL: newProfile.avatar_url,
-        username: cleanUsername,
-        plan: 'free',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // 2. pages/{pageId}
-      await setDoc(doc(db, 'pages', user.uid), {
-        userId: user.uid,
-        username: cleanUsername,
-        title: fullName,
-        bio: '',
-        avatarUrl: newProfile.avatar_url,
-        isPublished: true,
-        themeId: 'warm',
-        backgroundType: 'color',
-        backgroundValue: '#ECE7DC',
-        fontFamily: 'Plus Jakarta Sans',
-        textColor: '#1C1E22',
-        buttonStyle: 'rounded',
-        buttonColor: '#5E4BF7',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      // 3. profiles & usernames
-      await setDoc(doc(db, 'profiles', user.uid), newProfile);
-      await setDoc(doc(db, 'usernames', cleanUsername), {
-        userId: user.uid,
-        pageId: user.uid,
-        username: cleanUsername,
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}`);
+      await updateAuthProfile(user, { displayName: fullName });
+      await this.provisionAccount(user, cleanUsername);
+      // Trigger email verification non-blockingly
+      sendEmailVerification(user).catch((e) => console.warn('Verification email notice:', e));
+    } catch (err: any) {
+      // If provisioning failed, rollback Auth user to prevent orphaned accounts
+      try {
+        await deleteAuthUser(user);
+      } catch (delErr) {
+        console.warn('Rollback user delete notice:', delErr);
+      }
+      throw new Error(err.message || 'Failed to complete registration.');
     }
 
     return user;
@@ -665,34 +682,19 @@ export const profileService = {
     }
   },
 
-  // 4e. Delete User Account & Purge Data
+  // 4e. Delete User Account & Purge Data (Invokes Cloud Function deleteAccount)
   async deleteUserAccount(userId: string): Promise<void> {
     const user = auth.currentUser;
-    try {
-      // 1. Delete Firestore records
-      await deleteDoc(doc(db, 'users', userId)).catch(() => {});
-      await deleteDoc(doc(db, 'profiles', userId)).catch(() => {});
-      await deleteDoc(doc(db, 'pages', userId)).catch(() => {});
-      await deleteDoc(doc(db, 'subscriptions', userId)).catch(() => {});
-      
-      // Delete user's links
-      const linksSnap = await getDocs(collection(db, 'pages', userId, 'links')).catch(() => null);
-      if (linksSnap) {
-        for (const d of linksSnap.docs) {
-          await deleteDoc(doc(db, 'pages', userId, 'links', d.id)).catch(() => {});
-          await deleteDoc(doc(db, 'links', d.id)).catch(() => {});
-        }
-      }
+    if (!user || user.uid !== userId) {
+      throw new Error('User is not authorized or not signed in.');
+    }
 
-      // 2. Delete Firebase Auth user if authenticated
-      if (user && user.uid === userId) {
-        await deleteAuthUser(user);
-      }
+    try {
+      const deleteAccountFn = httpsCallable(functions, 'deleteAccount');
+      await deleteAccountFn({});
+      await firebaseSignOut(auth);
     } catch (err: any) {
       console.error('Delete account error:', err);
-      if (err.code === 'auth/requires-recent-login') {
-        throw new Error('Deleting your account requires a recent authentication. Please sign out, sign back in, and try again.');
-      }
       throw new Error(err.message || 'Failed to delete account.');
     }
   },
@@ -703,6 +705,7 @@ export const profileService = {
       const profile = await this.getProfile(userId);
       const links = await this.getLinks(userId);
       const sections = await this.getSections(userId);
+      const leads = await this.getLeads(userId);
       const subscription = await this.getUserSubscription(userId);
       const invoices = await this.getPaymentInvoices(userId);
       const analytics = await this.getAnalyticsSummary(userId);
@@ -717,8 +720,10 @@ export const profileService = {
           emailVerified: auth.currentUser?.emailVerified || false,
         },
         profile,
+        socialLinks: profile?.socials || {},
         sections,
         links,
+        leads,
         subscription,
         invoices,
         analyticsSummary: analytics,
@@ -873,40 +878,17 @@ export const profileService = {
     const cleanDomain = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
 
     try {
-      // 1. Check domains routing index collection
+      // Check domains routing index collection only (strictly validated claims)
       const domainDocSnap = await getDoc(doc(db, 'domains', cleanDomain));
       if (domainDocSnap.exists()) {
-        const userId = domainDocSnap.data()?.userId || domainDocSnap.data()?.pageId;
+        const data = domainDocSnap.data();
+        const userId = data?.userId || data?.uid || data?.pageId;
         if (userId) {
           const profile = await this.getProfile(userId);
           if (profile) {
             const links = await this.getLinks(userId);
             return { profile, links };
           }
-        }
-      }
-
-      // 2. Query pages collection where customDomain == cleanDomain
-      const qPages = query(collection(db, 'pages'), where('customDomain', '==', cleanDomain));
-      const pageSnap = await getDocs(qPages);
-      if (!pageSnap.empty) {
-        const pageDoc = pageSnap.docs[0];
-        const profile = await this.getProfile(pageDoc.id);
-        if (profile) {
-          const links = await this.getLinks(pageDoc.id);
-          return { profile, links };
-        }
-      }
-
-      // 3. Query profiles collection where custom_domain == cleanDomain
-      const qProfiles = query(collection(db, 'profiles'), where('custom_domain', '==', cleanDomain));
-      const profSnap = await getDocs(qProfiles);
-      if (!profSnap.empty) {
-        const profDoc = profSnap.docs[0];
-        const profile = await this.getProfile(profDoc.id);
-        if (profile) {
-          const links = await this.getLinks(profDoc.id);
-          return { profile, links };
         }
       }
     } catch (err) {
@@ -916,43 +898,26 @@ export const profileService = {
     return null;
   },
 
-  // 6c. Save & Bind Custom Domain to User Account
+  // 6c. Save & Bind Custom Domain to User Account via Cloud Functions
   async saveCustomDomain(userId: string, domain: string): Promise<void> {
     const cleanDomain = (domain || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
     try {
       if (cleanDomain) {
-        await setDoc(
-          doc(db, 'domains', cleanDomain),
-          sanitizeForFirestore({
-            domain: cleanDomain,
-            userId,
-            pageId: userId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          }),
-          { merge: true }
+        const claimFn = httpsCallable<{ domain: string }, { success: boolean; domain: string }>(
+          functions,
+          'claimCustomDomain'
         );
+        await claimFn({ domain: cleanDomain });
+      } else {
+        const releaseFn = httpsCallable<{ domain?: string }, { success: boolean }>(
+          functions,
+          'releaseCustomDomain'
+        );
+        await releaseFn({});
       }
-
-      await setDoc(
-        doc(db, 'pages', userId),
-        sanitizeForFirestore({
-          customDomain: cleanDomain,
-          updatedAt: serverTimestamp(),
-        }),
-        { merge: true }
-      );
-
-      await setDoc(
-        doc(db, 'profiles', userId),
-        sanitizeForFirestore({
-          custom_domain: cleanDomain,
-          updated_at: new Date().toISOString(),
-        }),
-        { merge: true }
-      );
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `domains/${cleanDomain}`);
+    } catch (err: any) {
+      console.error('saveCustomDomain error:', err);
+      throw new Error(err?.message || 'Failed to update custom domain settings.');
     }
   },
 
@@ -979,19 +944,42 @@ export const profileService = {
   async updateProfile(userId: string, updates: Partial<DbProfile>) {
     try {
       const currentProfile = await this.getProfile(userId);
-      if (updates.username && currentProfile?.username && currentProfile.username !== updates.username) {
-        const cleanOld = (currentProfile.username || '').toLowerCase();
-        const cleanNew = (updates.username || '').toLowerCase();
-        if (cleanOld) {
-          await deleteDoc(doc(db, 'usernames', cleanOld)).catch(() => {});
-        }
-        if (cleanNew) {
-          await setDoc(doc(db, 'usernames', cleanNew), { userId, pageId: userId, username: cleanNew });
-        }
-      } else if (updates.username && (!currentProfile?.username || currentProfile.username !== updates.username)) {
-        const cleanNew = (updates.username || '').toLowerCase();
-        if (cleanNew) {
-          await setDoc(doc(db, 'usernames', cleanNew), { userId, pageId: userId, username: cleanNew });
+      if (updates.username) {
+        const cleanNew = updates.username.toLowerCase().trim();
+        const currentUsername = (currentProfile?.username || '').toLowerCase().trim();
+
+        if (cleanNew !== currentUsername) {
+          const val = validateUsername(cleanNew);
+          if (!val.valid) {
+            throw new Error(val.reason || 'Invalid username format.');
+          }
+
+          // Transactional username update: check collision, claim new, release old
+          await runTransaction(db, async (tx) => {
+            const newDocRef = doc(db, 'usernames', cleanNew);
+            const newSnap = await tx.get(newDocRef);
+            if (newSnap.exists()) {
+              const data = newSnap.data();
+              if (data?.userId && data.userId !== userId && data?.uid !== userId) {
+                throw new Error(`Username @${cleanNew} is already taken.`);
+              }
+            }
+
+            // Claim new username
+            tx.set(newDocRef, {
+              userId,
+              uid: userId,
+              pageId: userId,
+              username: cleanNew,
+              updatedAt: serverTimestamp(),
+            });
+
+            // Delete old username claim if different
+            if (currentUsername) {
+              const oldDocRef = doc(db, 'usernames', currentUsername);
+              tx.delete(oldDocRef);
+            }
+          });
         }
       }
 
@@ -1259,55 +1247,107 @@ export const profileService = {
   },
 
   // 11. Record Analytics Event (pages/{pageId}/analytics/{eventId})
-  async recordClick(linkId: string, pageId?: string, visitorId?: string) {
-    const targetPageId = pageId || auth.currentUser?.uid;
-    const eventId = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  async recordClick(pageIdOrLinkId: string, linkIdOrPageId?: string) {
+    // Normalizes recordClick(pageId, linkId) while supporting legacy recordClick(linkId, pageId)
+    let pageId = '';
+    let linkId = '';
+
+    if (linkIdOrPageId) {
+      pageId = pageIdOrLinkId;
+      linkId = linkIdOrPageId;
+    } else {
+      linkId = pageIdOrLinkId;
+      pageId = auth.currentUser?.uid || '';
+    }
+
+    if (!pageId || !linkId) return;
+
+    // Skip recording if current user is the owner (creator clicking/previewing their own links)
+    if (auth.currentUser && auth.currentUser.uid === pageId) {
+      return;
+    }
+
+    // Ignore automated bots/crawlers
+    if (isBot()) {
+      return;
+    }
 
     try {
-      // 1. Increment click count in subcollection and root
-      if (targetPageId) {
-        await updateDoc(doc(db, 'pages', targetPageId, 'links', linkId), {
-          clickCount: increment(1),
-        }).catch(() => {});
+      // 1. Increment click count atomically in pages/{pageId}/links/{linkId}
+      await updateDoc(doc(db, 'pages', pageId, 'links', linkId), {
+        clickCount: increment(1),
+      }).catch((err) => {
+        console.warn('Notice updating link clickCount:', err);
+      });
 
-        // 2. Create immutable analytics event at pages/{pageId}/analytics/{eventId}
-        await setDoc(doc(db, 'pages', targetPageId, 'analytics', eventId), {
-          type: 'link_click',
-          linkId: linkId,
-          visitorId: visitorId || 'anonymous-id',
-          country: 'IN',
-          device: window.innerWidth < 640 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop',
-          referrer: document.referrer || 'direct',
-          timestamp: serverTimestamp(),
-        });
-      }
+      // 2. Create immutable raw analytics event with expireAt (+90 days) for TTL policy
+      const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const uaInfo = parseUserAgent();
+      const visitorId = getVisitorId();
+      const expireAt = Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+      const eventData: Record<string, any> = {
+        type: 'link_click',
+        linkId,
+        visitorId,
+        device: uaInfo.device,
+        browser: uaInfo.browser,
+        referrer: typeof document !== 'undefined' && document.referrer ? document.referrer.slice(0, 150) : 'direct',
+        timestamp: serverTimestamp(),
+        expireAt,
+      };
+
+      await setDoc(doc(db, 'pages', pageId, 'analytics', eventId), eventData);
     } catch (err) {
       console.warn('Click event logged with notice:', err);
     }
   },
 
   // 12. Record Page View Event (pages/{pageId}/analytics/{eventId})
-  async recordPageView(pageId: string, visitorId?: string) {
-    const eventId = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  async recordPageView(pageId: string) {
+    if (!pageId) return;
+
+    // Skip recording if creator is viewing their own page
+    if (auth.currentUser && auth.currentUser.uid === pageId) {
+      return;
+    }
+
+    // Ignore automated bots/crawlers
+    if (isBot()) {
+      return;
+    }
+
+    // Deduplicate: once per visitor per 30 minutes for this page
+    if (!shouldRecordPageView(pageId)) {
+      return;
+    }
+
     try {
-      await setDoc(doc(db, 'pages', pageId, 'analytics', eventId), {
+      const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const uaInfo = parseUserAgent();
+      const visitorId = getVisitorId();
+      const expireAt = Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+      const eventData: Record<string, any> = {
         type: 'page_view',
         linkId: null,
-        visitorId: visitorId || 'anonymous-id',
-        country: 'IN',
-        device: window.innerWidth < 640 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop',
-        browser: navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Safari',
-        referrer: document.referrer || 'direct',
+        visitorId,
+        device: uaInfo.device,
+        browser: uaInfo.browser,
+        referrer: typeof document !== 'undefined' && document.referrer ? document.referrer.slice(0, 150) : 'direct',
         timestamp: serverTimestamp(),
-      });
+        expireAt,
+      };
+
+      await setDoc(doc(db, 'pages', pageId, 'analytics', eventId), eventData);
     } catch (err) {
       console.warn('Page view event logged with notice:', err);
     }
   },
 
   // View tracking alias
-  async recordView(pageId: string, visitorId?: string) {
-    return this.recordPageView(pageId, visitorId);
+  async recordView(pageId: string) {
+    return this.recordPageView(pageId);
   },
 
   // 13. Delete Link (Flexible signature)
@@ -1410,58 +1450,139 @@ export const profileService = {
     }
   },
 
-  // 18. Get Real-Time Analytics Summary & Specialized Vertical Metrics
-  async getAnalyticsSummary(pageId: string) {
+  // 18. Get Analytics Summary from Daily Rollups (pages/{pageId}/stats/{yyyy-mm-dd})
+  async getAnalyticsSummary(pageId: string, days: number = 30): Promise<SpecializedAnalyticsSummary> {
+    const defaultSummary: SpecializedAnalyticsSummary = {
+      totalViews: 0,
+      totalClicks: 0,
+      ctr: '0.0',
+      propertyViews: 0,
+      showingRequests: 0,
+      homeValuations: 0,
+      brandInquiries: 0,
+      mediaKitDownloads: 0,
+      packageClicks: 0,
+      packageBookings: 0,
+      generalContacts: 0,
+      musicBookings: 0,
+      podcastSponsorships: 0,
+      estimatedPipelineValueINR: 0,
+      deviceCounts: { mobile: 0, desktop: 0, tablet: 0 },
+      browserCounts: {},
+      referrerCounts: {},
+      linkClickCounts: {},
+      topLinks: [],
+      dailyStats: [],
+    };
+
+    if (!pageId) return defaultSummary;
+
     try {
-      const snap = await getDocs(collection(db, 'pages', pageId, 'analytics'));
+      // Calculate start date string for the last N days (YYYY-MM-DD)
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - (days - 1));
+      startDate.setHours(0, 0, 0, 0);
+      const startDateStr = startDate.toISOString().split('T')[0];
+
+      // Query bounded daily rollups at pages/{pageId}/stats where date >= startDateStr
+      const statsQuery = query(
+        collection(db, 'pages', pageId, 'stats'),
+        where('date', '>=', startDateStr)
+      );
+
+      const snap = await getDocs(statsQuery);
+
       let totalViews = 0;
       let totalClicks = 0;
-      let propertyViews = 0;
       let showingRequests = 0;
       let homeValuations = 0;
       let brandInquiries = 0;
       let mediaKitDownloads = 0;
-      let packageClicks = 0;
+      let packageBookings = 0;
+      let generalContacts = 0;
+      let musicBookings = 0;
+      let podcastSponsorships = 0;
+      let propertyViews = 0;
 
       const deviceCounts: Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
+      const browserCounts: Record<string, number> = {};
       const referrerCounts: Record<string, number> = {};
       const linkClickCounts: Record<string, number> = {};
+      const dailyMap: Record<string, { date: string; views: number; clicks: number }> = {};
 
-      snap.forEach((d) => {
-        const data = d.data();
-        const eventType = data.type;
-        if (eventType === 'page_view') {
-          totalViews++;
-        } else if (eventType === 'link_click') {
-          totalClicks++;
-          if (data.linkId) {
-            linkClickCounts[data.linkId] = (linkClickCounts[data.linkId] || 0) + 1;
-          }
-        } else if (eventType === 'property_view') {
-          propertyViews++;
-        } else if (eventType === 'showing_request') {
-          showingRequests++;
-        } else if (eventType === 'home_valuation') {
-          homeValuations++;
-        } else if (eventType === 'brand_inquiry') {
-          brandInquiries++;
-        } else if (eventType === 'media_kit_download') {
-          mediaKitDownloads++;
-        } else if (eventType === 'package_booking') {
-          packageClicks++;
-        }
+      // Initialize all days in the range so the timeline has continuous points
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        const dStr = d.toISOString().split('T')[0];
+        dailyMap[dStr] = { date: dStr, views: 0, clicks: 0 };
+      }
 
-        const dev = (data.device || 'mobile').toLowerCase();
-        if (deviceCounts[dev] !== undefined) {
-          deviceCounts[dev]++;
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const views = Number(data.views || 0);
+        const clicks = Number(data.clicks || 0);
+        const date = data.date || docSnap.id;
+
+        totalViews += views;
+        totalClicks += clicks;
+
+        if (dailyMap[date]) {
+          dailyMap[date].views += views;
+          dailyMap[date].clicks += clicks;
         } else {
-          deviceCounts.mobile++;
+          dailyMap[date] = { date, views, clicks };
         }
 
-        const ref = data.referrer || 'direct';
-        referrerCounts[ref] = (referrerCounts[ref] || 0) + 1;
+        // Aggregate devices
+        if (data.devices && typeof data.devices === 'object') {
+          for (const [dev, count] of Object.entries(data.devices)) {
+            const cleanDev = ['mobile', 'desktop', 'tablet'].includes(dev) ? dev : 'mobile';
+            deviceCounts[cleanDev] = (deviceCounts[cleanDev] || 0) + Number(count || 0);
+          }
+        }
+
+        // Aggregate browsers
+        if (data.browsers && typeof data.browsers === 'object') {
+          for (const [browser, count] of Object.entries(data.browsers)) {
+            browserCounts[browser] = (browserCounts[browser] || 0) + Number(count || 0);
+          }
+        }
+
+        // Aggregate referrers
+        if (data.referrers && typeof data.referrers === 'object') {
+          for (const [ref, count] of Object.entries(data.referrers)) {
+            referrerCounts[ref] = (referrerCounts[ref] || 0) + Number(count || 0);
+          }
+        }
+
+        // Aggregate per-link clicks
+        if (data.linkClicks && typeof data.linkClicks === 'object') {
+          for (const [linkId, count] of Object.entries(data.linkClicks)) {
+            linkClickCounts[linkId] = (linkClickCounts[linkId] || 0) + Number(count || 0);
+          }
+        }
+
+        // Aggregate conversions / event types
+        if (data.eventTypes && typeof data.eventTypes === 'object') {
+          showingRequests += Number(data.eventTypes.showing_request || data.eventTypes.showing || 0);
+          homeValuations += Number(data.eventTypes.home_valuation || data.eventTypes.valuation || 0);
+          brandInquiries += Number(data.eventTypes.brand_inquiry || data.eventTypes.brand || 0);
+          mediaKitDownloads += Number(data.eventTypes.media_kit_download || 0);
+          packageBookings += Number(data.eventTypes.package_booking || 0);
+          generalContacts += Number(data.eventTypes.general_contact || 0);
+          musicBookings += Number(data.eventTypes.music_booking || 0);
+          podcastSponsorships += Number(data.eventTypes.podcast_sponsorship || 0);
+          propertyViews += Number(data.eventTypes.property_view || 0);
+        }
       });
 
+      // Assemble top links sorted by clicks descending
+      const topLinks = Object.entries(linkClickCounts)
+        .map(([linkId, clicks]) => ({ linkId, clicks }))
+        .sort((a, b) => b.clicks - a.clicks);
+
+      const dailyStats = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
       const ctr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : '0.0';
 
       return {
@@ -1473,14 +1594,22 @@ export const profileService = {
         homeValuations,
         brandInquiries,
         mediaKitDownloads,
-        packageClicks,
+        packageClicks: totalClicks,
+        packageBookings,
+        generalContacts,
+        musicBookings,
+        podcastSponsorships,
+        estimatedPipelineValueINR: (showingRequests * 50000) + (brandInquiries * 25000) + (packageBookings * 15000),
         deviceCounts,
+        browserCounts,
         referrerCounts,
         linkClickCounts,
+        topLinks,
+        dailyStats,
       };
     } catch (err) {
-      console.warn('Could not read analytics collection:', err);
-      return null;
+      console.warn('Could not read analytics stats rollups:', err);
+      return defaultSummary;
     }
   },
 
@@ -1492,7 +1621,7 @@ export const profileService = {
   async submitLead(
     pageId: string,
     lead: {
-      type: 'showing_request' | 'brand_inquiry' | 'home_valuation' | 'general_contact' | 'media_kit_download' | 'package_booking';
+      type: LeadType;
       name: string;
       email: string;
       phone?: string;
@@ -1506,47 +1635,127 @@ export const profileService = {
       propertyAddress?: string;
       propertyCondition?: string;
       selectedPackageName?: string;
+      _hp?: string; // Honeypot spam field
     }
-  ): Promise<any> {
+  ): Promise<LeadRecord> {
+    const cleanPageId = (pageId || '').trim();
+    if (!cleanPageId || cleanPageId === 'public_page') {
+      throw new Error('A valid pageId is required to submit an inquiry.');
+    }
+
+    // 1. Honeypot check: Bots fill hidden fields; humans do not
+    if (lead._hp && lead._hp.trim().length > 0) {
+      throw new Error('Spam submission detected.');
+    }
+
+    // 2. Client-side rate limit (1 submission per 30 seconds)
+    try {
+      const lastSubmit = localStorage.getItem('linklyra_last_lead_submit');
+      if (lastSubmit) {
+        const elapsed = Date.now() - Number(lastSubmit);
+        if (elapsed < 30000) {
+          const remainingSec = Math.ceil((30000 - elapsed) / 1000);
+          throw new Error(`Please wait ${remainingSec}s before submitting another inquiry.`);
+        }
+      }
+    } catch (storageErr: any) {
+      if (storageErr.message?.includes('before submitting')) {
+        throw storageErr;
+      }
+    }
+
+    // 3. Validation matching Firestore Security Rules limits
+    const cleanName = (lead.name || '').trim();
+    if (!cleanName || cleanName.length > 100) {
+      throw new Error('Name is required and cannot exceed 100 characters.');
+    }
+
+    const cleanEmail = (lead.email || '').trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || cleanEmail.length > 150 || !EMAIL_REGEX.test(cleanEmail)) {
+      throw new Error('A valid email address is required (maximum 150 characters).');
+    }
+
+    const cleanPhone = lead.phone ? lead.phone.trim() : undefined;
+    if (cleanPhone && cleanPhone.length > 30) {
+      throw new Error('Phone number cannot exceed 30 characters.');
+    }
+
+    const cleanDetails = lead.details ? lead.details.trim() : undefined;
+    if (cleanDetails && cleanDetails.length > 2000) {
+      throw new Error('Message details cannot exceed 2000 characters.');
+    }
+
+    const cleanCompany = lead.companyOrBrand ? lead.companyOrBrand.trim() : undefined;
+    if (cleanCompany && cleanCompany.length > 150) {
+      throw new Error('Company name cannot exceed 150 characters.');
+    }
+
+    const cleanAddress = lead.propertyAddress ? lead.propertyAddress.trim() : undefined;
+    if (cleanAddress && cleanAddress.length > 300) {
+      throw new Error('Property address cannot exceed 300 characters.');
+    }
+
     const leadId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const nowIso = new Date().toISOString();
 
-    const record = sanitizeForFirestore({
+    const record: LeadRecord = sanitizeForFirestore({
       id: leadId,
-      pageId,
-      ...lead,
-      status: 'new',
+      pageId: cleanPageId,
+      type: lead.type,
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      companyOrBrand: cleanCompany,
+      campaignType: lead.campaignType ? lead.campaignType.trim() : undefined,
+      budgetOrPrice: lead.budgetOrPrice ? lead.budgetOrPrice.trim() : undefined,
+      timelineOrDate: lead.timelineOrDate ? lead.timelineOrDate.trim() : undefined,
+      details: cleanDetails,
+      propertyTitle: lead.propertyTitle ? lead.propertyTitle.trim() : undefined,
+      buyerStatus: lead.buyerStatus ? lead.buyerStatus.trim() : undefined,
+      propertyAddress: cleanAddress,
+      propertyCondition: lead.propertyCondition ? lead.propertyCondition.trim() : undefined,
+      selectedPackageName: lead.selectedPackageName ? lead.selectedPackageName.trim() : undefined,
+      status: 'new' as const,
       createdAt: nowIso,
+    });
+
+    // Write to Firestore - never swallow errors!
+    await setDoc(doc(db, 'pages', cleanPageId, 'leads', leadId), {
+      ...record,
       serverTimestamp: serverTimestamp(),
     });
 
+    // Record submission timestamp for rate limiting
     try {
-      // 1. Write to creator subcollection: pages/{pageId}/leads/{leadId}
-      await setDoc(doc(db, 'pages', pageId, 'leads', leadId), record);
-      // 2. Record specialized analytics event
-      await setDoc(doc(db, 'pages', pageId, 'analytics', `evt_${leadId}`), {
-        type: lead.type,
-        linkId: null,
-        visitorId: 'lead-visitor',
-        country: 'IN',
-        device: window.innerWidth < 640 ? 'mobile' : 'desktop',
-        referrer: document.referrer || 'direct',
-        timestamp: serverTimestamp(),
-      }).catch(() => {});
-
-      return record;
-    } catch (err) {
-      console.warn('Notice: lead submit write:', err);
-      return record;
+      localStorage.setItem('linklyra_last_lead_submit', Date.now().toString());
+    } catch {
+      // ignore storage quota issues
     }
+
+    // Telemetry: record lead event in background with TTL
+    const uaInfo = parseUserAgent();
+    setDoc(doc(db, 'pages', cleanPageId, 'analytics', `evt_${leadId}`), {
+      type: lead.type,
+      linkId: null,
+      visitorId: getVisitorId(),
+      device: uaInfo.device,
+      browser: uaInfo.browser,
+      referrer: typeof document !== 'undefined' && document.referrer ? document.referrer.slice(0, 150) : 'direct',
+      timestamp: serverTimestamp(),
+      expireAt: Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
+
+    return record;
   },
 
   // Get all leads for page owner
-  async getLeads(pageId: string): Promise<any[]> {
+  async getLeads(pageId: string): Promise<LeadRecord[]> {
+    if (!pageId || pageId === 'public_page') return [];
     try {
       const snap = await getDocs(collection(db, 'pages', pageId, 'leads'));
-      const leads: any[] = [];
-      snap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
+      const leads: LeadRecord[] = [];
+      snap.forEach((d) => leads.push({ id: d.id, ...(d.data() as any) }));
       return leads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } catch (err) {
       console.warn('Notice: fetching leads:', err);

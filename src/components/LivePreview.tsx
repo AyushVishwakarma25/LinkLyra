@@ -11,12 +11,8 @@ import { ProfileCard } from './ProfileCard';
 import { SocialIconsRow } from './SocialIconsRow';
 import { UI_KIT } from '../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../lib/whatsapp';
-import { BrandInquiryModal } from './BrandInquiryModal';
-import { MusicBookingModal } from './MusicBookingModal';
-import { PodcastSponsorshipModal } from './PodcastSponsorshipModal';
-import { ShowingBookingModal } from './ShowingBookingModal';
-import { HomeValuationModal } from './HomeValuationModal';
-import { MediaKitModal } from './MediaKitModal';
+import { useLeadModals } from '../hooks/useLeadModals';
+import { LeadModalHost } from './LeadModalHost';
 
 export interface LivePreviewProps {
   profile: UserProfile;
@@ -33,22 +29,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   const [deviceMode, setDeviceMode] = useState<'mobile' | 'ios' | 'desktop'>('mobile');
   const [missingPhoneNotice, setMissingPhoneNotice] = useState(false);
 
-  // In-Preview Interactive Lead Modals
-  const [brandInquiryOpen, setBrandInquiryOpen] = useState(false);
-  const [selectedBrandPackage, setSelectedBrandPackage] = useState<CollaborationPackageItem | null>(null);
-  const [selectedBrandCard, setSelectedBrandCard] = useState<ProfileCardData | null>(null);
-
-  const [musicBookingOpen, setMusicBookingOpen] = useState(false);
-  const [selectedMusicCard, setSelectedMusicCard] = useState<ProfileCardData | null>(null);
-
-  const [podcastSponsorOpen, setPodcastSponsorOpen] = useState(false);
-  const [selectedPodcastCard, setSelectedPodcastCard] = useState<ProfileCardData | null>(null);
-
-  const [showingModalOpen, setShowingModalOpen] = useState(false);
-  const [selectedShowingCard, setSelectedShowingCard] = useState<ProfileCardData | null>(null);
-
-  const [homeValuationOpen, setHomeValuationOpen] = useState(false);
-  const [mediaKitModalOpen, setMediaKitModalOpen] = useState(false);
+  // In-Preview Interactive Lead Modals via centralized hook
+  const leadModals = useLeadModals();
 
   const activeCards = profile.cards.filter((c) => c.isActive !== false);
 
@@ -68,32 +50,27 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
     // Direct Lead Inquiry Triggers
     if (card.templateType === 'brand_inquiry') {
-      setSelectedBrandPackage(null);
-      setSelectedBrandCard(card);
-      setBrandInquiryOpen(true);
+      leadModals.openBrandInquiry(null, card);
       return;
     }
-    if (card.templateType === 'music_booking_inquiry') {
-      setSelectedMusicCard(card);
-      setMusicBookingOpen(true);
+    if (card.templateType === 'music_booking_inquiry' || card.templateType === 'music_book_me') {
+      leadModals.openMusicBooking(card);
       return;
     }
-    if (card.templateType === 'podcast_sponsor_inquiry') {
-      setSelectedPodcastCard(card);
-      setPodcastSponsorOpen(true);
+    if (card.templateType === 'podcast_sponsor_inquiry' || card.templateType === 'podcast_sponsor_me') {
+      leadModals.openPodcastSponsor(card);
       return;
     }
     if (card.templateType === 'showing_booking') {
-      setSelectedShowingCard(card);
-      setShowingModalOpen(true);
+      leadModals.openShowing(card);
       return;
     }
     if (card.templateType === 'home_valuation') {
-      setHomeValuationOpen(true);
+      leadModals.openValuation(card);
       return;
     }
     if (card.templateType === 'media_kit' || card.templateType === 'music_press_kit') {
-      setMediaKitModalOpen(true);
+      leadModals.openMediaKit(card);
       return;
     }
 
@@ -275,29 +252,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                         e.stopPropagation();
                         handleCardInteraction(card);
                       }}
-                      onOpenBrandInquiryModal={(pkg, c) => {
-                        setSelectedBrandPackage(pkg || null);
-                        setSelectedBrandCard(c || card);
-                        setBrandInquiryOpen(true);
-                      }}
-                      onOpenMusicBookingModal={(c) => {
-                        setSelectedMusicCard(c || card);
-                        setMusicBookingOpen(true);
-                      }}
-                      onOpenPodcastSponsorModal={(c) => {
-                        setSelectedPodcastCard(c || card);
-                        setPodcastSponsorOpen(true);
-                      }}
-                      onOpenShowingModal={(c) => {
-                        setSelectedShowingCard(c || card);
-                        setShowingModalOpen(true);
-                      }}
-                      onOpenValuationModal={() => {
-                        setHomeValuationOpen(true);
-                      }}
-                      onOpenMediaKitModal={() => {
-                        setMediaKitModalOpen(true);
-                      }}
+                      onOpenBrandInquiryModal={(pkg, c) => leadModals.openBrandInquiry(pkg, c || card)}
+                      onOpenMusicBookingModal={(c) => leadModals.openMusicBooking(c || card)}
+                      onOpenPodcastSponsorModal={(c) => leadModals.openPodcastSponsor(c || card)}
+                      onOpenShowingModal={(c) => leadModals.openShowing(c || card)}
+                      onOpenValuationModal={() => leadModals.openValuation(card)}
+                      onOpenMediaKitModal={() => leadModals.openMediaKit(card)}
                     />
                   </div>
                 );
@@ -513,66 +473,14 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         </div>
       </div>
 
-      {/* Brand Inquiry Modal */}
-      <BrandInquiryModal
-        isOpen={brandInquiryOpen}
-        onClose={() => setBrandInquiryOpen(false)}
-        pageId={profile.username || 'creator'}
+      {/* Centralized Lead Modals Host (In-Preview interactive mode) */}
+      <LeadModalHost
+        leadModals={leadModals}
+        pageId={profile.id || profile.username || 'creator'}
         creatorName={profile.name}
         creatorPhone={profile.businessPhone}
-        selectedPackage={selectedBrandPackage}
-        cardData={selectedBrandCard}
-      />
-
-      {/* Music Booking Modal */}
-      <MusicBookingModal
-        isOpen={musicBookingOpen}
-        onClose={() => setMusicBookingOpen(false)}
-        pageId={profile.username || 'artist'}
-        artistName={profile.name}
-        artistPhone={profile.businessPhone}
-        cardData={selectedMusicCard}
-      />
-
-      {/* Podcast Sponsorship Modal */}
-      <PodcastSponsorshipModal
-        isOpen={podcastSponsorOpen}
-        onClose={() => setPodcastSponsorOpen(false)}
-        pageId={profile.username || 'podcaster'}
-        podcastTitle={profile.name}
-        hostName={profile.name}
-        hostPhone={profile.businessPhone}
-        cardData={selectedPodcastCard}
-      />
-
-      {/* Real Estate Showing Modal */}
-      <ShowingBookingModal
-        isOpen={showingModalOpen}
-        onClose={() => setShowingModalOpen(false)}
-        pageId={profile.username || 'realtor'}
-        agentName={profile.name}
-        agentPhone={profile.businessPhone}
-        cardData={selectedShowingCard}
-      />
-
-      {/* Home Valuation Modal */}
-      <HomeValuationModal
-        isOpen={homeValuationOpen}
-        onClose={() => setHomeValuationOpen(false)}
-        pageId={profile.username || 'realtor'}
-        agentName={profile.name}
-        agentPhone={profile.businessPhone}
-      />
-
-      {/* Media Kit Modal */}
-      <MediaKitModal
-        isOpen={mediaKitModalOpen}
-        onClose={() => setMediaKitModalOpen(false)}
         profile={profile}
-        onOpenInquiry={() => {
-          setMediaKitModalOpen(false);
-          setBrandInquiryOpen(true);
-        }}
+        isPreview={true}
       />
     </div>
   );

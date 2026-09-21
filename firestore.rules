@@ -174,7 +174,8 @@ service cloud.firestore {
       allow create: if exists(/databases/$(database)/documents/pages/$(pageId))
         && request.resource.data.type in [
           'showing_request', 'brand_inquiry', 'home_valuation', 'general_contact',
-          'media_kit_download', 'package_booking', 'showing', 'brand', 'valuation', 'coaching'
+          'media_kit_download', 'package_booking', 'music_booking', 'podcast_sponsorship',
+          'showing', 'brand', 'valuation', 'coaching'
         ]
         && request.resource.data.status == 'new'
         && request.resource.data.keys().hasOnly([
@@ -203,15 +204,27 @@ service cloud.firestore {
       // Public create with type allowlist, strict keys, timestamp == request.time
       allow create: if request.resource.data.type in [
           'page_view', 'link_click', 'property_view', 'showing_request',
-          'brand_inquiry', 'home_valuation', 'media_kit_download', 'package_booking', 'general_contact'
+          'brand_inquiry', 'home_valuation', 'media_kit_download', 'package_booking',
+          'music_booking', 'podcast_sponsorship', 'general_contact'
         ]
         && request.resource.data.keys().hasOnly([
-          'type', 'linkId', 'visitorId', 'country', 'device', 'browser', 'referrer', 'timestamp'
+          'type', 'linkId', 'visitorId', 'country', 'device', 'browser', 'referrer', 'timestamp', 'expireAt'
         ])
         && request.resource.data.timestamp == request.time;
 
       allow read: if isPageOwner(pageId);
       allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // PAGES SUBCOLLECTIONS: STATS (Aggregated Daily Rollups)
+    // =========================================================================
+
+    match /pages/{pageId}/stats/{date} {
+      // Owner can read aggregated daily statistics
+      allow read: if isPageOwner(pageId);
+      // Client writes disabled (Only Cloud Functions / Admin SDK writes)
+      allow write: if false;
     }
 
     // =========================================================================

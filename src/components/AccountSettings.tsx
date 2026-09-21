@@ -38,11 +38,18 @@ import {
   PaymentInvoiceRecord,
   SubscriptionPlanType,
 } from '../types';
-import { User } from 'firebase/auth';
+import {
+  User,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  GoogleAuthProvider,
+} from 'firebase/auth';
 import { profileService, auth } from '../lib/firebase';
 import { usePlan } from '../hooks/usePlan';
 import { uploadImageToStorage } from '../lib/storage';
 import { PLANS_CONFIG } from '../lib/razorpay';
+import { downloadLeadsCsv } from '../lib/csvExport';
 import { BillingDashboard } from './BillingDashboard';
 import { Button, ButtonGroup } from './ui';
 
@@ -141,6 +148,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deleteReauthPassword, setDeleteReauthPassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Sync initial tab when changed from props
@@ -365,39 +374,81 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
     }
   };
 
-  const handleExportLeadsCsv = () => {
-    const csvHeader = 'Timestamp,Name,Email,Phone,InquiryType,Message,Status\n';
-    const sampleRows = [
-      `"${new Date().toISOString()}","Aarav Mehta","aarav@example.com","+91 9876543210","Design Consultation","Looking for UI/UX redesign proposal.","New Lead"`,
-      `"${new Date(Date.now() - 86400000).toISOString()}","Priya Sharma","priya.s@agency.in","+91 9811223344","Brand Collaboration","Interested in sponsored campaign.","Contacted"`,
-    ].join('\n');
+  const handleExportLeadsCsv = async () => {
+    // Enforce Business / Agency tier gate consistent with PLANS_CONFIG
+    const isAgency = profile.plan === 'agency' || (profile as any).role === 'agency';
+    const isBusiness = profile.plan === 'business';
 
-    const blob = new Blob([csvHeader + sampleRows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `linklyra_leads_${profile.username}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    if (!isAgency && !isBusiness) {
+      if (onOpenProModal) {
+        onOpenProModal('Lead CRM CSV Export');
+      } else {
+        alert('Exporting Lead CRM to CSV requires the Business or Agency plan.');
+      }
+      return;
+    }
+
+    const pageId = profile.id || currentUser?.uid || profile.username;
+    if (!pageId) {
+      alert('Account ID not found.');
+      return;
+    }
+
+    try {
+      const leads = await profileService.getLeads(pageId);
+      if (!leads || leads.length === 0) {
+        alert('No inbound leads or inquiries to export yet.');
+        return;
+      }
+      downloadLeadsCsv(leads, profile.username || 'creator');
+    } catch (err: any) {
+      console.error('Error exporting leads CSV:', err);
+      alert('Failed to export leads: ' + (err?.message || 'Unknown error'));
+    }
   };
 
   const handleDeleteAccountFinal = async () => {
     if (deleteConfirmationText !== 'DELETE') return;
+    if (!currentUser) return;
+
+    setDeleteError(null);
     setIsDeletingAccount(true);
 
     try {
-      if (currentUser?.uid) {
-        await profileService.deleteUserAccount(currentUser.uid);
+      // 1. Re-authenticate first
+      const isGoogle = currentUser.providerData?.some((p) => p.providerId === 'google.com');
+      if (isGoogle) {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await reauthenticateWithPopup(currentUser, provider);
+      } else {
+        if (!deleteReauthPassword) {
+          throw new Error('Please enter your current password to confirm account deletion.');
+        }
+        if (!currentUser.email) {
+          throw new Error('No user email associated with this account.');
+        }
+        const credential = EmailAuthProvider.credential(currentUser.email, deleteReauthPassword);
+        await reauthenticateWithCredential(currentUser, credential);
       }
+
+      // 2. Call Cloud Function via deleteUserAccount
+      await profileService.deleteUserAccount(currentUser.uid);
+
+      // 3. Sign out and reload
       onSignOut();
       window.location.reload();
     } catch (err: any) {
       console.error('Failed to delete account:', err);
-      alert('Could not complete account deletion: ' + (err.message || 'Please sign in again first.'));
+      let msg = err.message || 'Could not complete account deletion.';
+      if (msg.includes('auth/wrong-password') || msg.includes('auth/invalid-credential')) {
+        msg = 'Incorrect password. Re-authentication failed.';
+      } else if (msg.includes('auth/popup-closed-by-user')) {
+        msg = 'Google re-authentication was cancelled. Please try again.';
+      }
+      setDeleteError(msg);
     } finally {
       setIsDeletingAccount(false);
-      setShowDeleteConfirm(false);
     }
   };
 
@@ -1619,6 +1670,34 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
               />
             </div>
 
+            {!isGoogleUser && (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#1C1E22]">
+                  Enter current password to verify identity:
+                </label>
+                <input
+                  type="password"
+                  value={deleteReauthPassword}
+                  onChange={(e) => setDeleteReauthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+                />
+              </div>
+            )}
+
+            {isGoogleUser && (
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs text-[#737882]">
+                A Google sign-in window will confirm your ownership before deletion is executed.
+              </div>
+            )}
+
+            {deleteError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-600 font-medium flex items-center gap-1.5">
+                <HugeIcon icon={AlertCircleIcon} size={14} className="w-3.5 h-3.5 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <ButtonGroup variant="secondary" size="sm">
                 <Button
@@ -1627,13 +1706,19 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setDeleteConfirmationText('');
+                    setDeleteReauthPassword('');
+                    setDeleteError(null);
                   }}
                 >
                   Cancel
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={deleteConfirmationText !== 'DELETE' || isDeletingAccount}
+                  disabled={
+                    deleteConfirmationText !== 'DELETE' ||
+                    (!isGoogleUser && !deleteReauthPassword) ||
+                    isDeletingAccount
+                  }
                   onClick={handleDeleteAccountFinal}
                 >
                   {isDeletingAccount && <HugeIcon icon={Loading03Icon} size={14} className="w-3.5 h-3.5 animate-spin" />}

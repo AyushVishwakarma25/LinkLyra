@@ -16,6 +16,8 @@ import { SocialIconsRow } from '../../components/SocialIconsRow';
 import { UI_KIT } from '../../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../../lib/whatsapp';
 import { ProfileCardData } from '../../types';
+import { useLeadModals } from '../../hooks/useLeadModals';
+import { LeadModalHost } from '../../components/LeadModalHost';
 
 export interface PublicProfilePageProps {
   username?: string;
@@ -173,6 +175,36 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   }, [username]);
 
   const [missingPhoneAlert, setMissingPhoneAlert] = useState(false);
+  const leadModals = useLeadModals();
+
+  const linkToCard = (link: DbLink): ProfileCardData => ({
+    id: link.id,
+    title: link.title,
+    subtitle: link.subtitle,
+    linkUrl: link.link_url,
+    color: link.color,
+    logoSrc: link.logo_url,
+    badgeText: link.badge_text,
+    expanded: link.expanded,
+    templateType: link.template_type,
+    realEstate: link.real_estate
+      ? {
+          propertyName: link.real_estate.property_name || link.title,
+          location: link.real_estate.location || '',
+          priceBracket: link.real_estate.price_bracket || '',
+          propertyType: link.real_estate.property_type || '',
+        }
+      : undefined,
+    coaching: link.coaching
+      ? {
+          courseName: link.coaching.course_name || link.title,
+          examTrack: link.coaching.exam_track || '',
+          batchTiming: link.coaching.batch_timing || '',
+          feeStructure: link.coaching.fee_structure || '',
+        }
+      : undefined,
+    customWhatsappPhone: link.custom_whatsapp_phone,
+  });
 
   const handleShare = () => {
     const url = window.location.href;
@@ -184,40 +216,41 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   };
 
   const handleOpenLink = (link: DbLink) => {
-    // Record click analytics atomically
-    profileService.recordClick(link.id);
+    // Record click analytics atomically (skips bots and owner views)
+    if (profile?.id || link.profile_id) {
+      profileService.recordClick(profile?.id || link.profile_id, link.id);
+    }
+
+    const cardData = linkToCard(link);
+
+    // Direct interactive Lead Inquiry Triggers
+    if (link.template_type === 'brand_inquiry') {
+      leadModals.openBrandInquiry(null, cardData);
+      return;
+    }
+    if (link.template_type === 'music_booking_inquiry' || link.template_type === 'music_book_me') {
+      leadModals.openMusicBooking(cardData);
+      return;
+    }
+    if (link.template_type === 'podcast_sponsor_inquiry' || link.template_type === 'podcast_sponsor_me') {
+      leadModals.openPodcastSponsor(cardData);
+      return;
+    }
+    if (link.template_type === 'showing_booking') {
+      leadModals.openShowing(cardData);
+      return;
+    }
+    if (link.template_type === 'home_valuation') {
+      leadModals.openValuation(cardData);
+      return;
+    }
+    if (link.template_type === 'media_kit' || link.template_type === 'music_press_kit') {
+      leadModals.openMediaKit(cardData);
+      return;
+    }
 
     // Dynamic WhatsApp intent generation for localized business cards
     if (link.template_type === 'real_estate' || link.template_type === 'coaching_institute') {
-      const cardData: ProfileCardData = {
-        id: link.id,
-        title: link.title,
-        subtitle: link.subtitle,
-        linkUrl: link.link_url,
-        color: link.color,
-        logoSrc: link.logo_url,
-        badgeText: link.badge_text,
-        expanded: link.expanded,
-        templateType: link.template_type,
-        realEstate: link.real_estate
-          ? {
-              propertyName: link.real_estate.property_name || link.title,
-              location: link.real_estate.location || '',
-              priceBracket: link.real_estate.price_bracket || '',
-              propertyType: link.real_estate.property_type || '',
-            }
-          : undefined,
-        coaching: link.coaching
-          ? {
-              courseName: link.coaching.course_name || link.title,
-              examTrack: link.coaching.exam_track || '',
-              batchTiming: link.coaching.batch_timing || '',
-              feeStructure: link.coaching.fee_structure || '',
-            }
-          : undefined,
-        customWhatsappPhone: link.custom_whatsapp_phone,
-      };
-
       const intent = generateWhatsAppIntentUrl(cardData, profile?.business_phone);
 
       if (!intent.hasPhone) {
@@ -568,62 +601,71 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                   (() => {
                     const hasSections = sections && sections.length > 0;
 
-                    const renderCardItem = (link: DbLink) => (
-                      <div
-                        key={link.id}
-                        onClick={() => handleOpenLink(link)}
-                        className="cursor-pointer group block max-w-full overflow-hidden"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleOpenLink(link);
-                          }
-                        }}
-                      >
-                        <ProfileCard
-                          id={link.id}
-                          title={link.title}
-                          subtitle={link.subtitle}
-                          linkUrl={link.link_url}
-                          color={link.color}
-                          logoSrc={link.logo_url}
-                          badgeText={link.badge_text}
-                          expanded={link.expanded}
-                          templateType={link.template_type}
-                          realEstate={
-                            link.real_estate
-                              ? {
-                                  propertyName: link.real_estate.property_name || link.title,
-                                  location: link.real_estate.location || '',
-                                  priceBracket: link.real_estate.price_bracket || '',
-                                  propertyType: link.real_estate.property_type || '',
-                                }
-                              : undefined
-                          }
-                          coaching={
-                            link.coaching
-                              ? {
-                                  courseName: link.coaching.course_name || link.title,
-                                  examTrack: link.coaching.exam_track || '',
-                                  batchTiming: link.coaching.batch_timing || '',
-                                  feeStructure: link.coaching.fee_structure || '',
-                                }
-                              : undefined
-                          }
-                          businessPhone={profile.business_phone}
-                          customWhatsappPhone={link.custom_whatsapp_phone}
-                          interactive={true}
-                          onMissingPhone={() => setMissingPhoneAlert(true)}
+                    const renderCardItem = (link: DbLink) => {
+                      const cardData = linkToCard(link);
+                      return (
+                        <div
+                          key={link.id}
                           onClick={() => handleOpenLink(link)}
-                          onLinkClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenLink(link);
+                          className="cursor-pointer group block max-w-full overflow-hidden"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleOpenLink(link);
+                            }
                           }}
-                        />
-                      </div>
-                    );
+                        >
+                          <ProfileCard
+                            id={link.id}
+                            title={link.title}
+                            subtitle={link.subtitle}
+                            linkUrl={link.link_url}
+                            color={link.color}
+                            logoSrc={link.logo_url}
+                            badgeText={link.badge_text}
+                            expanded={link.expanded}
+                            templateType={link.template_type}
+                            realEstate={
+                              link.real_estate
+                                ? {
+                                    propertyName: link.real_estate.property_name || link.title,
+                                    location: link.real_estate.location || '',
+                                    priceBracket: link.real_estate.price_bracket || '',
+                                    propertyType: link.real_estate.property_type || '',
+                                  }
+                                : undefined
+                            }
+                            coaching={
+                              link.coaching
+                                ? {
+                                    courseName: link.coaching.course_name || link.title,
+                                    examTrack: link.coaching.exam_track || '',
+                                    batchTiming: link.coaching.batch_timing || '',
+                                    feeStructure: link.coaching.fee_structure || '',
+                                  }
+                                : undefined
+                            }
+                            businessPhone={profile.business_phone}
+                            customWhatsappPhone={link.custom_whatsapp_phone}
+                            interactive={true}
+                            onMissingPhone={() => setMissingPhoneAlert(true)}
+                            onClick={() => handleOpenLink(link)}
+                            onLinkClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenLink(link);
+                            }}
+                            onOpenShowingModal={(c) => leadModals.openShowing(c || cardData)}
+                            onOpenValuationModal={() => leadModals.openValuation(cardData)}
+                            onOpenBrandInquiryModal={(pkg, c) => leadModals.openBrandInquiry(pkg, c || cardData)}
+                            onOpenMediaKitModal={() => leadModals.openMediaKit(cardData)}
+                            onOpenMusicBookingModal={(c) => leadModals.openMusicBooking(c || cardData)}
+                            onOpenPodcastSponsorModal={(c) => leadModals.openPodcastSponsor(c || cardData)}
+                          />
+                        </div>
+                      );
+                    };
 
                     if (!hasSections || searchQuery || colorFilter !== 'all') {
                       return filteredLinks.map(renderCardItem);
@@ -707,6 +749,15 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           </div>
         )}
       </main>
+
+      {/* Centralized Lead Modals Host for Public Profile */}
+      <LeadModalHost
+        leadModals={leadModals}
+        pageId={profile?.id || username}
+        creatorName={profile?.full_name || username}
+        creatorPhone={profile?.business_phone || ''}
+        isPreview={false}
+      />
     </div>
   );
 };

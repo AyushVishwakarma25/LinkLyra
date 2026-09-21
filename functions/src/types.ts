@@ -16,3 +16,11 @@ export interface ConsumeCreditsRequest {
   amount: number;
   reason: string;
 }
+
+export interface ClaimDomainRequest {
+  domain: string;
+}
+
+export interface ReleaseDomainRequest {
+  domain?: string;
+}

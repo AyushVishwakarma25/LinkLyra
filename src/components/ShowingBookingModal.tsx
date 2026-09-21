@@ -24,6 +24,7 @@ export interface ShowingBookingModalProps {
   agentName?: string;
   agentPhone?: string;
   cardData?: ProfileCardData | null;
+  isPreview?: boolean;
 }
 
 const TIME_SLOTS = [
@@ -47,6 +48,7 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
   agentName = 'Agent',
   agentPhone = '',
   cardData = null,
+  isPreview = false,
 }) => {
   const realEstate: RealEstateMetadata | undefined = cardData?.realEstate;
   const propertyTitle = realEstate?.propertyName || cardData?.title || 'Featured Property Listing';
@@ -66,21 +68,36 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
+  const [hp, setHp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hp) return;
+
     if (!name.trim() || !phone.trim() || !email.trim()) {
-      alert('Please fill in your Name, Phone Number, and Email.');
+      setErrorMessage('Please fill in your Name, Phone Number, and Email.');
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await profileService.submitLead(pageId || 'public_page', {
+      if (isPreview) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setSubmitted(true);
+        return;
+      }
+
+      if (!pageId) {
+        throw new Error('Agent page ID is missing. Please refresh and try again.');
+      }
+
+      await profileService.submitLead(pageId, {
         type: 'showing_request',
         name: name.trim(),
         email: email.trim(),
@@ -92,9 +109,9 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
       });
 
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting showing request:', err);
-      setSubmitted(true);
+      setErrorMessage(err?.message || 'Failed to submit showing request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -112,10 +129,12 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
 
   const handleResetAndClose = () => {
     setSubmitted(false);
+    setErrorMessage(null);
     setName('');
     setPhone('');
     setEmail('');
     setNotes('');
+    setHp('');
     onClose();
   };
 
@@ -208,6 +227,37 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isPreview && (
+                <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>Preview: submissions aren't saved</span>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+                  <span>{errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Honeypot field for bot protection */}
+              <input
+                type="text"
+                name="_hp"
+                value={hp}
+                onChange={(e) => setHp(e.target.value)}
+                style={{ display: 'none' }}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
+
               {/* Date & Time Slot Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

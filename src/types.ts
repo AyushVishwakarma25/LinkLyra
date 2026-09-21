@@ -406,16 +406,29 @@ export interface UserProfile {
 // Lead & CRM Entities (Saved in Firestore)
 // -------------------------------------------------------------
 export type LeadType =
-  | 'showing_request'
   | 'brand_inquiry'
+  | 'showing_request'
   | 'home_valuation'
-  | 'general_contact'
   | 'media_kit_download'
   | 'package_booking'
   | 'music_booking'
-  | 'podcast_sponsorship';
+  | 'podcast_sponsorship'
+  | 'general_contact'
+  | 'showing'
+  | 'brand'
+  | 'valuation'
+  | 'coaching';
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'in_progress' | 'closed' | 'booked' | 'archived';
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'won'
+  | 'lost'
+  | 'qualified'
+  | 'in_progress'
+  | 'closed'
+  | 'booked'
+  | 'archived';
 
 export interface LeadRecord {
   id: string;
@@ -445,17 +458,29 @@ export interface LeadRecord {
 export interface SpecializedAnalyticsSummary {
   totalViews: number;
   totalClicks: number;
-  overallCtr: number;
+  overallCtr?: number;
+  ctr?: string;
   // Real Estate Metrics
   propertyViews: number;
-  listingClicks: number;
+  listingClicks?: number;
   showingRequests: number;
   homeValuations: number;
   // Creator Metrics
   brandInquiries: number;
   mediaKitDownloads: number;
-  packageClicks: number;
-  estimatedPipelineValueINR: number;
+  packageClicks?: number;
+  packageBookings: number;
+  generalContacts: number;
+  musicBookings?: number;
+  podcastSponsorships?: number;
+  estimatedPipelineValueINR?: number;
+  // Distribution & Breakdown rollups
+  deviceCounts?: Record<string, number>;
+  browserCounts?: Record<string, number>;
+  referrerCounts?: Record<string, number>;
+  linkClickCounts?: Record<string, number>;
+  topLinks?: { linkId: string; title?: string; clicks: number }[];
+  dailyStats?: { date: string; views: number; clicks: number }[];
 }
 
 // -------------------------------------------------------------

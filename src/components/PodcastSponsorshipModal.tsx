@@ -26,6 +26,7 @@ export interface PodcastSponsorshipModalProps {
   hostPhone?: string;
   mediaKitUrl?: string;
   cardData?: ProfileCardData | null;
+  isPreview?: boolean;
 }
 
 const AD_SLOT_TYPES = [
@@ -56,6 +57,7 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
   hostPhone = '',
   mediaKitUrl = '',
   cardData = null,
+  isPreview = false,
 }) => {
   const [brandName, setBrandName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -67,22 +69,37 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
   );
   const [targetMonth, setTargetMonth] = useState('');
   const [pitch, setPitch] = useState('');
+  const [hp, setHp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hp) return;
+
     if (!brandName.trim() || !contactName.trim() || !email.trim()) {
-      alert('Please provide your brand name, your name, and a valid work email.');
+      setErrorMessage('Please provide your brand name, your name, and a valid work email.');
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await profileService.submitLead(pageId || 'public_page', {
-        type: 'podcast_sponsorship' as any,
+      if (isPreview) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setSubmitted(true);
+        return;
+      }
+
+      if (!pageId) {
+        throw new Error('Podcast host page ID is missing. Please refresh and try again.');
+      }
+
+      await profileService.submitLead(pageId, {
+        type: 'podcast_sponsorship',
         name: contactName.trim(),
         email: email.trim(),
         phone: phone.trim(),
@@ -94,9 +111,9 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
         selectedPackageName: `Podcast Ad: ${adSlot}`,
       });
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting podcast sponsorship request:', err);
-      setSubmitted(true);
+      setErrorMessage(err?.message || 'Failed to submit sponsorship inquiry. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,6 +131,14 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
 
   const handleResetAndClose = () => {
     setSubmitted(false);
+    setErrorMessage(null);
+    setBrandName('');
+    setContactName('');
+    setEmail('');
+    setPhone('');
+    setPitch('');
+    setTargetMonth('');
+    setHp('');
     onClose();
   };
 
@@ -190,6 +215,37 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
+            {isPreview && (
+              <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <span>Preview: submissions aren't saved</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+                <span>{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Honeypot field for bot protection */}
+            <input
+              type="text"
+              name="_hp"
+              value={hp}
+              onChange={(e) => setHp(e.target.value)}
+              style={{ display: 'none' }}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-stone-700 block mb-1">

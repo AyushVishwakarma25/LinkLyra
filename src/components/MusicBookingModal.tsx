@@ -23,6 +23,7 @@ export interface MusicBookingModalProps {
   artistName?: string;
   artistPhone?: string;
   cardData?: ProfileCardData | null;
+  isPreview?: boolean;
 }
 
 const EVENT_TYPES = [
@@ -60,6 +61,7 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
   artistName = 'Artist',
   artistPhone = '',
   cardData = null,
+  isPreview = false,
 }) => {
   const [organizerName, setOrganizerName] = useState('');
   const [companyOrOrganization, setCompanyOrOrganization] = useState('');
@@ -73,22 +75,37 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
     cardData?.music?.bookingRate || BUDGET_BRACKETS[1]
   );
   const [notes, setNotes] = useState('');
+  const [hp, setHp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hp) return;
+
     if (!organizerName.trim() || !email.trim()) {
-      alert('Please provide your name and email address.');
+      setErrorMessage('Please provide your name and email address.');
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await profileService.submitLead(pageId || 'public_page', {
-        type: 'music_booking' as any,
+      if (isPreview) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setSubmitted(true);
+        return;
+      }
+
+      if (!pageId) {
+        throw new Error('Artist page ID is missing. Please refresh and try again.');
+      }
+
+      await profileService.submitLead(pageId, {
+        type: 'music_booking',
         name: organizerName.trim(),
         email: email.trim(),
         phone: phone.trim(),
@@ -100,9 +117,9 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
         details: notes.trim(),
       });
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting booking inquiry:', err);
-      setSubmitted(true);
+      setErrorMessage(err?.message || 'Failed to submit booking request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,6 +137,15 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
 
   const handleResetAndClose = () => {
     setSubmitted(false);
+    setErrorMessage(null);
+    setOrganizerName('');
+    setCompanyOrOrganization('');
+    setEmail('');
+    setPhone('');
+    setNotes('');
+    setVenueAndCity('');
+    setEventDate('');
+    setHp('');
     onClose();
   };
 
@@ -185,6 +211,37 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
+            {isPreview && (
+              <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <span>Preview: submissions aren't saved</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+                <span>{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Honeypot field for bot protection */}
+            <input
+              type="text"
+              name="_hp"
+              value={hp}
+              onChange={(e) => setHp(e.target.value)}
+              style={{ display: 'none' }}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-stone-700 block mb-1">

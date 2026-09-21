@@ -22,6 +22,7 @@ export interface HomeValuationModalProps {
   pageId?: string;
   agentName?: string;
   agentPhone?: string;
+  isPreview?: boolean;
 }
 
 const PROPERTY_TYPES = [
@@ -43,6 +44,7 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
   pageId = '',
   agentName = 'Agent',
   agentPhone = '',
+  isPreview = false,
 }) => {
   const [address, setAddress] = useState('');
   const [propertyType, setPropertyType] = useState(PROPERTY_TYPES[0]);
@@ -52,21 +54,36 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [hp, setHp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hp) return;
+
     if (!address.trim() || !name.trim() || !phone.trim() || !email.trim()) {
-      alert('Please fill in your Property Address, Name, Phone Number, and Email.');
+      setErrorMessage('Please fill in your Property Address, Name, Phone Number, and Email.');
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await profileService.submitLead(pageId || 'public_page', {
+      if (isPreview) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        setSubmitted(true);
+        return;
+      }
+
+      if (!pageId) {
+        throw new Error('Agent page ID is missing. Please refresh and try again.');
+      }
+
+      await profileService.submitLead(pageId, {
         type: 'home_valuation',
         name: name.trim(),
         email: email.trim(),
@@ -79,9 +96,9 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
       });
 
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting home valuation request:', err);
-      setSubmitted(true);
+      setErrorMessage(err?.message || 'Failed to submit valuation request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -99,10 +116,12 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
 
   const handleResetAndClose = () => {
     setSubmitted(false);
+    setErrorMessage(null);
     setAddress('');
     setName('');
     setPhone('');
     setEmail('');
+    setHp('');
     onClose();
   };
 
@@ -171,6 +190,37 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isPreview && (
+                <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>Preview: submissions aren't saved</span>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+                  <span>{errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Honeypot field for bot protection */}
+              <input
+                type="text"
+                name="_hp"
+                value={hp}
+                onChange={(e) => setHp(e.target.value)}
+                style={{ display: 'none' }}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
+
               {/* Property Address */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">

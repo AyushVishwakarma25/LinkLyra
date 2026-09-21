@@ -165,6 +165,23 @@ export default function App() {
     // Plan is granted and verified on the server; usePlan hook will automatically update state.
   };
 
+  // Email verification banner state
+  const [emailBannerDismissed, setEmailBannerDismissed] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const handleResendVerification = async () => {
+    setResendStatus('sending');
+    try {
+      await profileService.sendVerificationEmail();
+      setResendStatus('sent');
+      setTimeout(() => setResendStatus('idle'), 4000);
+    } catch (err: any) {
+      console.warn('Failed to resend verification email:', err);
+      setResendStatus('error');
+      setTimeout(() => setResendStatus('idle'), 4000);
+    }
+  };
+
   // Sync profile changes to user-scoped localStorage
   useEffect(() => {
     if (currentUser) {
@@ -612,13 +629,13 @@ export default function App() {
   };
 
   const handleCardClick = (card: ProfileCardData) => {
+    // In studio builder preview, only update local state, do not write to analytics
     setProfile((prev) => ({
       ...prev,
       cards: prev.cards.map((c) =>
         c.id === card.id ? { ...c, clicks: (c.clicks || 0) + 1 } : c
       ),
     }));
-    profileService.recordClick(card.id);
 
     if (card.linkUrl && card.linkUrl !== '#') {
       const finalUrl =
@@ -830,6 +847,42 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-[#ECE7DC] text-[#1C1E22] antialiased">
+      {/* Non-blocking Email Verification Banner */}
+      {currentUser && !currentUser.emailVerified && !emailBannerDismissed && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-center justify-between gap-2 shrink-0 z-40">
+          <div className="flex items-center gap-2 min-w-0">
+            <HugeiconsIcon icon={Mail01Icon} size={16} className="text-amber-700 shrink-0" />
+            <span className="truncate">
+              Please verify your email address (<strong>{currentUser.email}</strong>) to secure your account.
+            </span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendStatus === 'sending'}
+              className="font-bold underline hover:text-amber-950 text-amber-800 cursor-pointer disabled:opacity-50"
+            >
+              {resendStatus === 'sending'
+                ? 'Sending...'
+                : resendStatus === 'sent'
+                ? 'Email Sent!'
+                : resendStatus === 'error'
+                ? 'Failed to send'
+                : 'Resend Verification'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEmailBannerDismissed(true)}
+              className="text-amber-600 hover:text-amber-900 text-base leading-none px-1 cursor-pointer"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Global App Header Navigation (Safe Area optimized for iOS notch / Android status bar) */}
       <header className="bg-white border-b border-black/10 px-3 sm:px-6 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 sm:pb-2.5 flex items-center justify-between shrink-0 shadow-2xs z-30">
         {/* Brand Logo & Handle */}

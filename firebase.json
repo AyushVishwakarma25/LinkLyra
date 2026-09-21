@@ -20,6 +20,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "linklyra",
     "public": "dist",
     "ignore": [
       "firebase.json",

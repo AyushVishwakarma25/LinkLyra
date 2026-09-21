@@ -144,20 +144,24 @@ setLogLevel('silent');
 // Singleton Firebase Application & Service Initialization
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-
 function createFirestoreInstance() {
+  const dbId = (!firebaseConfig.firestoreDatabaseId || firebaseConfig.firestoreDatabaseId === '(default)')
+    ? undefined
+    : firebaseConfig.firestoreDatabaseId;
+
   try {
     return initializeFirestore(app, {
       experimentalForceLongPolling: true,
-    }, firebaseConfig.firestoreDatabaseId);
+    }, dbId as any);
   } catch {
-    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
   }
 }
 
 export const db = createFirestoreInstance();
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // --------------------------------------------------------------------------
 // Core Linktree Database Types
@@ -471,7 +475,13 @@ export const profileService = {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
 
-    let profile = await this.getProfile(user.uid);
+    let profile: DbProfile | null = null;
+    try {
+      profile = await this.getProfile(user.uid);
+    } catch (fetchErr) {
+      console.warn('Initial profile retrieval notice during Google sign-in:', fetchErr);
+    }
+
     if (!profile) {
       const generatedUsername = (user.displayName || user.email?.split('@')[0] || 'creator')
         .toLowerCase()
@@ -530,7 +540,7 @@ export const profileService = {
           username: generatedUsername,
         });
       } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}`);
+        console.warn('Initial Firestore record initialization notice:', err);
       }
     }
 

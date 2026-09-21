@@ -7,7 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true }); try { fs.rmSync('server.js'); } catch (e) {}\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

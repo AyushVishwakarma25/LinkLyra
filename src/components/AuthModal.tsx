@@ -58,12 +58,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err: any) {
       console.error('Google sign in error:', err);
       let msg = err.message || 'Failed to sign in with Google. Please try again.';
-      if (msg.includes('auth/popup-closed-by-user')) {
+      if (msg.includes('auth/unauthorized-domain')) {
+        msg = 'Domain not authorized: Please add "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+      } else if (msg.includes('auth/popup-closed-by-user')) {
         msg = 'Sign-in popup was closed before completing. Please try again.';
       } else if (msg.includes('auth/popup-blocked')) {
-        msg = 'Popup was blocked by your browser. Please allow popups for this site.';
+        msg = 'Popup was blocked by your browser. Please allow popups for localhost:3000.';
       } else if (msg.includes('auth/operation-not-allowed')) {
-        msg = 'Google Sign-in is temporarily unavailable. Please try again or use your email.';
+        msg = 'Google provider is disabled. In Firebase Console, go to Authentication -> Sign-in method and enable Google.';
+      } else if (msg.includes('auth/cancelled-popup-request')) {
+        msg = 'Another sign-in attempt is currently running. Please wait a moment.';
+      } else if (msg.includes('auth/internal-error')) {
+        msg = 'Firebase internal error. Verify Identity Toolkit API is enabled in Google Cloud Console.';
+      } else if (msg.includes('access_denied') || msg.includes('403')) {
+        msg = 'GCP OAuth Access Denied: If OAuth consent is in "Testing", add your email to Test Users in Google Cloud Console.';
+      } else if (msg.includes('redirect_uri_mismatch')) {
+        msg = 'OAuth Redirect URI mismatch. Ensure https://zeperai.firebaseapp.com/__/auth/handler is registered in GCP OAuth credentials.';
+      } else if (msg.includes('auth/network-request-failed')) {
+        msg = 'Network connection failed. Please check your connection or ad-blocker.';
       }
       setErrorMsg(msg);
     } finally {
@@ -106,7 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error('Auth error:', err);
       let msg = err.message || 'An error occurred during sign in.';
       if (msg.includes('auth/operation-not-allowed')) {
-        msg = 'Please use "Continue with Google" above to sign in instantly.';
+        msg = 'Email/Password sign-in is disabled. Enable Email/Password in Firebase Console -> Authentication -> Sign-in method.';
       } else if (msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')) {
         msg = 'Invalid email or password. Please verify your credentials.';
       } else if (msg.includes('auth/email-already-in-use')) {
@@ -115,6 +127,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         msg = 'Password is too weak. Please use at least 6 characters.';
       } else if (msg.includes('auth/user-not-found')) {
         msg = 'No account found with this email. Please click "Create Account" below.';
+      } else if (msg.includes('auth/unauthorized-domain')) {
+        msg = 'Domain not authorized: Please add "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+      } else if (msg.includes('auth/network-request-failed')) {
+        msg = 'Network connection failed. Please check your internet connection.';
       }
       setErrorMsg(msg);
     } finally {

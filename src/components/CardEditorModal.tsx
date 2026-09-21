@@ -529,6 +529,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
 
   // Image Upload state
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync state when initialCard changes
@@ -654,13 +655,22 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Image exceeds 2MB. Please upload an image under 2MB for fast loading.');
+      return;
+    }
+    setUploadError(null);
     setIsUploading(true);
     try {
       const url = await uploadImageToStorage(file, 'card_image');
       setLogoSrc(url);
     } catch (err) {
       console.error('Error uploading image to storage:', err);
+      setUploadError('Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -1059,13 +1069,18 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-hidden">
       <div
-        className="bg-stone-50 w-full max-w-2xl rounded-[28px] sm:rounded-[32px] border border-stone-200 shadow-2xl overflow-hidden flex flex-col max-h-[94vh]"
+        className="bg-stone-50 w-full max-w-2xl rounded-t-[32px] sm:rounded-[32px] border border-stone-200 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile drag handle */}
+        <div className="sm:hidden pt-2.5 pb-1 flex justify-center bg-white shrink-0">
+          <div className="w-12 h-1 bg-stone-300 rounded-full" />
+        </div>
+
         {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-stone-200 flex items-center justify-between bg-white shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-stone-200 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-9 h-9 rounded-2xl bg-[#1C1E22] text-white flex items-center justify-center shadow-xs shrink-0">
               <HugeIcon icon={StarIcon} size={16} className="w-4 h-4 text-amber-400" />
@@ -1944,6 +1959,10 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   <span>Upload</span>
                 </button>
               </div>
+              <p className="text-[10px] text-[#737882] mt-1">Image limit: max 2MB (PNG, JPG, WebP)</p>
+              {uploadError && (
+                <p className="text-[10px] font-semibold text-rose-600 mt-1 animate-fadeIn">{uploadError}</p>
+              )}
             </div>
 
             {/* Color Palette */}
@@ -2007,14 +2026,15 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     </div>
 
         {/* Footer actions */}
-        <div className="px-5 sm:px-6 py-4 border-t border-stone-200 flex items-center justify-between bg-white shrink-0">
+        {/* Footer (Safe area padded for iOS & Android) */}
+        <div className="px-4 sm:px-6 py-3 sm:py-4 pb-[max(0.875rem,env(safe-area-inset-bottom,0px))] border-t border-stone-200 flex items-center justify-between bg-white shrink-0">
           {activeView === 'picker' ? (
             <>
               {isEditing ? (
                 <button
                   type="button"
                   onClick={() => setActiveView('configure')}
-                  className="px-3 py-1.5 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-700 flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-700 flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200 touch-manipulation"
                 >
                   <HugeIcon icon={ArrowLeft01Icon} size={14} className="w-3.5 h-3.5" />
                   <span>Return to Card Form</span>
@@ -2028,7 +2048,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl hover:bg-black/5 text-xs font-bold text-[#737882] transition-colors cursor-pointer"
+                className="min-h-[44px] px-4 py-2 rounded-xl hover:bg-black/5 text-xs font-bold text-[#737882] transition-colors cursor-pointer touch-manipulation"
               >
                 Close
               </button>
@@ -2044,7 +2064,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       onClose();
                     }
                   }}
-                  className="px-3 py-1.5 rounded-xl text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer touch-manipulation"
                 >
                   <HugeIcon icon={Delete02Icon} size={14} className="w-3.5 h-3.5" />
                   <span>Delete</span>
@@ -2053,7 +2073,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveView('picker')}
-                  className="px-3 py-1.5 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-700 flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-700 flex items-center gap-1.5 transition-colors cursor-pointer border border-stone-200 touch-manipulation"
                 >
                   <HugeIcon icon={ArrowLeft01Icon} size={14} className="w-3.5 h-3.5" />
                   <span>Change Template</span>
@@ -2064,14 +2084,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl hover:bg-black/5 text-xs font-bold text-[#737882] transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 rounded-xl hover:bg-black/5 text-xs font-bold text-[#737882] transition-colors cursor-pointer touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   form="card-editor-form"
-                  className="px-5 py-2 rounded-xl bg-[#1C1E22] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#1C1E22] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer touch-manipulation"
                 >
                   <HugeIcon icon={Tick01Icon} size={14} className="w-3.5 h-3.5" />
                   <span>{isEditing ? 'Update Card' : 'Add to Showcase'}</span>

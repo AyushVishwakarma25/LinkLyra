@@ -63,7 +63,7 @@ export const MediaKitModal: React.FC<MediaKitModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">{profile.name}</h1>
-                <span className="p-1 rounded-full bg-blue-500/20 text-blue-400 text-xs">
+                <span className="p-1 rounded-full bg-white/10 text-white text-xs">
                   <HugeIcon icon={Award01Icon} size={16} className="w-4 h-4" />
                 </span>
               </div>
@@ -131,8 +131,8 @@ export const MediaKitModal: React.FC<MediaKitModalProps> = ({
               </ul>
             </div>
 
-            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
-              <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider mb-2 text-indigo-900">
+            <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-black/10">
+              <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider mb-2">
                 Deliverables & Turnaround
               </h4>
               <ul className="space-y-1.5 text-xs text-stone-700">

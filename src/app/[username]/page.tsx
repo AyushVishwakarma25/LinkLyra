@@ -8,6 +8,7 @@ import {
   AlertCircleIcon,
   ArrowLeft01Icon,
   Cancel01Icon,
+  Home01Icon,
 } from '@hugeicons/core-free-icons';
 import { profileService, DbProfile, DbLink, DbSection } from '../../lib/firebase';
 import { ProfileCard } from '../../components/ProfileCard';
@@ -60,6 +61,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const [colorFilter, setColorFilter] = useState<string>('all');
   const [copied, setCopied] = useState(false);
 
@@ -264,13 +266,18 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   const bgClass = themeConfig.bgClass;
   const isDarkTheme = themeConfig.isDark;
 
+  const isCustomImageWallpaper =
+    profile?.wallpaper_mode === 'image' && Boolean(profile?.background_value);
+  const tintPercent =
+    typeof profile?.wallpaper_tint === 'number' ? profile.wallpaper_tint : 20;
+
   return (
     <div className="min-h-screen bg-[#ECE7DC] flex flex-col antialiased text-[#1C1E22] overflow-x-hidden">
       {/* Top Floating Banner */}
       {onBackToEditor && (
         <div className="w-full bg-[#1C1E22] text-white px-3 sm:px-4 py-2 flex items-center justify-between text-xs shadow-md z-30 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/80 shrink-0" />
             <span className="font-semibold truncate">Visitor View</span>
             <span className="text-white/60 font-mono hidden sm:inline truncate">
               /{username}
@@ -322,97 +329,185 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           </div>
         ) : (
           <div
-            className={`w-full max-w-xl ${bgClass} rounded-[28px] sm:rounded-[36px] p-4 sm:p-7 md:p-8 shadow-md border border-black/10 flex flex-col justify-between min-h-[580px] overflow-hidden`}
+            className={`w-full max-w-xl ${
+              isCustomImageWallpaper ? 'bg-stone-900' : bgClass
+            } relative rounded-[28px] sm:rounded-[36px] p-4 sm:p-7 md:p-8 shadow-md border border-black/10 flex flex-col justify-between min-h-[580px] overflow-hidden`}
+            style={
+              isCustomImageWallpaper
+                ? {
+                    backgroundImage: `url(${profile.background_value})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                  }
+                : undefined
+            }
           >
-            <div className="space-y-4 max-w-full">
-              {/* Creator Profile Header */}
-              <div className="flex items-center justify-between gap-2.5 min-w-0">
-                <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-white shadow-xs bg-white shrink-0">
-                    <img
-                      src={
-                        profile.avatar_url && profile.avatar_url.trim() !== ''
-                          ? profile.avatar_url
-                          : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
-                      }
-                      alt=""
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80';
-                      }}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h1
-                      className={`text-base sm:text-lg md:text-xl font-bold leading-tight truncate ${
-                        isDarkTheme ? 'text-white' : 'text-[#1C1E22]'
-                      }`}
+            {/* Custom Wallpaper Dimming / Tint Overlay */}
+            {isCustomImageWallpaper && (
+              <div
+                className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-0"
+                style={{
+                  backgroundColor: `rgba(0, 0, 0, ${tintPercent / 100})`,
+                }}
+              />
+            )}
+
+            <div className="space-y-4 max-w-full relative z-10">
+              {/* Top Navigation Breadcrumb Bar */}
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-black/5">
+                <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[#737882] min-w-0 font-medium">
+                  <a
+                    href="/"
+                    className="hover:text-[#1C1E22] transition-colors truncate flex items-center gap-1"
+                  >
+                    <HugeIcon icon={Home01Icon} size={13} className="w-3.5 h-3.5 shrink-0" />
+                    <span>Home</span>
+                  </a>
+                  <span className={`text-[10px] shrink-0 ${isDarkTheme ? 'text-white/30' : 'text-black/20'}`}>
+                    /
+                  </span>
+                  <span className="font-bold text-[#5E4BF7] truncate">
+                    @{profile.username || 'creator'}
+                  </span>
+                </nav>
+
+                {/* Breadcrumb Menu: 3 lines button opening Search, Filter, Share dropdown */}
+                <div className="shrink-0 relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickActions(!showQuickActions)}
+                    aria-label="Menu"
+                    title="Search, Filter, Share menu"
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-lg border shadow-2xs flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                      showQuickActions
+                        ? 'bg-[#1C1E22] text-white border-black'
+                        : 'bg-white/95 text-[#1C1E22] border-black/10 hover:bg-black/5'
+                    }`}
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      {profile.full_name}
-                    </h1>
-                    <p
-                      className={`text-xs sm:text-sm font-medium truncate mt-0.5 ${
-                        isDarkTheme ? 'text-white/75' : 'text-[#737882]'
-                      }`}
-                    >
-                      {profile.bio}
-                    </p>
-                  </div>
+                      <line x1="4" y1="6.5" x2="20" y2="6.5" />
+                      <line x1="4" y1="12" x2="20" y2="12" />
+                      <line x1="4" y1="17.5" x2="20" y2="17.5" />
+                    </svg>
+                  </button>
+
+                  {/* Floating Dropdown Menu with names: Search, Filter, Share */}
+                  {showQuickActions && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-30"
+                        onClick={() => setShowQuickActions(false)}
+                      />
+                      <div className="absolute right-0 top-9 w-48 bg-white/98 backdrop-blur-md rounded-2xl shadow-xl border border-black/10 py-1.5 z-40 animate-fadeIn text-xs text-[#1C1E22]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowSearch((prev) => !prev);
+                            setShowQuickActions(false);
+                          }}
+                          className="w-full px-3.5 py-2.5 text-left font-semibold hover:bg-black/5 flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <span className={showSearch ? 'text-[#5E4BF7]' : 'text-[#1C1E22]'}>
+                            Search
+                          </span>
+                          {showSearch && (
+                            <span className="text-[10px] text-[#5E4BF7] font-bold px-1.5 py-0.5 rounded bg-[#5E4BF7]/10">
+                              Active
+                            </span>
+                          )}
+                        </button>
+
+                        <div className="h-px bg-black/5 my-1" />
+
+                        <div className="px-3.5 py-2">
+                          <div className="flex items-center justify-between mb-1.5 font-semibold text-[#1C1E22]">
+                            <span>Filter</span>
+                            <span className="text-[10px] text-[#5E4BF7] font-bold capitalize">
+                              {colorFilter === 'all' ? 'All' : colorFilter}
+                            </span>
+                          </div>
+                          <select
+                            value={colorFilter}
+                            onChange={(e) => {
+                              setColorFilter(e.target.value);
+                              setShowQuickActions(false);
+                            }}
+                            className="w-full bg-[#FAF8F5] border border-black/10 rounded-lg px-2 py-1.5 text-xs text-[#1C1E22] font-medium outline-hidden focus:border-[#5E4BF7] cursor-pointer"
+                          >
+                            <option value="all">All Colors</option>
+                            <option value="purple">Purple</option>
+                            <option value="orange">Orange</option>
+                            <option value="yellow">Yellow</option>
+                            <option value="green">Green</option>
+                            <option value="dark">Dark</option>
+                          </select>
+                        </div>
+
+                        <div className="h-px bg-black/5 my-1" />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleShare();
+                            setShowQuickActions(false);
+                          }}
+                          className="w-full px-3.5 py-2.5 text-left font-semibold hover:bg-black/5 flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <span>Share</span>
+                          {copied && (
+                            <span className="text-[10px] text-emerald-600 font-bold">
+                              Copied!
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
+              </div>
 
-                {/* Actions: Search, Filter, Share */}
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                  {/* Search toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setShowSearch(!showSearch)}
-                    aria-label="Search"
-                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-black/10 flex items-center justify-center transition-all shadow-2xs cursor-pointer ${
-                      showSearch
-                        ? 'bg-[#1C1E22] text-white'
-                        : 'bg-white text-[#1C1E22] hover:bg-black/5'
-                    }`}
-                  >
-                    <HugeIcon icon={Search01Icon} size={15} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-
-                  {/* Color filters */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextIdx =
-                        (availableColors.indexOf(colorFilter) + 1) % availableColors.length;
-                      setColorFilter(availableColors[nextIdx]);
+              {/* Creator Profile Header (Full Width, Host of The Founders title fully visible!) */}
+              <div className="flex items-center gap-3 sm:gap-3.5 pt-1">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-white shadow-xs bg-white shrink-0">
+                  <img
+                    src={
+                      profile.avatar_url && profile.avatar_url.trim() !== ''
+                        ? profile.avatar_url
+                        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+                    }
+                    alt=""
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80';
                     }}
-                    aria-label="Filter links"
-                    className={`h-8 sm:h-9 px-2.5 sm:px-3 rounded-full border border-black/10 flex items-center gap-1 text-xs font-semibold hover:bg-black/5 active:scale-95 transition-all shadow-2xs cursor-pointer ${
-                      colorFilter !== 'all'
-                        ? 'bg-[#1C1E22] text-white border-transparent'
-                        : 'bg-white text-[#1C1E22]'
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1
+                    className={`text-base sm:text-lg md:text-xl font-bold leading-tight ${
+                      isDarkTheme ? 'text-white' : 'text-[#1C1E22]'
                     }`}
                   >
-                    <HugeIcon icon={PreferenceHorizontalIcon} size={13} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    <span className="capitalize hidden sm:inline text-[11px]">
-                      {colorFilter === 'all' ? 'Filter' : colorFilter}
-                    </span>
-                  </button>
-
-                  {/* Share button */}
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    aria-label="Share profile link"
-                    title="Copy profile link"
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-black/10 flex items-center justify-center text-[#1C1E22] hover:bg-black/5 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                    {profile.full_name}
+                  </h1>
+                  <p
+                    className={`text-xs sm:text-sm font-medium mt-0.5 leading-snug break-words ${
+                      isDarkTheme ? 'text-white/80' : 'text-[#737882]'
+                    }`}
                   >
-                    {copied ? (
-                      <HugeIcon icon={Tick01Icon} size={14} className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <HugeIcon icon={Share01Icon} size={14} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    )}
-                  </button>
+                    {profile.bio || 'Host of The Founders'}
+                  </p>
                 </div>
               </div>
 

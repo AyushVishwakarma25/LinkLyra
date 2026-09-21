@@ -16,6 +16,8 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  setLogLevel,
   doc,
   getDoc,
   setDoc,
@@ -27,7 +29,6 @@ import {
   getDocs,
   increment,
   writeBatch,
-  getDocFromServer,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -43,6 +44,9 @@ import {
   SubscriptionPlanType,
   BillingCycle,
   OnboardingProfile,
+  CardStyleType,
+  WallpaperMode,
+  FooterSettings,
 } from '../types';
 
 // Structured Firestore Error Protocol mandated by Skill guidelines
@@ -73,8 +77,14 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMessage = error instanceof Error ? error.message : String(error);
+  const isOffline =
+    errMessage.includes('offline') ||
+    errMessage.includes('client is offline') ||
+    errMessage.includes('Could not reach Cloud Firestore backend');
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMessage,
     authInfo: {
       userId: auth?.currentUser?.uid,
       email: auth?.currentUser?.email,
@@ -90,7 +100,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+
+  if (isOffline) {
+    console.warn('Firestore offline notice (operating from cache):', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -123,24 +138,26 @@ export function sanitizeForFirestore<T>(data: T): T {
   return data;
 }
 
+// Silence SDK internal logging to prevent sandbox timeout warnings from polluting errors
+setLogLevel('silent');
+
 // Singleton Firebase Application & Service Initialization
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const storage = getStorage(app);
-export const googleProvider = new GoogleAuthProvider();
 
-// Connection validation test on boot
-async function testConnection() {
+function createFirestoreInstance() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firestore connection notice: Client is initializing or offline.');
-    }
+    return initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    }, firebaseConfig.firestoreDatabaseId);
+  } catch {
+    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
   }
 }
-testConnection();
+
+export const db = createFirestoreInstance();
+export const storage = getStorage(app);
+export const googleProvider = new GoogleAuthProvider();
 
 // --------------------------------------------------------------------------
 // Core Linktree Database Types
@@ -168,8 +185,15 @@ export interface FirestorePage {
   backgroundValue: string;
   fontFamily: string;
   textColor: string;
-  buttonStyle: 'rounded' | 'square' | 'pill' | 'glass';
+  buttonStyle: 'rounded' | 'square' | 'pill' | 'smooth' | 'glass';
   buttonColor: string;
+  cardStyle?: CardStyleType;
+  wallpaperMode?: WallpaperMode;
+  wallpaperTint?: number;
+  cardBgColor?: string;
+  cardTextColor?: string;
+  stickers?: string[];
+  footerSettings?: FooterSettings;
   businessPhone?: string;
   createdAt: any;
   updatedAt: any;
@@ -272,9 +296,17 @@ export interface DbProfile {
   business_phone?: string;
   theme?: CanvasTheme;
   font_family?: string;
-  button_style?: 'rounded' | 'square' | 'pill' | 'glass';
+  button_style?: 'rounded' | 'square' | 'pill' | 'smooth' | 'glass';
   background_type?: 'color' | 'gradient' | 'image';
   background_value?: string;
+  card_style?: CardStyleType;
+  wallpaper_mode?: WallpaperMode;
+  wallpaper_tint?: number;
+  card_bg_color?: string;
+  card_text_color?: string;
+  button_color?: string;
+  stickers?: string[];
+  footer_settings?: FooterSettings;
   socials?: SocialLinks;
   plan?: 'free' | 'pro' | 'business' | 'agency';
   role?: string;
@@ -723,6 +755,14 @@ export const profileService = {
           button_style: pageData.buttonStyle || profileData?.button_style,
           background_type: pageData.backgroundType || profileData?.background_type,
           background_value: pageData.backgroundValue || profileData?.background_value,
+          card_style: (pageData as any).cardStyle || profileData?.card_style || 'fill',
+          wallpaper_mode: (pageData as any).wallpaperMode || profileData?.wallpaper_mode || 'color',
+          wallpaper_tint: (pageData as any).wallpaperTint ?? profileData?.wallpaper_tint ?? 20,
+          card_bg_color: (pageData as any).cardBgColor || profileData?.card_bg_color,
+          card_text_color: (pageData as any).cardTextColor || profileData?.card_text_color,
+          button_color: (pageData as any).buttonColor || profileData?.button_color,
+          stickers: (pageData as any).stickers || profileData?.stickers || [],
+          footer_settings: (pageData as any).footerSettings || profileData?.footer_settings,
           plan: isAgency ? 'agency' : (profileData?.plan || 'free'),
           role: isAgency ? 'agency' : (profileData?.role || 'creator'),
           has_completed_onboarding: profileData?.has_completed_onboarding ?? profileData?.onboarding_profile?.onboardingCompleted ?? false,
@@ -742,7 +782,12 @@ export const profileService = {
           custom_domain: profileData.custom_domain || '',
         };
       }
-    } catch (err) {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('offline') || errMsg.includes('client is offline')) {
+        console.warn('Firestore offline notice: Returning local/empty profile while offline.');
+        return null;
+      }
       handleFirestoreError(err, OperationType.GET, `users/${userId}`);
     }
     return null;
@@ -965,6 +1010,14 @@ export const profileService = {
       if (updates.button_style !== undefined) pageUpdates.buttonStyle = updates.button_style;
       if (updates.background_type !== undefined) pageUpdates.backgroundType = updates.background_type;
       if (updates.background_value !== undefined) pageUpdates.backgroundValue = updates.background_value;
+      if (updates.card_style !== undefined) pageUpdates.cardStyle = updates.card_style;
+      if (updates.wallpaper_mode !== undefined) pageUpdates.wallpaperMode = updates.wallpaper_mode;
+      if (updates.wallpaper_tint !== undefined) pageUpdates.wallpaperTint = updates.wallpaper_tint;
+      if (updates.card_bg_color !== undefined) pageUpdates.cardBgColor = updates.card_bg_color;
+      if (updates.card_text_color !== undefined) pageUpdates.cardTextColor = updates.card_text_color;
+      if (updates.button_color !== undefined) pageUpdates.buttonColor = updates.button_color;
+      if (updates.stickers !== undefined) pageUpdates.stickers = updates.stickers;
+      if (updates.footer_settings !== undefined) pageUpdates.footerSettings = updates.footer_settings;
       if (updates.custom_domain !== undefined) (pageUpdates as any).customDomain = updates.custom_domain;
       pageUpdates.updatedAt = serverTimestamp();
 
@@ -1047,7 +1100,12 @@ export const profileService = {
         });
       });
       return links.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-    } catch (err) {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('offline') || errMsg.includes('client is offline')) {
+        console.warn('Firestore offline notice: Returning empty links array while offline.');
+        return [];
+      }
       handleFirestoreError(err, OperationType.LIST, `pages/${pageId}/links`);
       return [];
     }

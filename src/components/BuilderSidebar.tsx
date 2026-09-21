@@ -48,9 +48,12 @@ import { uploadImageToStorage } from '../lib/storage';
 import { profileService } from '../lib/firebase';
 import { BillingDashboard } from './BillingDashboard';
 import { AccountSettings, AccountSubTab } from './AccountSettings';
+import { DesignSettingsPanel } from './DesignSettingsPanel';
+import { LeadsDashboard } from './LeadsDashboard';
 
 export type SidebarTabKey =
   | 'links'
+  | 'leads'
   | 'appearance'
   | 'analytics'
   | 'settings'
@@ -174,6 +177,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   const [internalTab, setInternalTab] = useState<SidebarTabKey>('links');
   const [copied, setCopied] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Manual Save State & Feedback
@@ -231,13 +235,22 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   }, [currentUser, activeSidebarTab, internalTab]);
 
   const handleAvatarFileUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
+    if (!file.type.startsWith('image/')) {
+      setAvatarUploadError('Please select a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarUploadError('Image exceeds 2MB. Please upload an image under 2MB for fast loading.');
+      return;
+    }
+    setAvatarUploadError(null);
     setIsUploadingAvatar(true);
     try {
       const url = await uploadImageToStorage(file, 'avatar', currentUser?.uid);
       onUpdateProfile({ avatarUrl: url });
     } catch (err) {
       console.error('Failed to upload avatar:', err);
+      setAvatarUploadError('Failed to upload image. Please try again.');
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -290,8 +303,37 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   const activeLinksCount = profile.cards.filter((c) => c.isActive !== false).length;
   const topCard = [...profile.cards].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0];
 
+  // Unread / New inquiries count for CRM badge
+  const [unreadLeadsCount, setUnreadLeadsCount] = useState<number>(0);
+
+  useEffect(() => {
+    const pageId = currentUser?.uid || profile.username || 'public_page';
+    const localKey = `linklyra_leads_${pageId}`;
+    try {
+      const cached = localStorage.getItem(localKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setUnreadLeadsCount(parsed.filter((l: any) => l.status === 'new').length);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    profileService
+      .getLeads(pageId)
+      .then((leads) => {
+        if (Array.isArray(leads)) {
+          setUnreadLeadsCount(leads.filter((l: any) => l.status === 'new').length);
+        }
+      })
+      .catch(() => {});
+  }, [currentUser?.uid, profile.username]);
+
   const navItems = [
     { id: 'links' as const, label: 'Links', icon: Link01Icon, badge: profile.cards.length },
+    { id: 'leads' as const, label: 'Inquiries', icon: Mail01Icon, badge: unreadLeadsCount > 0 ? unreadLeadsCount : undefined },
     { id: 'appearance' as const, label: 'Appearance', icon: ColorsIcon },
     { id: 'analytics' as const, label: 'Analytics', icon: ChartBarLineIcon },
     { id: 'settings' as const, label: 'Settings', icon: Settings01Icon },
@@ -355,38 +397,18 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
           })}
         </nav>
 
-        {/* Bottom: Templates, Status & Account */}
-        <div className="w-full flex flex-col items-center gap-2 pt-2 border-t border-black/5">
-          {onOpenOnboarding && (
-            <button
-              type="button"
-              onClick={onOpenOnboarding}
-              className="w-full py-1.5 px-0.5 rounded-lg text-[#5E4BF7] hover:bg-[#5E4BF7]/10 flex flex-col items-center justify-center gap-0.5 transition-colors text-[9px] font-bold"
-              title="Starter Templates & Setup Wizard"
-            >
-              <HugeiconsIcon icon={Layers01Icon} size={16} />
-              <span>Templates</span>
-            </button>
-          )}
-
-          <div
-            className="flex items-center gap-1 text-[9px] font-medium text-[#737882]"
-            title={currentUser ? 'Saved online to your account' : 'Draft mode on this device'}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${currentUser ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-            <span className="hidden lg:inline">{currentUser ? 'Saved' : 'Draft'}</span>
-          </div>
-
+        {/* Bottom: Account Settings & Auth Avatar */}
+        <div className="w-full flex flex-col items-center pt-2 border-t border-black/5">
           <button
             type="button"
             onClick={() => onOpenAccountSettings ? onOpenAccountSettings('profile') : onOpenAuth?.()}
-            className="w-7 h-7 rounded-full overflow-hidden border border-black/10 hover:ring-2 hover:ring-[#5E4BF7] transition-all relative shrink-0"
-            title={currentUser ? `Account: ${currentUser.email}` : 'Sign In'}
+            className="w-8 h-8 rounded-full overflow-hidden border border-black/15 hover:ring-2 hover:ring-[#1C1E22] transition-all relative shrink-0 cursor-pointer shadow-2xs group"
+            title={currentUser ? `Account: ${currentUser.email || currentUser.displayName || profile.name}` : 'Sign In / Account'}
           >
             <img
               src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
               alt={profile.name || 'Account'}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
           </button>
         </div>
@@ -394,8 +416,8 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
 
       {/* Main Workspace Column */}
       <div className="flex-1 h-full flex flex-col min-w-0 bg-white overflow-hidden">
-        {/* Mobile Navigation Header (Only visible on small mobile screens) */}
-        <div className="md:hidden border-b border-black/5 bg-[#FAF8F5] px-2 py-1.5 overflow-x-auto scrollbar-none shrink-0 flex items-center gap-1">
+        {/* Mobile Navigation Header (Only visible on small mobile screens - optimized for touch) */}
+        <div className="md:hidden border-b border-black/5 bg-[#FAF8F5] px-2.5 py-2 overflow-x-auto scrollbar-none shrink-0 flex items-center gap-1.5 touch-scroll">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -404,16 +426,16 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all shrink-0 ${
+                className={`min-h-[44px] px-3.5 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all shrink-0 touch-manipulation active:scale-95 ${
                   isActive
                     ? 'bg-[#1C1E22] text-white shadow-xs'
-                    : 'text-[#737882] hover:text-[#1C1E22] hover:bg-black/5'
+                    : 'text-[#737882] hover:text-[#1C1E22] hover:bg-black/5 bg-white/60'
                 }`}
               >
-                <HugeiconsIcon icon={Icon} size={14} />
+                <HugeiconsIcon icon={Icon} size={15} />
                 <span>{item.label}</span>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className={`text-[9px] px-1 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-black/10 text-[#1C1E22]'}`}>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-black/10 text-[#1C1E22]'}`}>
                     {item.badge}
                   </span>
                 )}
@@ -425,8 +447,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
         {/* Section Header Bar */}
         <div className="p-3.5 sm:p-4 border-b border-black/5 bg-white flex items-center justify-between gap-2 shrink-0">
           <div className="min-w-0 flex-1">
-            <h2 className="font-bold text-[#1C1E22] text-lg sm:text-xl tracking-tight truncate">
+            <h2 className="font-bold text-[#1C1E22] text-base sm:text-xl tracking-tight truncate">
               {currentTab === 'links' && 'Content'}
+              {currentTab === 'leads' && 'Inquiries & Leads'}
               {currentTab === 'appearance' && 'Appearance'}
               {currentTab === 'analytics' && 'Analytics'}
               {currentTab === 'settings' && 'Settings'}
@@ -435,6 +458,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             </h2>
             <p className="text-[11px] text-[#737882] truncate">
               {currentTab === 'links' && `${profile.cards.length} link${profile.cards.length === 1 ? '' : 's'} • @${profile.username}`}
+              {currentTab === 'leads' && 'Inbound bookings, sponsor deals, and client requests'}
               {currentTab === 'appearance' && 'Themes, button styling, and typography'}
               {currentTab === 'analytics' && 'Real-time page views and link clicks'}
               {currentTab === 'settings' && 'Profile photo, bio, and social accounts'}
@@ -443,58 +467,43 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Dedicated Save Progress Button */}
-            <button
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Dedicated Save Progress Button using Universal UI Kit */}
+            <Button
               id="header-save-button"
-              type="button"
+              variant="primary"
+              size="md"
               onClick={handleTriggerSave}
               disabled={isSaving}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                justSaved
-                  ? 'bg-emerald-600 text-white'
-                  : isSaving
-                  ? 'bg-stone-100 text-stone-500 border border-stone-200'
-                  : 'bg-[#1C1E22] hover:bg-black text-white active:scale-95'
-              }`}
+              isLoading={isSaving}
+              className={justSaved ? '!bg-emerald-600 !border-emerald-600 shadow-xs' : ''}
               title="Save all changes"
             >
-              {isSaving ? (
-                <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
-              ) : justSaved ? (
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="text-emerald-200" />
-              ) : (
-                <HugeiconsIcon icon={FloppyDiskIcon} size={14} />
+              {!isSaving && (
+                justSaved ? (
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={15} className="text-emerald-200" />
+                ) : (
+                  <HugeiconsIcon icon={FloppyDiskIcon} size={15} />
+                )
               )}
               <span>{isSaving ? 'Saving...' : justSaved ? 'Saved!' : 'Save'}</span>
-            </button>
+            </Button>
 
-            {(!profile.plan || profile.plan === 'free') && onOpenProModal && (
-              <Button
-                size="sm"
-                onClick={() => onOpenProModal('LinkLyra Pro')}
-                className="bg-[#5E4BF7] hover:bg-[#4E3BE5] text-white border-transparent rounded-full px-3 py-1"
-              >
-                <HugeiconsIcon icon={CrownIcon} size={13} className="text-[#F8BA38]" />
-                <span className="hidden sm:inline text-xs font-semibold">Pro</span>
-              </Button>
-            )}
-
+            {/* Preview Button using Universal UI Kit */}
             <Button
-              size="sm"
+              size="md"
               variant="secondary"
               onClick={onOpenPublicView}
               title="Open live visitor view"
-              className="rounded-full px-3"
             >
-              <HugeiconsIcon icon={ViewIcon} size={14} />
-              <span className="hidden sm:inline text-xs">Preview</span>
+              <HugeiconsIcon icon={ViewIcon} size={15} />
+              <span className="hidden sm:inline">Preview</span>
             </Button>
           </div>
         </div>
 
         {/* Tab Content Panels */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 max-w-full">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 max-w-full [scrollbar-gutter:stable]">
         {/* ===================== TAB 1: LINKS ===================== */}
         {currentTab === 'links' && (
           <div className="space-y-4 max-w-full">
@@ -524,8 +533,8 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                 <h3 className="text-sm sm:text-base font-bold text-[#1C1E22] truncate leading-tight">
                   {profile.name || 'Ayush Vishwakarma'}
                 </h3>
-                <p className="text-xs text-[#737882] truncate mt-0.5">
-                  {profile.headline || 'Founder'}
+                <p className="text-xs text-[#737882] mt-0.5 leading-snug break-words">
+                  {profile.headline || 'Host of The Founders'}
                 </p>
 
                 {/* Social icons row */}
@@ -533,10 +542,10 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => setTab('settings')}
-                    className="w-6 h-6 rounded-full bg-stone-100 hover:bg-stone-200 text-[#1C1E22] flex items-center justify-center transition-colors text-[11px]"
+                    className="w-6 h-6 rounded-full bg-[#0A66C2]/10 hover:bg-[#0A66C2]/20 text-[#0A66C2] flex items-center justify-center transition-colors text-[11px]"
                     title="LinkedIn"
                   >
-                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 fill-[#0A66C2]" viewBox="0 0 24 24">
                       <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
                     </svg>
                   </button>
@@ -567,7 +576,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddSection(!showAddSection)}
-                className="w-full py-2.5 px-4 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 text-[#1C1E22] rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 border border-black/5"
+                className="w-full min-h-[44px] py-2.5 px-4 bg-stone-100 hover:bg-stone-200/80 active:bg-stone-200 text-[#1C1E22] rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 border border-black/5 touch-manipulation active:scale-95"
               >
                 <HugeiconsIcon icon={FolderAddIcon} size={15} />
                 <span>Add Collection</span>
@@ -576,7 +585,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
               <button
                 type="button"
                 onClick={onAddCard}
-                className="w-full py-2.5 px-4 bg-[#1C1E22] hover:bg-black active:bg-[#0E0F11] text-white rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs"
+                className="w-full min-h-[44px] py-2.5 px-4 bg-[#1C1E22] hover:bg-black active:bg-[#0E0F11] text-white rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs touch-manipulation active:scale-95"
               >
                 <HugeiconsIcon icon={PlusSignIcon} size={15} />
                 <span>Add Link</span>
@@ -724,8 +733,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                           <button
                             type="button"
                             onClick={() => setActiveCardMenuId(isMenuOpen ? null : card.id)}
-                            className="w-8 h-8 rounded-full hover:bg-stone-100 text-[#737882] hover:text-[#1C1E22] flex items-center justify-center transition-colors"
+                            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full hover:bg-stone-100 active:bg-stone-200 text-[#737882] hover:text-[#1C1E22] flex items-center justify-center transition-colors touch-manipulation"
                             title="More options"
+                            aria-label="More options for this card"
                           >
                             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -734,16 +744,16 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
 
                           {/* Sleek Floating Dropdown Menu */}
                           {isMenuOpen && (
-                            <div className="absolute right-0 top-9 w-44 bg-white rounded-2xl shadow-xl border border-stone-200/90 py-1.5 z-30 animate-fadeIn text-xs">
+                            <div className="absolute right-0 top-11 w-48 bg-white rounded-2xl shadow-xl border border-stone-200/90 py-1.5 z-30 animate-fadeIn text-xs">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setActiveCardMenuId(null);
                                   onEditCard(card);
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-[#1C1E22] hover:bg-stone-50 flex items-center gap-2 font-medium"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-[#1C1E22] hover:bg-stone-50 active:bg-stone-100 flex items-center gap-2 font-medium touch-manipulation"
                               >
-                                <HugeiconsIcon icon={Edit01Icon} size={14} className="text-stone-500" />
+                                <HugeiconsIcon icon={Edit01Icon} size={15} className="text-stone-500" />
                                 <span>Edit Card</span>
                               </button>
 
@@ -754,9 +764,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                                   setActiveCardMenuId(null);
                                   onMoveCard(index, 'up');
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-[#1C1E22] hover:bg-stone-50 flex items-center gap-2 font-medium disabled:opacity-30 disabled:pointer-events-none"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-[#1C1E22] hover:bg-stone-50 active:bg-stone-100 flex items-center gap-2 font-medium disabled:opacity-30 disabled:pointer-events-none touch-manipulation"
                               >
-                                <HugeiconsIcon icon={ArrowUp01Icon} size={14} className="text-stone-500" />
+                                <HugeiconsIcon icon={ArrowUp01Icon} size={15} className="text-stone-500" />
                                 <span>Move Up</span>
                               </button>
 
@@ -767,9 +777,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                                   setActiveCardMenuId(null);
                                   onMoveCard(index, 'down');
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-[#1C1E22] hover:bg-stone-50 flex items-center gap-2 font-medium disabled:opacity-30 disabled:pointer-events-none"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-[#1C1E22] hover:bg-stone-50 active:bg-stone-100 flex items-center gap-2 font-medium disabled:opacity-30 disabled:pointer-events-none touch-manipulation"
                               >
-                                <HugeiconsIcon icon={ArrowDown01Icon} size={14} className="text-stone-500" />
+                                <HugeiconsIcon icon={ArrowDown01Icon} size={15} className="text-stone-500" />
                                 <span>Move Down</span>
                               </button>
 
@@ -779,9 +789,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                                   setActiveCardMenuId(null);
                                   onToggleCardActive(card.id);
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-[#1C1E22] hover:bg-stone-50 flex items-center gap-2 font-medium"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-[#1C1E22] hover:bg-stone-50 active:bg-stone-100 flex items-center gap-2 font-medium touch-manipulation"
                               >
-                                <HugeiconsIcon icon={ViewIcon} size={14} className="text-stone-500" />
+                                <HugeiconsIcon icon={ViewIcon} size={15} className="text-stone-500" />
                                 <span>{card.isActive !== false ? 'Hide Link' : 'Show Link'}</span>
                               </button>
 
@@ -793,9 +803,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                                     navigator.clipboard.writeText(card.linkUrl);
                                   }
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-[#1C1E22] hover:bg-stone-50 flex items-center gap-2 font-medium"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-[#1C1E22] hover:bg-stone-50 active:bg-stone-100 flex items-center gap-2 font-medium touch-manipulation"
                               >
-                                <HugeiconsIcon icon={Copy01Icon} size={14} className="text-stone-500" />
+                                <HugeiconsIcon icon={Copy01Icon} size={15} className="text-stone-500" />
                                 <span>Copy URL</span>
                               </button>
 
@@ -807,9 +817,9 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                                   setActiveCardMenuId(null);
                                   onDeleteCard(card.id);
                                 }}
-                                className="w-full px-3.5 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"
+                                className="w-full min-h-[40px] px-3.5 py-2.5 text-left text-red-600 hover:bg-red-50 active:bg-red-100 flex items-center gap-2 font-medium touch-manipulation"
                               >
-                                <HugeiconsIcon icon={Delete01Icon} size={14} />
+                                <HugeiconsIcon icon={Delete01Icon} size={15} />
                                 <span>Delete Card</span>
                               </button>
                             </div>
@@ -835,7 +845,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                   <span>Profile Identity & Details</span>
                 </h3>
                 <p className="text-[11px] text-[#737882] mt-0.5 truncate">
-                  Changes auto-sync with preview. Save anytime from the top bar.
+                  Changes preview in real-time. Save anytime from the top bar.
                 </p>
               </div>
             </div>
@@ -886,6 +896,10 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                       <HugeiconsIcon icon={Upload01Icon} size={14} />
                       <span>{isUploadingAvatar ? 'Uploading...' : 'Upload Image'}</span>
                     </button>
+                    <p className="text-[10px] text-[#737882]">Max 2MB (PNG, JPG, WebP)</p>
+                    {avatarUploadError && (
+                      <p className="text-[10px] font-semibold text-rose-600 animate-fadeIn">{avatarUploadError}</p>
+                    )}
                     <input
                       type="url"
                       value={profile.avatarUrl}
@@ -948,40 +962,40 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
                 />
               </div>
 
-              {/* WhatsApp Lead Routing Configuration */}
-              <div className="p-3.5 bg-[#E7F8EE] rounded-2xl border border-[#25D366]/30 space-y-2.5">
+              {/* WhatsApp Contact Box */}
+              <div className="p-3.5 bg-[#1C1E22] text-white rounded-2xl border border-black/10 space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-[#128C7E]">
-                    <HugeiconsIcon icon={Share01Icon} size={16} className="text-[#25D366]" />
-                    <span>WhatsApp Lead Routing Engine</span>
+                  <div className="flex items-center gap-2 font-bold text-xs text-white">
+                    <HugeiconsIcon icon={Share01Icon} size={15} className="text-white/80" />
+                    <span>WhatsApp Contact</span>
                   </div>
                   {profile.businessPhone ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#25D366]/20 text-[#128C7E] font-bold text-[10px]">
-                      <HugeiconsIcon icon={Tick01Icon} size={12} />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-white font-semibold text-[10px]">
+                      <HugeiconsIcon icon={Tick01Icon} size={11} className="text-white" />
                       <span>Connected</span>
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
-                      Needs Setup
+                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/70 font-medium text-[10px]">
+                      Optional
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-[#1C1E22] block mb-1">
-                    Business WhatsApp Number *
+                  <label className="text-[11px] font-semibold text-white/90 block mb-1">
+                    WhatsApp Number
                   </label>
                   <div className="relative">
                     <input
                       type="tel"
                       value={profile.businessPhone || ''}
                       onChange={(e) => onUpdateProfile({ businessPhone: e.target.value })}
-                      placeholder="e.g. +91 98765 43210 or 9876543210"
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-black/10 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#25D366] shadow-xs"
+                      placeholder="+91 98765 43210"
+                      className="w-full px-3 py-2 bg-white/10 rounded-xl border border-white/15 text-white placeholder-white/40 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 shadow-xs font-mono"
                     />
                   </div>
-                  <p className="text-[10px] text-[#737882] mt-1 leading-tight">
-                    Visitor clicks generate instant pre-filled inquiries: <span className="font-mono text-[#128C7E]">"Hi, I am interested in [Title] ([Details])..."</span>
+                  <p className="text-[10px] text-white/60 mt-1.5 leading-normal">
+                    Allows visitors to message or send inquiries directly to your WhatsApp.
                   </p>
                 </div>
               </div>
@@ -999,6 +1013,19 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-semibold text-[#1C1E22] block mb-0.5">
+                    WhatsApp (Phone or Chat Link)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+1234567890 or https://wa.me/..."
+                    value={profile.socials?.whatsapp || ''}
+                    onChange={(e) => handleSocialChange('whatsapp', e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white rounded-lg border border-black/10 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1C1E22]"
+                  />
+                </div>
+
                 <div>
                   <label className="text-[10px] sm:text-[11px] font-semibold text-[#1C1E22] block mb-0.5">
                     Instagram
@@ -1118,202 +1145,15 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
           </div>
         )}
 
-        {/* ===================== TAB 3: APPEARANCE & THEME ===================== */}
+        {/* ===================== TAB 3: APPEARANCE & DESIGN SETTINGS ===================== */}
         {currentTab === 'appearance' && (
-          <div className="space-y-4 max-w-full">
-            <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-[#1C1E22]">Background Canvas Theme</h3>
-                <span className="text-[10px] text-[#737882] font-semibold">5 Free • 5 Pro</span>
-              </div>
-              <p className="text-[11px] text-[#737882] mt-0.5">
-                Select the overarching palette for your profile
-              </p>
-            </div>
-
-            {/* Pro Upgrade Banner if on free plan */}
-            {(!profile.plan || profile.plan === 'free') && onOpenProModal && (
-              <div className="p-3 bg-[#FAF8F5] rounded-xl border border-black/10 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <HugeiconsIcon icon={CrownIcon} size={16} className="text-[#1C1E22] shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#1C1E22] truncate">Unlock All Designer Themes</div>
-                    <div className="text-[10px] text-[#737882] truncate">Emerald, Gold, Obsidian, Minimal & more</div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onOpenProModal('Pro Creator Themes')}
-                  className="px-2.5 py-1 rounded-lg bg-[#1C1E22] hover:bg-black text-white text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
-                >
-                  Upgrade
-                </button>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {THEME_OPTIONS.map((theme) => {
-                const isSelected = (profile.theme || 'warm') === theme.id;
-                const isProUser = profile.plan === 'pro' || profile.plan === 'business';
-                const isLocked = theme.isPro && !isProUser;
-
-                const handleThemeClick = () => {
-                  if (isLocked && onOpenProModal) {
-                    onOpenProModal(`Pro Theme: ${theme.name}`);
-                  } else {
-                    onUpdateProfile({ theme: theme.id });
-                  }
-                };
-
-                return (
-                  <div
-                    key={theme.id}
-                    onClick={handleThemeClick}
-                    className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between gap-2.5 ${
-                      isSelected
-                        ? 'border-[#5E4BF7] ring-2 ring-[#5E4BF7]/20 bg-white shadow-xs'
-                        : 'border-black/10 bg-white hover:border-black/25'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div
-                        className="w-8 h-8 rounded-xl border border-black/15 shadow-2xs shrink-0"
-                        style={{ backgroundColor: theme.hex }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="text-xs font-bold text-[#1C1E22] truncate">{theme.name}</h4>
-                          {theme.isPro ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-[#5E4BF7]/10 text-[#5E4BF7] font-black text-[9px]">
-                              <HugeiconsIcon icon={CrownIcon} size={10} />
-                              <span>PRO</span>
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold text-[9px]">
-                              FREE
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] sm:text-[11px] text-[#737882] truncate">{theme.desc}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isLocked ? (
-                        <div className="p-1 rounded-lg bg-black/5 text-[#737882]" title="Locked in Free Tier">
-                          <HugeiconsIcon icon={LockIcon} size={14} />
-                        </div>
-                      ) : isSelected ? (
-                        <HugeiconsIcon icon={Tick01Icon} size={16} className="text-[#5E4BF7] shrink-0" />
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pro Feature: Custom Domain & White Labeling */}
-            <div className="pt-3 border-t border-black/5 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-[#1C1E22]">Custom Domain & Branding</h3>
-                  <p className="text-[11px] text-[#737882]">Map your own domain & remove watermark</p>
-                </div>
-                <span className="px-1.5 py-0.5 rounded bg-[#5E4BF7]/10 text-[#5E4BF7] font-black text-[9px]">
-                  PRO
-                </span>
-              </div>
-
-              <div className="p-3 bg-white rounded-2xl border border-black/10 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#1C1E22]">Remove LinkLyra Watermark</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!profile.plan || profile.plan === 'free') {
-                        if (onOpenProModal) onOpenProModal('Watermark Removal');
-                      } else {
-                        onUpdateProfile({ customDomain: profile.customDomain ? '' : 'verified' });
-                      }
-                    }}
-                    className={`w-8 h-4.5 rounded-full transition-colors relative flex items-center px-0.5 ${
-                      profile.plan === 'pro' || profile.plan === 'business' ? 'bg-emerald-500' : 'bg-black/20'
-                    }`}
-                  >
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full bg-white transition-transform shadow-xs ${
-                        profile.plan === 'pro' || profile.plan === 'business' ? 'translate-x-3.5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Button Style Selector */}
-            <div className="pt-3 border-t border-black/5 space-y-2.5">
-              <div>
-                <h3 className="text-xs font-bold text-[#1C1E22]">Card & Button Corner Style</h3>
-                <p className="text-[11px] text-[#737882]">
-                  Customize button curvatures across your cards
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {BUTTON_STYLE_OPTIONS.map((btn) => {
-                  const isSelected = (profile.buttonStyle || 'rounded') === btn.id;
-                  return (
-                    <button
-                      key={btn.id}
-                      type="button"
-                      onClick={() => onUpdateProfile({ buttonStyle: btn.id })}
-                      className={`p-2.5 rounded-2xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-[#5E4BF7] bg-white ring-2 ring-[#5E4BF7]/20 shadow-xs'
-                          : 'border-black/10 bg-white/70 hover:bg-white text-[#737882]'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-[#1C1E22]">{btn.name}</div>
-                      <div className="text-[10px] text-[#737882] leading-tight">{btn.desc}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Font Family Selector */}
-            <div className="pt-3 border-t border-black/5 space-y-2.5">
-              <div>
-                <h3 className="text-xs font-bold text-[#1C1E22]">Display Font Pairing</h3>
-                <p className="text-[11px] text-[#737882]">
-                  Choose primary typography style
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {FONT_OPTIONS.map((font) => {
-                  const isSelected = (profile.fontFamily || 'Plus Jakarta Sans') === font.id;
-                  return (
-                    <button
-                      key={font.id}
-                      type="button"
-                      onClick={() => onUpdateProfile({ fontFamily: font.id })}
-                      className={`p-2.5 rounded-2xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-[#5E4BF7] bg-white ring-2 ring-[#5E4BF7]/20 shadow-xs'
-                          : 'border-black/10 bg-white/70 hover:bg-white text-[#737882]'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-[#1C1E22]" style={{ fontFamily: font.id }}>
-                        {font.name}
-                      </div>
-                      <div className="text-[10px] text-[#737882] leading-tight">{font.preview}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <DesignSettingsPanel
+            profile={profile}
+            onUpdateProfile={onUpdateProfile}
+            onManualSave={onManualSave}
+            onOpenProModal={onOpenProModal}
+            onOpenOnboarding={onOpenOnboarding}
+          />
         )}
 
         {/* ===================== TAB 4: ANALYTICS & STATS ===================== */}
@@ -1525,63 +1365,17 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             />
           </div>
         )}
-      </div>
 
-      {/* Creator Account & Plan Footer Bar */}
-      <div className="p-3 bg-white border-t border-black/10 flex items-center justify-between gap-2.5 shrink-0 z-10">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative shrink-0">
-            <img
-              src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
-              alt={profile.name || 'Creator'}
-              className="w-8 h-8 rounded-full object-cover border border-black/10 bg-black/5"
+        {/* ===================== TAB 7: LEADS & INQUIRIES CRM ===================== */}
+        {currentTab === 'leads' && (
+          <div className="space-y-4 max-w-full">
+            <LeadsDashboard
+              profile={profile}
+              currentUser={currentUser || null}
+              onOpenProModal={onOpenProModal}
             />
-            {profile.plan === 'pro' && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#F8BA38] rounded-full border border-white flex items-center justify-center text-[8px] font-black text-[#191A1E]">
-                ★
-              </span>
-            )}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs font-bold text-[#1C1E22] truncate">
-                {profile.name || 'Creator'}
-              </p>
-              <span className={`px-1.5 py-0.2 rounded-xs text-[9px] font-black shrink-0 ${
-                profile.plan === 'pro' || profile.plan === 'business'
-                  ? 'bg-[#F8BA38] text-[#191A1E]'
-                  : 'bg-black/5 text-[#737882]'
-              }`}>
-                {(profile.plan || 'Free').toUpperCase()}
-              </span>
-            </div>
-            <p className="text-[10px] text-[#737882] truncate font-mono">
-              @{profile.username || 'username'}
-            </p>
-          </div>
-        </div>
-
-        <div className="shrink-0 flex items-center gap-1.5">
-          <button
-            id="billing-setting-button"
-            type="button"
-            onClick={() => onOpenAccountSettings ? onOpenAccountSettings('billing') : onOpenProModal?.('Pro Upgrade')}
-            className="px-2.5 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-[#1C1E22] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-            title="Plans, Invoices & Billing"
-          >
-            <HugeiconsIcon icon={CreditCardIcon} size={14} className="text-[#5E4BF7]" />
-            <span>Billing</span>
-          </button>
-          <button
-            id="account-settings-button"
-            type="button"
-            onClick={() => onOpenAccountSettings ? onOpenAccountSettings('profile') : onOpenAuth?.()}
-            className="w-8 h-8 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-[#1C1E22] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
-            title="User Account & Security Settings"
-          >
-            <HugeiconsIcon icon={Settings01Icon} size={16} className="text-stone-700" />
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Floating Save Confirmation Notification */}

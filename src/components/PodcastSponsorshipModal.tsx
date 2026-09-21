@@ -121,16 +121,16 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
       <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto">
         {/* Header */}
-        <div className="px-5 py-4 bg-indigo-950 text-white flex items-center justify-between">
+        <div className="px-5 py-4 bg-[#1C1E22] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center font-bold">
               <HugeiconsIcon icon={Mic01Icon} size={16} />
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
                 Sponsor {podcastTitle}
               </h2>
-              <p className="text-[11px] text-indigo-200">
+              <p className="text-[11px] text-stone-300">
                 Reach an engaged, high-intent audience
               </p>
             </div>
@@ -330,7 +330,7 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-[#1C1E22] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>

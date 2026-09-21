@@ -16,6 +16,60 @@ body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Mobile Safe Area Helpers (iPhone Notch, Dynamic Island, Android Gesture Bar) */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pl-safe {
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+}
+
+.pr-safe {
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent accidental 300ms double-tap delay on mobile browsers */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS Safari unwanted auto-zoom when tapping inputs with font-size < 16px */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Momentum scrolling for iOS */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Custom scrollbar styling for builder panels */

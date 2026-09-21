@@ -170,15 +170,28 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
 
   const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setSaveStatus('error');
+      setStatusMessage('Please select a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setSaveStatus('error');
+      setStatusMessage('Image exceeds 2MB. Please upload an image under 2MB for fast loading.');
+      return;
+    }
 
     setIsUploadingAvatar(true);
+    setStatusMessage(null);
     try {
       const url = await uploadImageToStorage(file, 'avatar', currentUser?.uid);
       setAvatarUrl(url);
       onUpdateProfile({ avatarUrl: url });
       setSaveStatus('saved');
-      setStatusMessage('Avatar updated successfully!');
+      setStatusMessage('Avatar updated and compressed successfully!');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {
       console.error('Failed to upload avatar:', err);
@@ -410,11 +423,15 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fadeIn">
       {/* Modal Container */}
-      <div className="bg-[#FAF8F5] w-full max-w-5xl max-h-[92vh] rounded-3xl border border-black/10 shadow-2xl flex flex-col overflow-hidden animate-scaleUp">
+      <div className="bg-[#FAF8F5] w-full max-w-5xl max-h-[94dvh] sm:max-h-[92vh] rounded-t-[32px] sm:rounded-3xl border border-black/10 shadow-2xl flex flex-col overflow-hidden animate-scaleUp pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
+        {/* Mobile drag handle */}
+        <div className="sm:hidden pt-2.5 pb-1 flex justify-center bg-white shrink-0">
+          <div className="w-12 h-1 bg-stone-300 rounded-full" />
+        </div>
         {/* Top Header Bar */}
-        <div className="px-6 py-4 bg-white border-b border-black/10 flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-white border-b border-black/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#5E4BF7] text-white flex items-center justify-center shadow-xs">
               <HugeIcon icon={Settings01Icon} size={20} className="w-5 h-5 text-white" />
@@ -605,8 +622,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                         <button
                           type="button"
                           onClick={() => avatarInputRef.current?.click()}
-                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#5E4BF7] text-white flex items-center justify-center shadow-xs hover:bg-[#4E3BE5] transition-colors"
-                          title="Upload new avatar"
+                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#1C1E22] text-white flex items-center justify-center shadow-xs hover:bg-black transition-colors cursor-pointer"
+                          title="Upload new avatar (Max 2MB)"
                         >
                           <HugeIcon icon={Camera01Icon} size={12} className="w-3 h-3 text-white" />
                         </button>
@@ -712,21 +729,24 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                     />
                   </div>
 
-                  {/* WhatsApp Direct Routing */}
+                  {/* WhatsApp Contact */}
                   <div className="pt-2 border-t border-black/5">
                     <label className="block text-xs font-bold text-[#1C1E22] mb-1.5">
-                      Business WhatsApp Phone (for instant client leads)
+                      WhatsApp Number
                     </label>
                     <div className="relative">
-                      <HugeIcon icon={CallIcon} size={16} className="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <HugeIcon icon={CallIcon} size={16} className="w-4 h-4 text-[#1C1E22] absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         value={businessPhone}
                         onChange={(e) => setBusinessPhone(e.target.value)}
-                        placeholder="e.g. 919876543210"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs text-[#1C1E22] focus:outline-none focus:border-[#5E4BF7] focus:ring-1 focus:ring-[#5E4BF7] transition-all font-mono"
+                        placeholder="+91 98765 43210"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs text-[#1C1E22] focus:outline-none focus:border-[#1C1E22] focus:ring-1 focus:ring-[#1C1E22] transition-all font-mono"
                       />
                     </div>
+                    <p className="text-[11px] text-[#737882] mt-1">
+                      Allows visitors to message or send inquiries directly to your WhatsApp.
+                    </p>
                   </div>
 
                   <div className="flex justify-end pt-2">
@@ -767,9 +787,9 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                 {/* Auth Provider & Verification Status Card */}
                 <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 shadow-2xs space-y-4">
                   <div>
-                    <h3 className="text-sm font-bold text-[#1C1E22]">Authentication & Identity Provider</h3>
+                    <h3 className="text-sm font-bold text-[#1C1E22]">Account Sign-In</h3>
                     <p className="text-xs text-[#737882] mt-0.5">
-                      Manage your linked Google account, email verification, and security status.
+                      Manage your linked login method, email verification, and security.
                     </p>
                   </div>
 
@@ -1563,7 +1583,6 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                   }}
                   className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
                 >
-                  <ButtonGroup.Separator />
                   <span>Confirm Reset</span>
                 </Button>
               </ButtonGroup>
@@ -1616,7 +1635,6 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                   disabled={deleteConfirmationText !== 'DELETE' || isDeletingAccount}
                   onClick={handleDeleteAccountFinal}
                 >
-                  <ButtonGroup.Separator />
                   {isDeletingAccount && <HugeIcon icon={Loading03Icon} size={14} className="w-3.5 h-3.5 animate-spin" />}
                   <span>{isDeletingAccount ? 'Deleting...' : 'Permanently Delete'}</span>
                 </Button>

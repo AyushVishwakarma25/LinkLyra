@@ -18,11 +18,6 @@ service cloud.firestore {
       );
     }
 
-    // Connection test document
-    match /test/{docId} {
-      allow read: if true;
-    }
-
     // =========================
     // USERS (and Subcollections: subscriptions, payments, credit_transactions)
     // =========================
@@ -48,8 +43,18 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Connection Test Document
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /payments/{paymentId} {
-      allow read, write: if signedIn();
+      allow read, write: if signedIn() && (
+        request.auth.uid == paymentId ||
+        (request.resource.data != null && request.resource.data.userId == request.auth.uid) ||
+        (resource != null && resource.data.userId == request.auth.uid)
+      );
     }
 
     // =========================
@@ -141,12 +146,18 @@ service cloud.firestore {
 
     match /usernames/{username} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if signedIn() && (
+        !exists(/databases/$(database)/documents/usernames/$(username)) ||
+        get(/databases/$(database)/documents/usernames/$(username)).data.userId == request.auth.uid
+      );
     }
 
     match /domains/{domain} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if signedIn() && (
+        !exists(/databases/$(database)/documents/domains/$(domain)) ||
+        get(/databases/$(database)/documents/domains/$(domain)).data.userId == request.auth.uid
+      );
     }
     
     match /profiles/{userId} {
@@ -156,7 +167,11 @@ service cloud.firestore {
 
     match /links/{linkId} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if signedIn() && (
+        !exists(/databases/$(database)/documents/links/$(linkId)) ||
+        get(/databases/$(database)/documents/links/$(linkId)).data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
     }
 
     // =========================

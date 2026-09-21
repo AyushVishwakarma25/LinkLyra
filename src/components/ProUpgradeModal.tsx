@@ -286,7 +286,6 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
                   isSelected={billingCycle === 'yearly'}
                   className="rounded-lg gap-1.5"
                 >
-                  <ButtonGroup.Separator />
                   <span>Annual</span>
                   <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[9px] font-black">
                     SAVE 35%
@@ -307,7 +306,6 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
                   isSelected={currencyMode === 'USD'}
                   className="rounded-lg font-bold"
                 >
-                  <ButtonGroup.Separator />
                   $ USD
                 </Button>
               </ButtonGroup>

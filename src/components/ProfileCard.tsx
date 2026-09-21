@@ -15,10 +15,12 @@ import {
   Clock01Icon,
   CreditCardIcon,
   GalleryThumbnailsIcon,
+  WhatsappIcon,
 } from '@hugeicons/core-free-icons';
 import {
   CardColor,
   CardTemplateType,
+  CardStyleType,
   RealEstateMetadata,
   ShowingBookingMetadata,
   HomeValuationMetadata,
@@ -38,6 +40,7 @@ import {
 } from '../types';
 import { UI_KIT } from '../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../lib/whatsapp';
+import { sanitizeUrl } from '../lib/security';
 import {
   SmartMusicCard,
   MusicLatestReleaseCard,
@@ -89,6 +92,11 @@ export interface ProfileCardProps {
   isPremium?: boolean;
   businessPhone?: string;
   customWhatsappPhone?: string;
+  cardStyle?: CardStyleType;
+  buttonStyle?: 'rounded' | 'square' | 'pill' | 'glass' | 'smooth';
+  cardBgColor?: string;
+  cardTextColor?: string;
+  customAccentColor?: string;
 
   // Custom modal triggers
   onOpenShowingModal?: (card: ProfileCardData) => void;
@@ -106,6 +114,48 @@ export interface ProfileCardProps {
 
 export const COLOR_CONFIG = UI_KIT.cardPalettes;
 
+export const getCardRadiusClass = (curvature?: string) => {
+  if (curvature === 'square') return 'rounded-none';
+  if (curvature === 'smooth') return 'rounded-xl';
+  if (curvature === 'pill') return 'rounded-3xl';
+  return 'rounded-2xl';
+};
+
+export const getButtonRadiusClass = (curvature?: string) => {
+  if (curvature === 'pill') return 'rounded-full';
+  if (curvature === 'square') return 'rounded-none';
+  if (curvature === 'smooth') return 'rounded-xl';
+  return 'rounded-2xl';
+};
+
+export const getCardSurfaceClass = (
+  style?: CardStyleType | string,
+  fallbackTheme?: (typeof UI_KIT.cardPalettes)[CardColor],
+  customBg?: string,
+  customAccentColor?: string
+) => {
+  if (customBg) {
+    return 'border border-black/10 shadow-2xs';
+  }
+  if (style === 'outline') {
+    return 'bg-white/90 dark:bg-[#191A1E]/80 border-2 border-black/20 dark:border-white/20 text-[#1C1E22] dark:text-white shadow-none';
+  }
+  if (style === 'glass') {
+    return 'backdrop-blur-md bg-white/70 dark:bg-black/40 border border-white/50 dark:border-white/10 text-[#1C1E22] dark:text-white shadow-xs';
+  }
+  if (style === 'shadow') {
+    return 'bg-white dark:bg-stone-900 border-2 border-[#1C1E22] dark:border-white text-[#1C1E22] dark:text-white shadow-[3.5px_3.5px_0px_0px_#1C1E22] dark:shadow-[3.5px_3.5px_0px_0px_#FFFFFF]';
+  }
+  if (style === 'soft') {
+    return 'bg-black/5 dark:bg-white/10 border border-transparent text-[#1C1E22] dark:text-white shadow-none';
+  }
+  // Standard 'fill': if custom accent color is provided and theme is purple or default, omit bg-purple class
+  if (customAccentColor && (!fallbackTheme || fallbackTheme.bgClass.includes('5E4BF7') || fallbackTheme.bgClass.includes('purple'))) {
+    return 'text-white shadow-2xs border border-black/5';
+  }
+  return `${fallbackTheme?.bgClass || 'bg-[#5E4BF7]'} ${fallbackTheme?.textClass || 'text-white'} shadow-2xs`;
+};
+
 export const ProfileCard: React.FC<ProfileCardProps> = ({
   id,
   title,
@@ -116,6 +166,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   badgeText,
   expanded = false,
   templateType = 'standard',
+  cardStyle = 'fill',
+  buttonStyle = 'rounded',
+  cardBgColor,
+  cardTextColor,
+  customAccentColor,
   realEstate,
   showingBooking,
   homeValuation,
@@ -145,8 +200,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   interactive = true,
 }) => {
   const theme = UI_KIT.cardPalettes[color] || UI_KIT.cardPalettes.purple;
+  const radiusClass = getCardRadiusClass(buttonStyle);
   const [copiedCode, setCopiedCode] = useState(false);
   const [logoError, setLogoError] = useState(false);
+
+  const isWhatsAppLink = Boolean(
+    (linkUrl && (
+      linkUrl.includes('wa.me') ||
+      linkUrl.includes('whatsapp.com') ||
+      linkUrl.startsWith('whatsapp:')
+    )) ||
+    customWhatsappPhone ||
+    (templateType === 'real_estate' && !showingBooking) ||
+    templateType === 'coaching_institute'
+  );
 
   // Construct card object for WhatsApp intent generation
   const cardData: ProfileCardData = {
@@ -220,8 +287,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     const intent = generateWhatsAppIntentUrl(cardData, businessPhone);
 
     if (!intent.hasPhone) {
-      if (linkUrl && linkUrl !== 'https://' && linkUrl !== '#') {
-        window.open(linkUrl, '_blank', 'noopener,noreferrer');
+      const safeUrl = sanitizeUrl(linkUrl);
+      if (safeUrl && safeUrl !== '#' && safeUrl !== 'https://' && safeUrl !== 'http://') {
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
         return;
       }
       if (onMissingPhone) {
@@ -262,7 +330,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return (
       <div
         id={id}
-        className={`w-full max-w-full overflow-hidden bg-white text-stone-900 rounded-[24px] border border-stone-200/90 shadow-sm transition-all duration-200 select-none ${
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-white text-stone-900 border border-stone-200/90'
+        } ${radiusClass} shadow-sm transition-all duration-200 select-none ${
           interactive ? 'hover:shadow-md hover:-translate-y-0.5' : ''
         }`}
       >
@@ -334,7 +408,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               onClick={handleOpenLead}
               className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs sm:text-sm font-semibold transition-all active:scale-95"
             >
-              <HugeIcon icon={Message01Icon} size={14} className="w-3.5 h-3.5 text-[#25D366]" />
+              <HugeIcon icon={WhatsappIcon} size={15} className="w-4 h-4 text-[#25D366]" />
               WhatsApp Agent
             </button>
           </div>
@@ -359,40 +433,46 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           if (onOpenMediaKitModal) onOpenMediaKitModal();
           else handleOpenLead(e);
         }}
-        className={`w-full max-w-full overflow-hidden bg-[#202428] text-white rounded-2xl border border-white/10 p-4 sm:p-5 shadow-2xs transition-all duration-200 select-none ${
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-[#191A1E] text-white border border-white/10'
+        } ${radiusClass} p-4 sm:p-5 shadow-sm transition-all duration-200 select-none ${
           interactive ? 'cursor-pointer hover:border-white/20' : ''
         }`}
       >
         <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400/20 text-amber-300">
-              <HugeIcon icon={StarIcon} size={16} className="w-4 h-4" />
+            <span className="p-1.5 rounded-lg bg-white/10 text-white">
+              <HugeIcon icon={StarIcon} size={16} className="w-4 h-4 text-stone-200" />
             </span>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-white leading-tight">{title || 'Creator Metrics & Reach'}</h3>
               <p className="text-[11px] text-stone-400">{niche} • Verified Audience</p>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-stone-200 border border-white/15">
-            📊 Media Kit
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-stone-300 border border-white/10">
+            Media Kit
           </span>
         </div>
 
         {/* 3-Metric Stats Bento Grid */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 py-2 text-center">
-          <div className="p-2.5 sm:p-3 rounded-xl bg-[#181B1E] border border-white/5">
-            <span className="text-base sm:text-xl font-black text-white block">{ig}</span>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 py-1 text-center">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10">
+            <span className="text-base sm:text-lg font-bold text-white block">{ig}</span>
             <span className="text-[10px] sm:text-xs text-stone-400 font-medium">Followers</span>
           </div>
 
-          <div className="p-2.5 sm:p-3 rounded-xl bg-[#181B1E] border border-white/5">
-            <span className="text-base sm:text-xl font-black text-emerald-400 block">{eng}</span>
-            <span className="text-[10px] sm:text-xs text-stone-400 font-medium">Avg Eng.</span>
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10">
+            <span className="text-base sm:text-lg font-bold text-white block">{eng}</span>
+            <span className="text-[10px] sm:text-xs text-stone-400 font-medium">Engagement</span>
           </div>
 
-          <div className="p-2.5 sm:p-3 rounded-xl bg-[#181B1E] border border-white/5">
-            <span className="text-base sm:text-xl font-black text-amber-300 block">{reach}</span>
-            <span className="text-[10px] sm:text-xs text-stone-400 font-medium">Mo. Reach</span>
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10">
+            <span className="text-base sm:text-lg font-bold text-white block">{reach}</span>
+            <span className="text-[10px] sm:text-xs text-stone-400 font-medium">Reach</span>
           </div>
         </div>
 
@@ -407,28 +487,23 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   }
 
   // -------------------------------------------------------------
-  // 3. FEATURED WORK / CAMPAIGN SPOTLIGHT (Card 8 in Reference Image)
+  // 3. FEATURED WORK / CAMPAIGN SPOTLIGHT
   // -------------------------------------------------------------
   if (templateType === 'featured_work') {
-    const metric = featuredWork?.resultsMetric || 'Learn in ontlow';
+    const metric = featuredWork?.resultsMetric || 'Verified Campaign Case Study';
 
     return (
       <div
         id={id}
         onClick={handleOpenLead}
-        className={`w-full max-w-full overflow-hidden bg-[#202428] text-white rounded-2xl border border-white/10 p-4 space-y-2.5 shadow-2xs transition-all duration-200 select-none ${
+        className={`w-full max-w-full overflow-hidden bg-[#191A1E] text-white rounded-2xl border border-white/10 p-4 sm:p-5 space-y-3 shadow-sm transition-all duration-200 select-none ${
           interactive ? 'cursor-pointer hover:border-white/20' : ''
         }`}
       >
         <div className="flex items-center justify-between">
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400/10 text-amber-400 border border-amber-400/20">
-            {badgeText || '⚡ LOAD AWARNES'}
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-stone-300 border border-white/10">
+            {badgeText || 'Featured Work'}
           </span>
-          <button type="button" className="text-stone-400 hover:text-white p-1 flex items-center gap-0.5">
-            <span className="w-1 h-1 rounded-full bg-current" />
-            <span className="w-1 h-1 rounded-full bg-current" />
-            <span className="w-1 h-1 rounded-full bg-current" />
-          </button>
         </div>
 
         <div>
@@ -438,13 +513,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           )}
         </div>
 
-        <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2 text-xs">
+        <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2 text-xs">
           <span className="text-stone-400 text-[11px] font-medium truncate">
             {metric}
           </span>
           <button
             type="button"
-            className="px-3.5 py-1.5 rounded-full bg-white hover:bg-stone-100 text-[#1C1E22] text-xs font-semibold transition-colors shrink-0 shadow-2xs"
+            className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-[#191A1E] text-xs font-bold transition-colors shrink-0 shadow-sm"
           >
             Learn More
           </button>
@@ -466,7 +541,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return (
       <div
         id={id}
-        className="w-full max-w-full overflow-hidden bg-white text-stone-900 rounded-[24px] border border-stone-200/90 p-4 sm:p-5 shadow-sm space-y-3"
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-white text-stone-900 border border-stone-200/90'
+        } ${radiusClass} p-4 sm:p-5 shadow-sm space-y-3`}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -509,7 +590,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                       if (onOpenBrandInquiryModal) onOpenBrandInquiryModal(pkg, cardData);
                       else handleOpenLead(e);
                     }}
-                    className="mt-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-all active:scale-95 shadow-2xs"
+                    style={{
+                      backgroundColor: customAccentColor || undefined,
+                    }}
+                    className="mt-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:opacity-90 text-white text-[11px] font-semibold transition-all active:scale-95 shadow-2xs"
                   >
                     Select
                   </button>
@@ -526,7 +610,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // 5. WORK WITH ME CARD
   // -------------------------------------------------------------
   if (templateType === 'work_with_me') {
-    const status = creatorWork?.availabilityStatus || '🔥 Available for UGC / Sponsorships / Reels';
+    const status = creatorWork?.availabilityStatus || 'Available for UGC & Brand Deals';
     const deliverables = creatorWork?.deliverables || ['UGC Videos', 'Reels', 'Brand Ambassadorship', 'Product Demos'];
     const turnaround = creatorWork?.turnaroundTime || '3 - 5 Days Turnaround';
 
@@ -537,16 +621,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           if (onOpenBrandInquiryModal) onOpenBrandInquiryModal(null, cardData);
           else handleOpenLead(e);
         }}
-        className={`w-full max-w-full overflow-hidden bg-[#202428] text-white rounded-2xl border border-white/10 p-4 sm:p-5 shadow-2xs transition-all duration-200 select-none ${
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-[#191A1E] text-white border border-white/10'
+        } ${radiusClass} p-4 sm:p-5 shadow-sm transition-all duration-200 select-none ${
           interactive ? 'cursor-pointer hover:border-white/20' : ''
         }`}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">{status}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-white" />
+            <span className="text-xs font-bold text-stone-200 uppercase tracking-wider">{status}</span>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-stone-300">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-stone-300">
             {turnaround}
           </span>
         </div>
@@ -556,7 +646,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
         <div className="flex flex-wrap gap-1.5 mt-3">
           {deliverables.map((item, idx) => (
-            <span key={idx} className="px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-[#181B1E] text-stone-200 border border-white/5">
+            <span key={idx} className="px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-white/5 text-stone-200 border border-white/10">
               {item}
             </span>
           ))}
@@ -589,7 +679,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return (
       <div
         id={id}
-        className="w-full max-w-full overflow-hidden bg-white text-stone-900 rounded-[24px] border border-stone-200/90 p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-3"
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-white text-stone-900 border border-stone-200/90'
+        } ${radiusClass} p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-3`}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <img
@@ -620,7 +716,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         <button
           type="button"
           onClick={handleOpenLead}
-          className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all shrink-0 active:scale-95 inline-flex items-center gap-1"
+          style={{
+            backgroundColor: customAccentColor || undefined,
+          }}
+          className="px-3.5 py-2 rounded-xl bg-stone-900 hover:opacity-90 text-white text-xs font-bold transition-all shrink-0 active:scale-95 inline-flex items-center gap-1"
         >
           <span>Get Deal</span>
           <HugeIcon icon={ArrowUpRight01Icon} size={14} className="w-3.5 h-3.5" />
@@ -641,7 +740,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     return (
       <div
         id={id}
-        className="w-full max-w-full overflow-hidden bg-stone-50 text-stone-900 rounded-[24px] border border-stone-200/80 p-4 sm:p-5 shadow-2xs space-y-2.5"
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-stone-50 text-stone-900 border border-stone-200/80'
+        } ${radiusClass} p-4 sm:p-5 shadow-2xs space-y-2.5`}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-amber-500">
@@ -679,24 +784,30 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           if (onOpenValuationModal) onOpenValuationModal();
           else handleOpenLead(e);
         }}
-        className={`w-full max-w-full overflow-hidden bg-[#202428] text-white rounded-2xl border border-white/10 p-4 sm:p-5 shadow-2xs transition-all duration-200 select-none ${
+        style={{
+          backgroundColor: cardBgColor || undefined,
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${
+          cardBgColor ? 'border border-black/10' : 'bg-[#191A1E] text-white border border-white/10'
+        } ${radiusClass} p-4 sm:p-5 shadow-sm transition-all duration-200 select-none ${
           interactive ? 'cursor-pointer hover:border-white/20' : ''
         }`}
       >
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300">
-            🏡 Seller Lead Tool
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-stone-300 border border-white/10">
+            Free Market Analysis
           </span>
-          <HugeIcon icon={CalculatorIcon} size={16} className="w-4 h-4 text-amber-300" />
+          <HugeIcon icon={CalculatorIcon} size={16} className="w-4 h-4 text-stone-300" />
         </div>
 
         <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">{title || "What's Your Home Worth?"}</h3>
-        <p className="text-xs text-amber-100/80 mt-1 leading-relaxed">{subtitle || 'Get a free, no-obligation Comparative Market Analysis (CMA) report for your neighborhood.'}</p>
+        <p className="text-xs text-stone-400 mt-1 leading-relaxed">{subtitle || 'Get a complimentary, no-obligation Comparative Market Analysis (CMA) report.'}</p>
 
-        <div className="mt-3.5 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-amber-200">
-          <span>Instant MLS Comps</span>
+        <div className="mt-3.5 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-stone-400">
+          <span>Instant MLS Neighborhood Comps</span>
           <span className="font-bold text-white inline-flex items-center gap-1">
-            Get Free Report <HugeIcon icon={ArrowUpRight01Icon} size={16} className="w-4 h-4" />
+            Get Free Report <HugeIcon icon={ArrowUpRight01Icon} size={14} className="w-3.5 h-3.5" />
           </span>
         </div>
       </div>
@@ -896,6 +1007,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   referrerPolicy="no-referrer"
                   onError={() => setLogoError(true)}
                 />
+              ) : isWhatsAppLink ? (
+                <HugeIcon icon={WhatsappIcon} size={18} className="w-4 h-4 text-[#25D366]" />
               ) : isCoaching ? (
                 <HugeIcon icon={Book02Icon} size={18} className="w-4 h-4 text-[#191A1E]" />
               ) : (
@@ -919,10 +1032,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             )}
             <div
               className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shrink-0 ${theme.arrowBtnClass}`}
-              title="Connect"
+              title={isWhatsAppLink ? 'WhatsApp' : 'Connect'}
             >
-              <span className="text-xs font-bold whitespace-nowrap">Connect</span>
-              <HugeIcon icon={ArrowUpRight01Icon} size={14} className="w-3.5 h-3.5" />
+              <span className="text-xs font-bold whitespace-nowrap">{isWhatsAppLink ? 'WhatsApp' : 'Connect'}</span>
+              <HugeIcon icon={isWhatsAppLink ? WhatsappIcon : ArrowUpRight01Icon} size={14} className="w-3.5 h-3.5" />
             </div>
           </div>
         </div>
@@ -963,11 +1076,21 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // -------------------------------------------------------------
   // 10. STANDARD COMPACT CARD
   // -------------------------------------------------------------
+  const surfaceClass = getCardSurfaceClass(cardStyle, theme, cardBgColor, customAccentColor);
+
   return (
     <div
       id={id}
       onClick={handleOpenLead}
-      className={`w-full max-w-full overflow-hidden ${theme.bgClass} ${theme.textClass} rounded-2xl px-3.5 py-3 sm:px-4 sm:py-3.5 transition-all duration-150 select-none flex items-center justify-between gap-3 shadow-2xs ${
+      style={{
+        backgroundColor:
+          cardBgColor ||
+          (cardStyle === 'fill' && customAccentColor && (!color || color === 'purple')
+            ? customAccentColor
+            : undefined),
+        color: cardTextColor || undefined,
+      }}
+      className={`w-full max-w-full overflow-hidden ${surfaceClass} ${getButtonRadiusClass(buttonStyle)} px-3.5 py-3 sm:px-4 sm:py-3.5 transition-all duration-150 select-none flex items-center justify-between gap-3 ${
         interactive ? 'cursor-pointer hover:opacity-95 active:scale-[0.99]' : ''
       }`}
     >
@@ -981,6 +1104,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               referrerPolicy="no-referrer"
               onError={() => setLogoError(true)}
             />
+          ) : isWhatsAppLink ? (
+            <HugeIcon icon={WhatsappIcon} size={18} className="w-4 h-4 text-[#25D366]" />
           ) : (
             <HugeIcon icon={GalleryThumbnailsIcon} size={16} className={color === 'purple' ? 'text-[#584CE4]' : 'text-[#191A1E]'} />
           )}
@@ -994,7 +1119,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </div>
 
           {subtitle && (
-            <p className={`text-[11px] truncate ${theme.subtextClass} font-normal mt-0.5`}>
+            <p className={`text-[11px] truncate ${cardStyle === 'outline' || cardStyle === 'glass' ? 'opacity-70' : theme.subtextClass} font-normal mt-0.5`}>
               {subtitle}
             </p>
           )}
@@ -1010,11 +1135,23 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </span>
         )}
         <div
-          className={`px-3 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold transition-colors shrink-0 shadow-2xs ${theme.arrowBtnClass}`}
-          title="Connect"
+          style={{
+            backgroundColor:
+              cardStyle === 'fill'
+                ? undefined
+                : (customAccentColor || undefined),
+          }}
+          className={`px-3 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold transition-colors shrink-0 shadow-2xs ${
+            cardStyle === 'fill'
+              ? theme.arrowBtnClass
+              : customAccentColor
+              ? 'text-white'
+              : theme.arrowBtnClass
+          }`}
+          title={isWhatsAppLink ? 'WhatsApp' : 'Connect'}
         >
-          <span>Connect</span>
-          <HugeIcon icon={ArrowUpRight01Icon} size={13} className="w-3 h-3" />
+          <span>{isWhatsAppLink ? 'WhatsApp' : 'Connect'}</span>
+          <HugeIcon icon={isWhatsAppLink ? WhatsappIcon : ArrowUpRight01Icon} size={13} className="w-3 h-3" />
         </div>
       </div>
     </div>

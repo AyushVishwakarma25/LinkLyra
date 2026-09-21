@@ -357,6 +357,15 @@ export interface UserAccountSettings {
   };
 }
 
+export type CardStyleType = 'fill' | 'outline' | 'glass' | 'shadow' | 'soft';
+export type WallpaperMode = 'blur' | 'solid' | 'gradient' | 'mesh' | 'pattern' | 'image';
+
+export interface FooterSettings {
+  showWatermark?: boolean;
+  customFooterText?: string;
+  showSocials?: boolean;
+}
+
 export interface UserProfile {
   id: string;
   email?: string;
@@ -371,11 +380,18 @@ export interface UserProfile {
   hasCompletedOnboarding?: boolean;
   realtorLicenseNo?: string; // e.g. "TREC #0742918" or "RERA Reg. A51800021"
   realtorBrokerage?: string; // e.g. "Compass Real Estate" or "Luxury Sotheby's"
-  buttonStyle?: 'rounded' | 'square' | 'pill' | 'glass';
+  buttonStyle?: 'rounded' | 'square' | 'pill' | 'glass' | 'smooth';
+  cardStyle?: CardStyleType; // 'fill' | 'outline' | 'glass' | 'shadow' | 'soft'
+  wallpaperMode?: WallpaperMode; // 'blur' | 'solid' | 'gradient' | 'mesh' | 'pattern' | 'image'
+  wallpaperTint?: number; // Tint overlay % e.g. 0 to 80
   buttonColor?: string;
+  cardBgColor?: string;
+  cardTextColor?: string;
   fontFamily?: string;
   backgroundType?: 'color' | 'gradient' | 'image';
   backgroundValue?: string;
+  stickers?: string[];
+  footerSettings?: FooterSettings;
   isPublished?: boolean;
   plan?: 'free' | 'pro' | 'business' | 'agency';
   socials?: SocialLinks;
@@ -399,7 +415,7 @@ export type LeadType =
   | 'music_booking'
   | 'podcast_sponsorship';
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'closed';
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'in_progress' | 'closed' | 'booked' | 'archived';
 
 export interface LeadRecord {
   id: string;

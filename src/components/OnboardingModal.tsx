@@ -16,11 +16,12 @@ import {
   Loading03Icon,
   AlertCircleIcon,
   UserCheck01Icon,
-  StarIcon,
+  Settings01Icon,
 } from '@hugeicons/core-free-icons';
 import { UserProfile, CanvasTheme, CardTemplateType, ProfileCardData, OnboardingPrimaryRole } from '../types';
 import { profileService, DbLink } from '../lib/firebase';
 import { completeUserOnboarding } from '../lib/onboardingService';
+import Stepper, { Step } from './Stepper';
 
 export interface OnboardingModalProps {
   isOpen: boolean;
@@ -497,57 +498,42 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Progress Bar Header with Back to Studio / Cancel Button */}
-        <div className="px-5 sm:px-6 py-4 bg-stone-900 text-white flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
-              <HugeIcon icon={StarIcon} size={16} className="w-4 h-4" />
+        {/* Progress Bar Header with Setup Icon & Cancel Icon Button */}
+        <div className="px-5 sm:px-7 py-4 bg-stone-900 text-white flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0 border border-white/10">
+              <HugeIcon icon={Settings01Icon} size={16} className="w-4 h-4 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-bold text-white tracking-tight truncate">
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
                 Starter Templates & Setup
               </h2>
-              <p className="text-[11px] text-stone-300 truncate">
+              <p className="text-xs text-stone-300 truncate">
                 Step {step} of 3: {step === 1 ? 'Choose Creator Identity' : step === 2 ? 'Profile & Handle' : 'Theme & Launch'}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5">
-              {[1, 2, 3].map((s) => (
-                <div
-                  key={s}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    s === step
-                      ? 'w-6 bg-amber-400'
-                      : s < step
-                      ? 'w-3 bg-white/60'
-                      : 'w-3 bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-
+          <div className="flex items-center shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-stone-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Cancel and return to studio"
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Close setup"
+              aria-label="Close setup"
             >
-              <HugeIcon icon={Cancel01Icon} size={14} />
-              <span className="hidden sm:inline">Back to Studio</span>
+              <HugeIcon icon={Cancel01Icon} size={16} className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
 
-        {/* Content Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        {/* Stepper with animated steps and transitions */}
+        <div className="flex-1 overflow-y-auto">
           {saveError && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-fadeIn">
+            <div className="mx-5 sm:mx-7 mt-3.5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-fadeIn">
               <HugeIcon icon={AlertCircleIcon} size={16} className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="font-semibold">Setup Could Not Be Saved</p>
@@ -556,278 +542,258 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             </div>
           )}
 
-          {step === 1 && (
-            <div className="space-y-3">
-              <div className="text-center sm:text-left">
-                <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                  What kind of page are you creating today?
-                </h3>
-                <p className="text-xs text-stone-500">
-                  We'll pre-configure your cards, layout presets, and media players.
-                </p>
-              </div>
+          <Stepper
+            initialStep={1}
+            currentStep={step}
+            onStepChange={(newStep) => setStep(newStep as 1 | 2 | 3)}
+            onFinalStepCompleted={handleFinish}
+            stepContainerClassName="px-5 sm:px-7 py-3 bg-stone-50/80 border-b border-stone-200"
+            contentClassName="px-5 sm:px-7 py-4 sm:py-5"
+            footerClassName="px-5 sm:px-7 py-3.5 bg-stone-50 border-t border-stone-200"
+            backButtonText={
+              <span className="inline-flex items-center gap-1.5 font-semibold text-xs sm:text-sm text-stone-700">
+                <HugeIcon icon={ArrowLeft01Icon} size={14} />
+                Back
+              </span>
+            }
+            nextButtonText={
+              <span className="inline-flex items-center gap-1.5 font-bold text-xs sm:text-sm text-white">
+                Continue
+                <HugeIcon icon={ArrowRight01Icon} size={14} className="w-3.5 h-3.5" />
+              </span>
+            }
+            completeButtonText={
+              isSaving ? (
+                <span className="inline-flex items-center gap-2 font-bold text-xs sm:text-sm text-white">
+                  <HugeIcon icon={Loading03Icon} size={14} className="w-3.5 h-3.5 animate-spin" />
+                  Launching Canvas...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2 font-bold text-xs sm:text-sm text-white">
+                  Launch My LinkLyra Page
+                  <HugeIcon icon={ArrowRight01Icon} size={14} className="w-3.5 h-3.5" />
+                </span>
+              )
+            }
+            nextButtonProps={{
+              disabled: isSaving,
+              className:
+                '!bg-stone-900 hover:!bg-black !text-white px-6 py-2.5 rounded-xl shadow-xs transition-transform active:scale-95 disabled:opacity-50 cursor-pointer font-bold',
+            }}
+          >
+            {/* Step 1: Creator Persona */}
+            <Step key={1}>
+              <div className="space-y-3.5">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                    What kind of page are you creating today?
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    We'll pre-configure your cards, layout presets, and media players.
+                  </p>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                {PERSONAS.map((p) => {
-                  const iconObj = p.icon;
-                  const isSelected = selectedPersonaId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleSelectPersona(p)}
-                      className={`text-left p-3.5 rounded-2xl border transition-all flex items-start gap-3 relative cursor-pointer ${
-                        isSelected
-                          ? 'border-stone-900 bg-stone-50/80 shadow-xs ring-2 ring-stone-900/10'
-                          : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50/50'
-                      }`}
-                    >
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                  {PERSONAS.map((p) => {
+                    const iconObj = p.icon;
+                    const isSelected = selectedPersonaId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectPersona(p)}
+                        className={`text-left p-3 rounded-2xl border transition-all flex items-center gap-3 relative cursor-pointer ${
                           isSelected
-                            ? 'bg-stone-900 text-white'
-                            : 'bg-stone-100 text-stone-700'
+                            ? 'border-stone-900 bg-stone-50/80 shadow-xs ring-2 ring-stone-900/10'
+                            : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50/50'
                         }`}
                       >
-                        <HugeIcon icon={iconObj} size={16} className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0 pr-6">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-bold text-stone-900 leading-tight">
-                            {p.title}
-                          </h4>
-                        </div>
-                        <span
-                          className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                            p.badge.includes('NEW')
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-stone-100 text-stone-600'
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? 'bg-stone-900 text-white'
+                              : 'bg-stone-100 text-stone-700'
                           }`}
                         >
-                          {p.badge}
-                        </span>
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-stone-900 text-white flex items-center justify-center">
-                          <HugeIcon icon={Tick01Icon} size={10} className="w-2.5 h-2.5" />
+                          <HugeIcon icon={iconObj} size={16} className="w-4 h-4" />
                         </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-3 p-3 bg-stone-50 rounded-2xl border border-stone-200 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                  <HugeIcon icon={RadioIcon} size={14} className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-[11px] text-stone-600">
-                  <span className="font-bold text-stone-900">
-                    Selected Archetype: {activePersona.title}.
-                  </span>{' '}
-                  Includes {activePersona.defaultCards.length} curated premium interactive cards ready to customize.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-3.5">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                  Claim your unique LinkLyra URL & Profile
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Your visitors will view your page at linklyra.app/
-                  <strong>{username || 'yourname'}</strong>
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-1">
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">
-                    Your Username Handle *
-                  </label>
-                  <div className="flex rounded-xl shadow-2xs border border-stone-200 overflow-hidden focus-within:ring-2 focus-within:ring-stone-900">
-                    <span className="bg-stone-100 px-3 py-2 text-xs font-semibold text-stone-500 border-r border-stone-200 select-none flex items-center">
-                      linklyra.app/
-                    </span>
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                      placeholder="alexmusic"
-                      className="w-full px-3 py-2 text-xs font-semibold text-stone-900 bg-white focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">
-                    Display Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Alex Morgan"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 bg-stone-50 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">
-                    Headline / Bio Snippet
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    placeholder="Describe your craft, release or business..."
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 bg-stone-50 resize-none font-medium"
-                  />
-                </div>
-
-                {/* Starter Cards Option */}
-                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="starterCards"
-                    checked={installStarterCards}
-                    onChange={(e) => setInstallStarterCards(e.target.checked)}
-                    className="mt-0.5 rounded-sm text-stone-900 focus:ring-stone-900 w-4 h-4"
-                  />
-                  <label htmlFor="starterCards" className="text-xs cursor-pointer">
-                    <span className="font-bold text-stone-900 block">
-                      Auto-generate starter cards for {activePersona.title}
-                    </span>
-                    <span className="text-stone-500 text-[11px] block mt-0.5">
-                      Adds sample cards like "{activePersona.defaultCards[0]?.title}" so you can preview right away.
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-stone-900">
-                  Pick your initial canvas aesthetic
-                </h3>
-                <p className="text-xs text-stone-500">
-                  You can change fonts, custom hex colors, and card styles at any time in the builder.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {THEME_OPTIONS.map((t) => {
-                  const isSelected = selectedTheme === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setSelectedTheme(t.id)}
-                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between h-20 transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-stone-900 ring-2 ring-stone-900/10 shadow-xs'
-                          : 'border-stone-200 hover:border-stone-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-xs font-bold text-stone-900 leading-tight">
-                          {t.name}
-                        </span>
+                        <div className="min-w-0 pr-6 flex-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-stone-900 leading-tight truncate">
+                            {p.title}
+                          </h4>
+                          <span
+                            className={`inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                              p.badge.includes('NEW')
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-stone-100 text-stone-600'
+                            }`}
+                          >
+                            {p.badge}
+                          </span>
+                        </div>
                         {isSelected && (
-                          <div className="w-3.5 h-3.5 rounded-full bg-stone-900 text-white flex items-center justify-center">
-                            <HugeIcon icon={Tick01Icon} size={8} className="w-2 h-2" />
+                          <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-stone-900 text-white flex items-center justify-center">
+                            <HugeIcon icon={Tick01Icon} size={10} className="w-2.5 h-2.5" />
                           </div>
                         )}
-                      </div>
-                      <div className={`w-full h-5 rounded-lg border ${t.previewClass}`} />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                  <HugeIcon icon={UserCheck01Icon} size={16} className="w-4 h-4" />
+                      </button>
+                    );
+                  })}
                 </div>
+
+                <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
+                    <HugeIcon icon={RadioIcon} size={14} className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div className="text-xs text-stone-600 leading-snug">
+                    <span className="font-bold text-stone-900">
+                      Great choice: {activePersona.title}!
+                    </span>{' '}
+                    Includes {activePersona.defaultCards.length} curated starter cards ready to customize.
+                  </div>
+                </div>
+              </div>
+            </Step>
+
+            {/* Step 2: Handle & Bio */}
+            <Step key={2}>
+              <div className="space-y-3.5">
                 <div>
-                  <div className="text-xs font-bold text-emerald-950">
-                    Ready to build your live creator page!
+                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                    Claim your unique LinkLyra URL & Profile
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Your visitors will view your page at linklyra.app/
+                    <strong>{username || 'yourname'}</strong>
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-0.5">
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Your Username Handle *
+                    </label>
+                    <div className="flex rounded-xl shadow-2xs border border-stone-200 overflow-hidden focus-within:ring-2 focus-within:ring-stone-900">
+                      <span className="bg-stone-100 px-3 py-2 text-xs font-semibold text-stone-500 border-r border-stone-200 select-none flex items-center">
+                        linklyra.app/
+                      </span>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                        placeholder="alexmusic"
+                        className="w-full px-3 py-2 text-xs sm:text-sm font-semibold text-stone-900 bg-white focus:outline-none"
+                      />
+                    </div>
                   </div>
-                  <div className="text-[11px] text-emerald-800">
-                    We’ll launch your interactive canvas with live mobile preview and real-time editing.
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Display Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Alex Morgan"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 bg-stone-50 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Headline / Bio Snippet
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={headline}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      placeholder="Describe your craft, release or business..."
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 bg-stone-50 resize-none font-medium"
+                    />
+                  </div>
+
+                  {/* Starter Cards Option */}
+                  <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="starterCards"
+                      checked={installStarterCards}
+                      onChange={(e) => setInstallStarterCards(e.target.checked)}
+                      className="mt-0.5 rounded-sm text-stone-900 focus:ring-stone-900 w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="starterCards" className="text-xs cursor-pointer">
+                      <span className="font-bold text-stone-900 block text-xs">
+                        Auto-generate starter cards for {activePersona.title}
+                      </span>
+                      <span className="text-stone-500 text-[11px] block mt-0.5">
+                        Adds sample cards like "{activePersona.defaultCards[0]?.title}" so you can preview right away.
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            </Step>
 
-        {/* Footer Navigation */}
-        <div className="px-5 sm:px-6 py-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between gap-3 shrink-0">
-          {step > 1 ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStep((s) => (s - 1) as any)}
-                className="px-3.5 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <HugeIcon icon={ArrowLeft01Icon} size={14} />
-                <span>Back</span>
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-xs text-stone-500 hover:text-stone-800 px-2.5 py-2 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <HugeIcon icon={ArrowLeft01Icon} size={14} />
-              <span>Back to Studio</span>
-            </button>
-          )}
+            {/* Step 3: Aesthetic & Launch */}
+            <Step key={3}>
+              <div className="space-y-3.5">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-stone-900">
+                    Pick your initial canvas aesthetic
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    You can change fonts, custom hex colors, and card styles at any time in the builder.
+                  </p>
+                </div>
 
-          {step < 3 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => (s + 1) as any)}
-              className="px-5 py-2.5 rounded-xl bg-stone-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
-            >
-              <span>Continue</span>
-              <HugeIcon icon={ArrowRight01Icon} size={14} className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={handleFinish}
-              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-bold flex items-center gap-2 shadow-xs transition-transform active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              {isSaving ? (
-                <>
-                  <HugeIcon icon={Loading03Icon} size={14} className="w-3.5 h-3.5 animate-spin" />
-                  <span>Launching Canvas...</span>
-                </>
-              ) : (
-                <>
-                  <span>Launch My LinkLyra Page</span>
-                  <HugeIcon icon={ArrowRight01Icon} size={14} className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {THEME_OPTIONS.map((t) => {
+                    const isSelected = selectedTheme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedTheme(t.id)}
+                        className={`p-3 rounded-2xl border text-left flex flex-col justify-between h-20 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-stone-900 ring-2 ring-stone-900/10 shadow-xs'
+                            : 'border-stone-200 hover:border-stone-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold text-stone-900 leading-tight">
+                            {t.name}
+                          </span>
+                          {isSelected && (
+                            <div className="w-3.5 h-3.5 rounded-full bg-stone-900 text-white flex items-center justify-center">
+                              <HugeIcon icon={Tick01Icon} size={8} className="w-2 h-2" />
+                            </div>
+                          )}
+                        </div>
+                        <div className={`w-full h-5 rounded-lg border ${t.previewClass}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Obsidian Box */}
+                <div className="p-3.5 bg-stone-900 border border-stone-800 rounded-2xl flex items-center gap-3 text-white shadow-xs">
+                  <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0 border border-white/10">
+                    <HugeIcon icon={UserCheck01Icon} size={16} className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold text-white">
+                      Ready to build your live creator page!
+                    </div>
+                    <div className="text-[11px] text-stone-300 mt-0.5">
+                      We’ll launch your interactive canvas with live mobile preview and real-time editing.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Step>
+          </Stepper>
         </div>
       </div>
     </div>

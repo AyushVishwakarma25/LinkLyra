@@ -152,10 +152,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <h2 className="text-sm font-bold text-[#1C1E22]">
                 {currentUser ? 'Your Account' : mode === 'signin' ? 'Sign In to LinkCards' : 'Create an Account'}
               </h2>
-              <div className="flex items-center gap-1.5 text-[11px] text-[#737882]">
-                <HugeIcon icon={CloudIcon} size={12} className="w-3 h-3 text-[#5E4BF7]" />
-                <span>Secure Cloud Sync</span>
-              </div>
             </div>
           </div>
           <button
@@ -196,21 +192,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <p className="text-xs text-[#737882]">{currentUser.email}</p>
               </div>
 
-              <div className="p-3.5 bg-white rounded-2xl border border-black/5 text-left text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#737882]">Auth Provider:</span>
-                  <span className="font-semibold text-[#1C1E22]">
-                    {currentUser.providerData[0]?.providerId === 'google.com' ? 'Google Account' : 'Email/Password'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#737882]">Sync Status:</span>
-                  <span className="font-semibold text-emerald-600 flex items-center gap-1">
-                    <HugeIcon icon={CloudIcon} size={12} className="w-3 h-3" />
-                    <span>Saved online</span>
-                  </span>
-                </div>
-              </div>
+
 
               {onOpenAccountSettings && (
                 <button

@@ -160,7 +160,6 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
           variant={activeTab === 'invoices' ? 'primary' : 'ghost'}
           onClick={() => setActiveTab('invoices')}
         >
-          <ButtonGroup.Separator />
           <HugeIcon icon={Invoice01Icon} size={14} className="w-3.5 h-3.5" />
           <span>Invoices</span>
           {invoices.length > 0 && (
@@ -567,7 +566,6 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                   fullWidth
                   onClick={() => setSelectedInvoiceModal(null)}
                 >
-                  <ButtonGroup.Separator />
                   <span>Done</span>
                 </Button>
               </ButtonGroup>

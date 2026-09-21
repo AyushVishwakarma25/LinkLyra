@@ -11,10 +11,11 @@ import {
   CloudIcon,
   Home01Icon,
   CrownIcon,
+  Mail01Icon,
 } from '@hugeicons/core-free-icons';
 import { UserProfile, ProfileCardData } from './types';
 import { DEFAULT_STARTER_PROFILE } from './data';
-import { BuilderSidebar } from './components/BuilderSidebar';
+import { BuilderSidebar, SidebarTabKey } from './components/BuilderSidebar';
 import { LivePreview } from './components/LivePreview';
 import { CardEditorModal } from './components/CardEditorModal';
 import { AuthModal } from './components/AuthModal';
@@ -23,7 +24,7 @@ import { LandingPage } from './components/LandingPage';
 import { PublicProfilePage } from './app/[username]/page';
 import { AccountSettings, AccountSubTab } from './components/AccountSettings';
 import { OnboardingModal } from './components/OnboardingModal';
-import { Button, ButtonGroup } from './components/ui';
+import { Button, ButtonGroup, SegmentedControl } from './components/ui';
 import { profileService, DbProfile, isAgencyUserEmail } from './lib/firebase';
 import { checkUserOnboardingEligibility } from './lib/onboardingService';
 import { User } from 'firebase/auth';
@@ -104,10 +105,8 @@ export default function App() {
     return 'landing';
   });
 
-  // Active sidebar tab (Links, Profile, Theme, Analytics, Share)
-  const [activeSidebarTab, setActiveSidebarTab] = useState<
-    'links' | 'profile' | 'appearance' | 'analytics' | 'share'
-  >('links');
+  // Active sidebar tab (Links, Profile, Theme, Analytics, Share, Leads, Billing)
+  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTabKey>('links');
 
   // Firebase Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -209,6 +208,14 @@ export default function App() {
               buttonStyle: dbProf.button_style,
               backgroundType: dbProf.background_type,
               backgroundValue: dbProf.background_value,
+              cardStyle: dbProf.card_style || 'fill',
+              wallpaperMode: dbProf.wallpaper_mode || 'color',
+              wallpaperTint: dbProf.wallpaper_tint ?? 20,
+              cardBgColor: dbProf.card_bg_color,
+              cardTextColor: dbProf.card_text_color,
+              buttonColor: dbProf.button_color,
+              stickers: dbProf.stickers || [],
+              footerSettings: dbProf.footer_settings,
               socials: dbProf.socials || {},
               plan: isAgency ? 'agency' : (dbProf.plan || 'free'),
               customDomain: dbProf.custom_domain || '',
@@ -282,8 +289,19 @@ export default function App() {
               setIsOnboardingOpen(true);
             }
           }
-        } catch (err) {
-          console.error('Error syncing from Cloud Firestore:', err);
+        } catch (err: any) {
+          console.warn('Notice syncing from Cloud Firestore (operating in offline/cached mode):', err?.message || err);
+          // Graceful fallback to user-scoped local cache if network is offline/slow
+          const userKey = `${STORAGE_KEY}_${user.uid}`;
+          try {
+            const saved = localStorage.getItem(userKey);
+            if (saved) {
+              const userScopedData = JSON.parse(saved);
+              if (userScopedData && userScopedData.id === user.uid) {
+                setProfile(userScopedData);
+              }
+            }
+          } catch (_) {}
         } finally {
           setIsSyncing(false);
           setIsAuthChecking(false);
@@ -544,6 +562,14 @@ export default function App() {
       if (updated.buttonStyle !== undefined) updates.button_style = updated.buttonStyle;
       if (updated.backgroundType !== undefined) updates.background_type = updated.backgroundType;
       if (updated.backgroundValue !== undefined) updates.background_value = updated.backgroundValue;
+      if (updated.cardStyle !== undefined) updates.card_style = updated.cardStyle;
+      if (updated.wallpaperMode !== undefined) updates.wallpaper_mode = updated.wallpaperMode;
+      if (updated.wallpaperTint !== undefined) updates.wallpaper_tint = updated.wallpaperTint;
+      if (updated.cardBgColor !== undefined) updates.card_bg_color = updated.cardBgColor;
+      if (updated.cardTextColor !== undefined) updates.card_text_color = updated.cardTextColor;
+      if (updated.buttonColor !== undefined) updates.button_color = updated.buttonColor;
+      if (updated.stickers !== undefined) updates.stickers = updated.stickers;
+      if (updated.footerSettings !== undefined) updates.footer_settings = updated.footerSettings;
       if (updated.socials !== undefined) updates.socials = updated.socials;
       if (updated.customDomain !== undefined) updates.custom_domain = updated.customDomain;
       if (updated.accountSettings !== undefined) updates.accountSettings = updated.accountSettings;
@@ -568,6 +594,14 @@ export default function App() {
           button_style: profile.buttonStyle,
           background_type: profile.backgroundType,
           background_value: profile.backgroundValue,
+          card_style: profile.cardStyle,
+          wallpaper_mode: profile.wallpaperMode,
+          wallpaper_tint: profile.wallpaperTint,
+          card_bg_color: profile.cardBgColor,
+          card_text_color: profile.cardTextColor,
+          button_color: profile.buttonColor,
+          stickers: profile.stickers,
+          footer_settings: profile.footerSettings,
           socials: profile.socials,
           custom_domain: profile.customDomain,
           accountSettings: profile.accountSettings,
@@ -799,27 +833,24 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#ECE7DC] text-[#1C1E22] antialiased">
-      {/* Top Global App Header Navigation */}
-      <header className="bg-white border-b border-black/10 px-3 sm:px-6 py-2.5 flex items-center justify-between shrink-0 shadow-2xs z-30">
+    <div className="flex flex-col h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-[#ECE7DC] text-[#1C1E22] antialiased">
+      {/* Top Global App Header Navigation (Safe Area optimized for iOS notch / Android status bar) */}
+      <header className="bg-white border-b border-black/10 px-3 sm:px-6 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 sm:pb-2.5 flex items-center justify-between shrink-0 shadow-2xs z-30">
         {/* Brand Logo & Handle */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           <button
             type="button"
             onClick={() => setAppMode('landing')}
-            className="flex items-center gap-2 min-w-0 text-left hover:opacity-85 transition-opacity"
+            className="flex items-center gap-2 min-w-0 text-left hover:opacity-85 transition-opacity min-h-[44px] py-1"
             title="Back to Landing Page"
           >
             <div className="w-8 h-8 rounded-xl bg-[#1C1E22] text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
               LL
             </div>
-            <div className="hidden sm:block min-w-0">
-              <span className="font-extrabold text-sm text-[#1C1E22] tracking-tight block truncate">
-                LinkLyra
-              </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-[#737882]">
-                <span className="font-mono text-[#5E4BF7] font-semibold truncate">
-                  /@{profile.username}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-sm text-[#1C1E22] tracking-tight block truncate">
+                  LinkLyra
                 </span>
                 {profile.plan === 'pro' || profile.plan === 'business' ? (
                   <span className="px-1.5 py-0.2 rounded-full bg-[#F8BA38] text-[#191A1E] font-black text-[8px]">
@@ -831,13 +862,16 @@ export default function App() {
                   </span>
                 )}
               </div>
+              <div className="text-[11px] text-[#737882] truncate font-mono text-[#5E4BF7] font-semibold">
+                /@{profile.username}
+              </div>
             </div>
           </button>
 
           {/* Cloud Status Badge */}
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 text-[11px] text-[#737882] shrink-0">
-            <HugeiconsIcon icon={CloudIcon} size={14} className={currentUser ? 'text-emerald-500' : 'text-[#737882]'} />
-            <span className="truncate">
+            <HugeiconsIcon icon={CloudIcon} size={14} className={currentUser ? 'text-black' : 'text-[#737882]'} />
+            <span className="truncate text-[#191A1E] font-medium">
               {currentUser
                 ? isSyncing
                   ? 'Saving...'
@@ -847,103 +881,93 @@ export default function App() {
           </div>
         </div>
 
-        {/* View Mode Switcher ButtonGroup */}
-        <ButtonGroup variant="tertiary" size="sm" className="hidden sm:inline-flex bg-black/5 p-0.5 rounded-lg border border-black/5">
-          <Button
-            onClick={() => setAppMode('landing')}
-            isSelected={appMode === 'landing'}
-            className="rounded-md"
-            title="Landing Page"
-          >
-            <HugeiconsIcon icon={Home01Icon} size={14} />
-            <span>Home</span>
-          </Button>
-          <Button
-            onClick={() => {
-              if (!currentUser) {
+        {/* View Mode Switcher via Universal UI Kit SegmentedControl (No ' | ' separators!) */}
+        <div className="hidden sm:block">
+          <SegmentedControl
+            value={appMode}
+            onChange={(val) => {
+              if ((val === 'studio' || val === 'preview_only') && !currentUser) {
                 setIsAuthModalOpen(true);
                 return;
               }
-              setAppMode('studio');
+              setAppMode(val as any);
             }}
-            isSelected={appMode === 'studio'}
-            className="rounded-md"
-          >
-            <ButtonGroup.Separator />
-            Studio
-          </Button>
-          <Button
-            onClick={() => {
-              if (!currentUser) {
-                setIsAuthModalOpen(true);
-                return;
-              }
-              setAppMode('preview_only');
-            }}
-            isSelected={appMode === 'preview_only'}
-            className="rounded-md"
-          >
-            <ButtonGroup.Separator />
-            Live Preview
-          </Button>
-          <Button
-            onClick={() => setAppMode('public')}
-            isSelected={appMode === 'public'}
-            className="rounded-md"
-          >
-            <ButtonGroup.Separator />
-            <HugeiconsIcon icon={ViewIcon} size={14} />
-            <span>Visitor View</span>
-          </Button>
-        </ButtonGroup>
+            size="sm"
+            options={[
+              {
+                value: 'landing',
+                label: 'Home',
+                icon: <HugeiconsIcon icon={Home01Icon} size={14} />,
+                title: 'Landing Page',
+              },
+              {
+                value: 'studio',
+                label: 'Studio',
+                title: 'Creator Studio',
+              },
+              {
+                value: 'preview_only',
+                label: 'Live Preview',
+                title: 'Live Mobile Preview',
+              },
+              {
+                value: 'public',
+                label: 'Visitor View',
+                icon: <HugeiconsIcon icon={ViewIcon} size={14} />,
+                title: 'Visitor View',
+              },
+            ]}
+          />
+        </div>
 
         {/* Right Header Actions: Auth & Share */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <ButtonGroup variant="secondary" size="sm">
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => {
+              setActiveSidebarTab('share');
+              if (appMode === 'preview_only') setAppMode('studio');
+            }}
+            title="Share & QR Code"
+          >
+            <HugeiconsIcon icon={Share01Icon} size={14} />
+            <span className="hidden md:inline">Share</span>
+          </Button>
+
+          {currentUser ? (
             <Button
-              onClick={() => {
-                setActiveSidebarTab('share');
-                if (appMode === 'preview_only') setAppMode('studio');
-              }}
-              title="Share & QR Code"
+              variant="primary"
+              size="md"
+              onClick={() => handleOpenAccountSettings('profile')}
+              title="Account & Security Settings"
             >
-              <HugeiconsIcon icon={Share01Icon} size={14} />
-              <span className="hidden md:inline">Share / QR</span>
+              <HugeiconsIcon icon={UserCheck01Icon} size={14} className="text-emerald-400" />
+              <span className="hidden sm:inline truncate max-w-[110px]">
+                {currentUser.displayName || currentUser.email?.split('@')[0] || 'Account'}
+              </span>
             </Button>
-            {currentUser ? (
-              <Button
-                variant="primary"
-                onClick={() => handleOpenAccountSettings('profile')}
-                title="Account & Security Settings"
-              >
-                <ButtonGroup.Separator />
-                <HugeiconsIcon icon={UserCheck01Icon} size={14} className="text-emerald-400" />
-                <span className="hidden sm:inline truncate max-w-[120px]">
-                  {currentUser.displayName || currentUser.email?.split('@')[0] || 'Account'}
-                </span>
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                onClick={() => setIsAuthModalOpen(true)}
-              >
-                <ButtonGroup.Separator />
-                <HugeiconsIcon icon={UserCheck01Icon} size={14} className="text-emerald-400" />
-                <span className="hidden sm:inline">Sign In</span>
-              </Button>
-            )}
-          </ButtonGroup>
+          ) : (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsAuthModalOpen(true)}
+            >
+              <HugeiconsIcon icon={UserCheck01Icon} size={14} className="text-emerald-400" />
+              <span>Sign In</span>
+            </Button>
+          )}
         </div>
       </header>
 
       {/* Main Studio Body Workspace */}
       <div className="flex-1 flex flex-row overflow-hidden relative">
-        {/* Left Side: Builder Sidebar (Expanded width to use available space comfortably) */}
+        {/* Left Side: Builder Sidebar (Fixed width on desktop so clicking options never resizes container) */}
         <div
-          className={`h-full flex flex-col transition-all duration-300 min-w-0 ${
+          className={`h-full flex flex-col min-w-0 ${
             appMode === 'studio'
-              ? 'flex w-full lg:w-[520px] xl:w-[600px] 2xl:w-[660px]'
-              : 'hidden lg:flex lg:w-[520px] xl:w-[600px] 2xl:w-[660px]'
+              ? 'flex w-full lg:w-[500px] xl:w-[560px] 2xl:w-[620px] lg:flex-none lg:shrink-0'
+              : 'hidden lg:flex lg:w-[500px] xl:w-[560px] 2xl:w-[620px] lg:flex-none lg:shrink-0'
           }`}
         >
           <BuilderSidebar
@@ -972,7 +996,7 @@ export default function App() {
 
         {/* Right Side: Live Interactive Canvas Preview */}
         <div
-          className={`h-full flex-1 flex flex-col overflow-hidden bg-[#E5DFD3] transition-all duration-300 min-w-0 ${
+          className={`h-full flex-1 flex flex-col overflow-hidden bg-[#E5DFD3] min-w-0 ${
             appMode === 'preview_only' ? 'flex w-full' : 'hidden lg:flex'
           }`}
         >
@@ -984,48 +1008,32 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <div className="lg:hidden bg-white border-t border-black/10 px-2 py-1.5 flex items-center justify-around shrink-0 z-30 shadow-md">
+      {/* Mobile Bottom Navigation Bar (Optimized for iPhone Home Indicator & Android Navigation Bar) */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="lg:hidden bg-white/95 backdrop-blur-md border-t border-black/10 px-3 pt-1.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
+      >
         <button
           type="button"
           onClick={() => {
             setAppMode('studio');
             setActiveSidebarTab('links');
           }}
-          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-bold ${
+          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
             appMode === 'studio' && activeSidebarTab === 'links'
-              ? 'text-[#5E4BF7]'
-              : 'text-[#737882]'
+              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
+              : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={Link01Icon} size={16} />
-          <span>Links</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAppMode('studio');
-            setActiveSidebarTab('profile');
-          }}
-          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-bold ${
-            appMode === 'studio' && activeSidebarTab === 'profile'
-              ? 'text-[#5E4BF7]'
-              : 'text-[#737882]'
-          }`}
-        >
-          <HugeiconsIcon icon={UserIcon} size={16} />
-          <span>Profile</span>
-        </button>
-
-        {/* Center Floating Action Button (+ Add Link) */}
-        <button
-          type="button"
-          onClick={handleAddCard}
-          className="w-10 h-10 -mt-3 rounded-full bg-[#5E4BF7] text-white flex items-center justify-center shadow-lg active:scale-95 shrink-0"
-          title="Add Link Card"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} size={20} strokeWidth={2.5} />
+          <div className="relative">
+            <HugeiconsIcon icon={Link01Icon} size={18} />
+            {profile.cards.length > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-[13px] h-[13px] px-0.5 rounded-full bg-[#5E4BF7] text-white text-[8px] font-black flex items-center justify-center">
+                {profile.cards.length}
+              </span>
+            )}
+          </div>
+          <span className="mt-0.5 tracking-tight">Links</span>
         </button>
 
         <button
@@ -1034,29 +1042,75 @@ export default function App() {
             setAppMode('studio');
             setActiveSidebarTab('appearance');
           }}
-          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-bold ${
+          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
             appMode === 'studio' && activeSidebarTab === 'appearance'
-              ? 'text-[#5E4BF7]'
-              : 'text-[#737882]'
+              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
+              : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={ColorsIcon} size={16} />
-          <span>Theme</span>
+          <HugeiconsIcon icon={ColorsIcon} size={18} />
+          <span className="mt-0.5 tracking-tight">Theme</span>
+        </button>
+
+        {/* Center Floating Action Button (+ Add Link) */}
+        <div className="flex flex-col items-center -mt-5">
+          <button
+            type="button"
+            onClick={handleAddCard}
+            className="w-12 h-12 rounded-full bg-[#1C1E22] hover:bg-black active:scale-90 text-white flex items-center justify-center shadow-lg shadow-black/20 ring-4 ring-white transition-transform touch-manipulation"
+            title="Add Link Card"
+            aria-label="Add new link card"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} size={22} strokeWidth={2.5} />
+          </button>
+          <span className="text-[9px] font-extrabold text-[#1C1E22] mt-0.5 tracking-tight">Add</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAppMode('studio');
+            setActiveSidebarTab('leads');
+          }}
+          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+            appMode === 'studio' && activeSidebarTab === 'leads'
+              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
+              : 'text-[#737882] hover:text-[#1C1E22]'
+          }`}
+        >
+          <HugeiconsIcon icon={Mail01Icon} size={18} />
+          <span className="mt-0.5 tracking-tight">Leads</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setAppMode('preview_only')}
-          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-bold ${
-            appMode === 'preview_only'
-              ? 'text-[#5E4BF7]'
-              : 'text-[#737882]'
+          onClick={() => {
+            setAppMode('studio');
+            setActiveSidebarTab('profile');
+          }}
+          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+            appMode === 'studio' && activeSidebarTab === 'profile'
+              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
+              : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={ViewIcon} size={16} />
-          <span>Preview</span>
+          <HugeiconsIcon icon={UserIcon} size={18} />
+          <span className="mt-0.5 tracking-tight">Profile</span>
         </button>
-      </div>
+
+        <button
+          type="button"
+          onClick={() => setAppMode(appMode === 'preview_only' ? 'studio' : 'preview_only')}
+          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+            appMode === 'preview_only'
+              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
+              : 'text-[#737882] hover:text-[#1C1E22]'
+          }`}
+        >
+          <HugeiconsIcon icon={ViewIcon} size={18} />
+          <span className="mt-0.5 tracking-tight">{appMode === 'preview_only' ? 'Editor' : 'Preview'}</span>
+        </button>
+      </nav>
 
       {/* Card Editor Modal */}
       <CardEditorModal

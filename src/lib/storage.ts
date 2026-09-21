@@ -9,19 +9,34 @@ interface CompressionConfig {
 }
 
 const CATEGORY_CONFIG: Record<ImageUploadCategory, CompressionConfig> = {
-  avatar: { maxDimension: 400, quality: 0.82 },
-  card_image: { maxDimension: 600, quality: 0.82 },
-  page_image: { maxDimension: 1000, quality: 0.82 },
-  wallpaper: { maxDimension: 1280, quality: 0.80 },
+  avatar: { maxDimension: 1024, quality: 0.85 },
+  card_image: { maxDimension: 1600, quality: 0.85 },
+  page_image: { maxDimension: 1600, quality: 0.85 },
+  wallpaper: { maxDimension: 1600, quality: 0.85 },
 };
 
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
 /**
- * High-performance image compressor:
+ * Validates file format and size constraints before attempting processing or upload.
+ */
+export function validateImageFile(file: File): void {
+  if (!file || !file.type || !ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
+    throw new Error('Unsupported image format. Please upload a JPEG, PNG, WebP, or GIF image.');
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error('Image file is too large. Maximum allowed file size is 5 MB.');
+  }
+}
+
+/**
+ * High-performance client-side image downscaler and compressor:
+ * - Restricts max dimensions based on target category (avatar max 1024px, card/page/wallpaper max 1600px)
  * - Uses createImageBitmap for hardware acceleration when supported
- * - Falls back to fast Canvas 2D
- * - Converts to efficient WebP format (or JPEG if WebP unsupported)
- * - Restricts max dimensions based on target category (e.g. 400px for avatars)
- * - Typically takes < 25ms to execute!
+ * - Falls back to standard Canvas 2D
+ * - Converts to optimized WebP format
  */
 export async function compressImageFile(
   file: File,
@@ -29,12 +44,11 @@ export async function compressImageFile(
   customMaxDimension?: number,
   customQuality?: number
 ): Promise<File> {
-  if (!file.type.startsWith('image/')) {
-    return file;
-  }
+  // Enforce type validation
+  validateImageFile(file);
 
-  // If already SVG or tiny image (< 40KB), return as-is
-  if (file.type.includes('svg') || file.size < 40 * 1024) {
+  // If already SVG or tiny image (< 40KB) that doesn't exceed dimensions, return as-is
+  if (file.type.includes('svg')) {
     return file;
   }
 
@@ -44,7 +58,7 @@ export async function compressImageFile(
   const quality = customQuality || defaultQual;
 
   try {
-    // 1. Modern fast path: createImageBitmap (GPU-accelerated, async)
+    // 1. Fast path: createImageBitmap (GPU-accelerated, async)
     if (typeof createImageBitmap === 'function') {
       const bitmap = await createImageBitmap(file);
       let { width, height } = bitmap;
@@ -68,14 +82,10 @@ export async function compressImageFile(
         bitmap.close();
 
         const blob = await new Promise<Blob | null>((resolve) => {
-          canvas.toBlob(
-            (b) => resolve(b),
-            'image/webp',
-            quality
-          );
+          canvas.toBlob((b) => resolve(b), 'image/webp', quality);
         });
 
-        if (blob && blob.size < file.size) {
+        if (blob && (blob.size < file.size || width !== bitmap.width)) {
           return new File([blob], file.name.replace(/\.[^/.]+$/, '.webp'), {
             type: 'image/webp',
             lastModified: Date.now(),
@@ -84,11 +94,11 @@ export async function compressImageFile(
       }
     }
   } catch (err) {
-    console.warn('createImageBitmap fast-path error, using HTMLImageElement fallback:', err);
+    console.warn('createImageBitmap fast-path error, using standard Canvas fallback:', err);
   }
 
   // 2. Standard Canvas fallback
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -130,78 +140,67 @@ export async function compressImageFile(
           quality
         );
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => reject(new Error('Could not read image for compression.'));
       img.src = e.target?.result as string;
     };
-    reader.onerror = () => resolve(file);
+    reader.onerror = () => reject(new Error('Could not read file from disk.'));
     reader.readAsDataURL(file);
   });
 }
 
 /**
- * Uploads an image file to Firebase Cloud Storage with fast client-side optimization:
- * - Automatically scales and compresses according to category
- * - Applies timeout guard (4s) so slow networks don't hang the UI
- * - Yields a lightweight WebP Data URL fallback on network failure or offline mode
+ * Uploads an image file to Firebase Cloud Storage:
+ * - Validates file type and max 5MB size
+ * - Downscales client-side (avatar max 1024px, cards/wallpapers max 1600px)
+ * - Adheres strictly to storage.rules paths:
+ *     - users/{uid}/avatar/** for avatars
+ *     - pages/{uid}/images/** for cards, page images, and wallpapers
+ * - Throws a friendly error on failure (no base64 data-URL fallback)
  */
 export async function uploadImageToStorage(
   file: File,
   type: ImageUploadCategory = 'avatar',
   targetId?: string
 ): Promise<string> {
-  // Compress image on the client first for instant transfer (< 30KB)
+  // 1. Validate file format and size
+  validateImageFile(file);
+
+  // 2. Compress and downscale on the client first
   const optimizedFile = await compressImageFile(file, type);
 
-  const currentUid = auth.currentUser?.uid || 'anonymous';
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid && !targetId) {
+    throw new Error('You must be signed in to upload images.');
+  }
+
   const timestamp = Date.now();
   const safeFilename = optimizedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
 
+  // Adhere to storage.rules: users/{userId}/avatar/** or pages/{pageId}/images/**
   let path = '';
   if (type === 'avatar') {
     const userId = targetId || currentUid;
     path = `users/${userId}/avatar/${timestamp}_${safeFilename}`;
-  } else if (type === 'wallpaper') {
-    const userId = targetId || currentUid;
-    path = `users/${userId}/wallpaper/${timestamp}_${safeFilename}`;
   } else {
     const pageId = targetId || currentUid;
     path = `pages/${pageId}/images/${timestamp}_${safeFilename}`;
   }
 
-  // Upload with 4-second timeout to prevent UI freezes if Firebase Storage is unreachable
   try {
-    const uploadPromise = (async () => {
-      const storageRef = ref(storage, path);
-      const metadata = {
-        contentType: optimizedFile.type || 'image/webp',
-        customMetadata: {
-          uploadedBy: currentUid,
-          uploadedAt: new Date().toISOString(),
-        },
-      };
+    const storageRef = ref(storage, path);
+    const metadata = {
+      contentType: optimizedFile.type || 'image/webp',
+      customMetadata: {
+        uploadedBy: currentUid || 'unknown',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
 
-      const snapshot = await uploadBytes(storageRef, optimizedFile, metadata);
-      return await getDownloadURL(snapshot.ref);
-    })();
-
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Storage upload timed out')), 4000)
-    );
-
-    return await Promise.race([uploadPromise, timeoutPromise]);
-  } catch (error) {
-    // Fast, resilient DataURL fallback (since file is already compressed to ~15-30KB)
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result);
-        } else {
-          reject(new Error('Failed to convert file to data URL'));
-        }
-      };
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(optimizedFile);
-    });
+    const snapshot = await uploadBytes(storageRef, optimizedFile, metadata);
+    return await getDownloadURL(snapshot.ref);
+  } catch (error: any) {
+    console.error('Storage upload error:', error);
+    const message = error?.message || 'Failed to upload image. Please check your network connection and try again.';
+    throw new Error(message);
   }
 }

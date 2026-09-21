@@ -1,6 +1,6 @@
 # 📄 LinkLyra — Product Requirements Document (PRD)
 
-> **Document Version**: 3.0.0  
+> **Document Version**: 3.1.0  
 > **Status**: Production Ready  
 > **Target Platform**: Responsive Web (Desktop Studio + Mobile Showroom)  
 > **Last Updated**: September 2026
@@ -13,7 +13,7 @@
 - **Link-in-Bio Showroom**: An interactive, card-based mobile destination replacing flat text lists with tactile, high-converting multimedia cards.
 - **"Hire Me" & High-Intent Modes**: Specialized vertical layouts converting simple link pages into lead machines for Content Creators, Real Estate Agents, and Coaches.
 - **Account & Settings Hub**: A decoupled command center for public identity, security credentials, preferences, SEO/domains, and data exports.
-- **Billing Dashboard**: A dedicated financial center managing Razorpay subscriptions, GST-compliant tax invoices, PDF receipts, and custom merchant keys.
+- **Billing Dashboard**: A dedicated financial center managing Razorpay subscriptions, GST-compliant tax invoices, and PDF receipts.
 - **Lead Capture & Routing Engine**: In-app inquiry modals (Brand Deals, Showing Requests, Home Valuations) with automatic Firestore logging and 1-tap WhatsApp dispatch.
 
 ---
@@ -85,7 +85,6 @@ Traditional "link-in-bio" tools (Linktree, Beacons, Bio.fm) treat every creator 
    - **Pro Paywall Modal**: Razorpay checkout integration with instant UPI, NetBanking, and Card support.
    - **Invoices & Receipts**: Paginated history of tax invoices with status badges.
    - **PDF Receipt Generator**: Full-page interactive receipt modal with 1-click **Print / Save as PDF**.
-   - **Custom Razorpay Gateway**: Creators can save their own Razorpay Key ID for collecting client tips and direct payments.
 
 ---
 
@@ -142,9 +141,25 @@ firestore-root/
 
 ---
 
-## 🛡️ 5. Non-Functional Requirements & Security
+## 🔮 5. Planned Features (Roadmap)
+
+The following items are defined in the product roadmap and scheduled for upcoming milestone releases:
+
+1. **AI Bio Generation**:
+   - Automated creator bio, headline, and collaboration pitch generator using AI.
+2. **Custom Razorpay Gateway UI**:
+   - Creator merchant configuration tab allowing users to connect their own Razorpay Key ID to collect client tips and direct sales.
+3. **Email Lead Notifications**:
+   - Real-time automated email alerts dispatched to creators whenever a prospective client submits a brand inquiry, booking, or valuation lead.
+4. **Geolocation Analytics**:
+   - Geographic analytics dashboard breaking down page views, visitor countries, regions, and cities with interactive heatmap visualization.
+
+---
+
+## 🛡️ 6. Non-Functional Requirements & Security
 
 1. **Firestore Security Rules**: Strict RBAC ensuring creators can only write to their own profile, links, and leads.
 2. **WhatsApp Safe Routing**: Fallback notifications when no phone number is provided to prevent dead-click UX.
 3. **Performance**: Under 150KB initial JS bundle and sub-second page loads.
 4. **Accessibility (WCAG AA)**: Clear color contrast ratios and keyboard-navigable modals.
+5. **Modern Tech Stack**: React 19, TypeScript, Vite, Tailwind CSS v4, HugeIcons.

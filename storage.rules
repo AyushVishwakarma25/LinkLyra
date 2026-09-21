@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isUnder5MB() {
+      return request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Avatar storage: users/{uid}/avatar/**
+    match /users/{userId}/avatar/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImage() && isUnder5MB();
+    }
+
+    // Page & Card images storage: pages/{uid}/images/**
+    match /pages/{pageId}/images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(pageId) && isImage() && isUnder5MB();
+    }
+
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -744,9 +744,16 @@ export const profileService = {
       // Check pages/{pageId} first
       const pageSnap = await getDoc(doc(db, 'pages', userId));
       const profileSnap = await getDoc(doc(db, 'profiles', userId));
-      const userSnap = await getDoc(doc(db, 'users', userId));
+      let userData: any = null;
+      if (auth.currentUser?.uid === userId) {
+        try {
+          const userSnap = await getDoc(doc(db, 'users', userId));
+          if (userSnap.exists()) userData = userSnap.data();
+        } catch {
+          // ignore if user doc cannot be read
+        }
+      }
       const profileData = profileSnap.exists() ? (profileSnap.data() as DbProfile) : null;
-      const userData = userSnap.exists() ? userSnap.data() : null;
 
       const userEmail = auth.currentUser?.email || (userData?.email as string) || '';
       const isAgency = isAgencyUserEmail(userEmail) || profileData?.plan === 'agency' || profileData?.role === 'agency';
@@ -780,7 +787,7 @@ export const profileService = {
           page_archetype: profileData?.page_archetype,
           socials: profileData?.socials,
           custom_domain: profileData?.custom_domain || (pageSnap.data() as any)?.customDomain || (pageSnap.data() as any)?.custom_domain || '',
-          accountSettings: profileData?.accountSettings || userData?.accountSettings || undefined,
+          accountSettings: auth.currentUser?.uid === userId ? (userData?.accountSettings || undefined) : undefined,
         };
       }
 
@@ -956,7 +963,7 @@ export const profileService = {
     }
   },
 
-  // 6d. Save & Persist Account Settings & Preferences
+  // 6d. Save & Persist Account Settings & Preferences (Isolated to users/{uid} only)
   async updateAccountSettings(userId: string, settings: any): Promise<void> {
     try {
       await setDoc(
@@ -970,22 +977,8 @@ export const profileService = {
         }),
         { merge: true }
       );
-
-      await setDoc(
-        doc(db, 'profiles', userId),
-        sanitizeForFirestore({
-          accountSettings: settings,
-          custom_domain: settings.privacy?.customDomain || '',
-          updated_at: new Date().toISOString(),
-        }),
-        { merge: true }
-      );
-
-      if (settings.privacy?.customDomain) {
-        await this.saveCustomDomain(userId, settings.privacy.customDomain);
-      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/preferences`);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/accountSettings`);
     }
   },
 
@@ -1028,27 +1021,35 @@ export const profileService = {
       if (updates.button_color !== undefined) pageUpdates.buttonColor = updates.button_color;
       if (updates.stickers !== undefined) pageUpdates.stickers = updates.stickers;
       if (updates.footer_settings !== undefined) pageUpdates.footerSettings = updates.footer_settings;
-      if (updates.custom_domain !== undefined) (pageUpdates as any).customDomain = updates.custom_domain;
       pageUpdates.updatedAt = serverTimestamp();
 
       await setDoc(doc(db, 'pages', userId), sanitizeForFirestore(pageUpdates), { merge: true });
-      await setDoc(
-        doc(db, 'users', userId),
-        sanitizeForFirestore({
-          ...(updates.full_name ? { displayName: updates.full_name } : {}),
-          ...(updates.avatar_url ? { photoURL: updates.avatar_url } : {}),
-          ...(updates.username ? { username: updates.username } : {}),
-          ...(updates.plan ? { plan: updates.plan } : {}),
-          ...(updates.accountSettings ? { accountSettings: updates.accountSettings } : {}),
-          updatedAt: serverTimestamp(),
-        }),
-        { merge: true }
-      );
-      await setDoc(doc(db, 'profiles', userId), sanitizeForFirestore({ ...updates, id: userId }), { merge: true });
 
-      if (updates.custom_domain) {
-        await this.saveCustomDomain(userId, updates.custom_domain);
-      }
+      const userUpdates: Record<string, any> = {
+        updatedAt: serverTimestamp(),
+      };
+      if (updates.full_name) userUpdates.displayName = updates.full_name;
+      if (updates.avatar_url) userUpdates.photoURL = updates.avatar_url;
+      if (updates.username) userUpdates.username = updates.username;
+      if (updates.accountSettings) userUpdates.accountSettings = updates.accountSettings;
+
+      await setDoc(doc(db, 'users', userId), sanitizeForFirestore(userUpdates), { merge: true });
+
+      // Strip protected fields from public profile (plan, role, customDomain, whiteLabel, accountSettings)
+      const {
+        plan: _plan,
+        role: _role,
+        custom_domain: _customDomain,
+        customDomain: _customDomainCamel,
+        whiteLabel: _whiteLabel,
+        white_label: _whiteLabelSnake,
+        accountSettings: _accountSettings,
+        userId: _uid,
+        id: _id,
+        ...safeProfileUpdates
+      } = updates as any;
+
+      await setDoc(doc(db, 'profiles', userId), sanitizeForFirestore({ ...safeProfileUpdates, id: userId }), { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `pages/${userId}`);
     }
@@ -1287,10 +1288,6 @@ export const profileService = {
           timestamp: serverTimestamp(),
         });
       }
-
-      await updateDoc(doc(db, 'links', linkId), {
-        clicks: increment(1),
-      }).catch(() => {});
     } catch (err) {
       console.warn('Click event logged with notice:', err);
     }
@@ -1533,9 +1530,7 @@ export const profileService = {
     try {
       // 1. Write to creator subcollection: pages/{pageId}/leads/{leadId}
       await setDoc(doc(db, 'pages', pageId, 'leads', leadId), record);
-      // 2. Root fallback collection
-      await setDoc(doc(db, 'leads', leadId), record).catch(() => {});
-      // 3. Record specialized analytics event
+      // 2. Record specialized analytics event
       await setDoc(doc(db, 'pages', pageId, 'analytics', `evt_${leadId}`), {
         type: lead.type,
         linkId: null,
@@ -1556,19 +1551,9 @@ export const profileService = {
   // Get all leads for page owner
   async getLeads(pageId: string): Promise<any[]> {
     try {
-      // 1. Try subcollection
       const snap = await getDocs(collection(db, 'pages', pageId, 'leads'));
-      if (!snap.empty) {
-        const leads: any[] = [];
-        snap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
-        return leads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      }
-
-      // 2. Fallback to root collection
-      const q = query(collection(db, 'leads'), where('pageId', '==', pageId));
-      const rootSnap = await getDocs(q);
       const leads: any[] = [];
-      rootSnap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
+      snap.forEach((d) => leads.push({ id: d.id, ...d.data() }));
       return leads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } catch (err) {
       console.warn('Notice: fetching leads:', err);
@@ -1583,7 +1568,6 @@ export const profileService = {
       if (notes !== undefined) updates.notes = notes;
 
       await updateDoc(doc(db, 'pages', pageId, 'leads', leadId), updates).catch(() => {});
-      await updateDoc(doc(db, 'leads', leadId), updates).catch(() => {});
       return true;
     } catch (err) {
       console.warn('Notice: updating lead status:', err);
@@ -1595,7 +1579,6 @@ export const profileService = {
   async deleteLead(pageId: string, leadId: string): Promise<boolean> {
     try {
       await deleteDoc(doc(db, 'pages', pageId, 'leads', leadId)).catch(() => {});
-      await deleteDoc(doc(db, 'leads', leadId)).catch(() => {});
       return true;
     } catch (err) {
       console.warn('Notice: deleting lead:', err);
@@ -1657,14 +1640,8 @@ export const profileService = {
     };
 
     try {
-      // 1. Write to user subcollection
+      // Write to user subcollection
       await setDoc(doc(db, 'users', userId, 'subscriptions', 'current'), record);
-      // 2. Write to root collection for fast querying
-      await setDoc(doc(db, 'subscriptions', userId), record).catch(() => {});
-      // 3. Update profile plan
-      await updateDoc(doc(db, 'profiles', userId), { plan: record.plan }).catch(() => {});
-      await updateDoc(doc(db, 'users', userId), { plan: record.plan }).catch(() => {});
-
       return record;
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `users/${userId}/subscriptions/current`);
@@ -1698,7 +1675,6 @@ export const profileService = {
 
     try {
       await setDoc(doc(db, 'users', userId, 'payments', invoiceId), fullInvoice);
-      await setDoc(doc(db, 'payments', invoiceId), fullInvoice).catch(() => {});
       return fullInvoice;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, `users/${userId}/payments/${invoiceId}`);

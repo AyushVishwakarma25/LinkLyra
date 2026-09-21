@@ -1,30 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { HugeIcon } from './HugeIcon';
 import {
-  ChevronRight,
-  Sparkles,
-  Palette,
-  Layers,
-  Type,
-  Square,
-  Image as ImageIcon,
-  Check,
-  Lock,
-  Crown,
-  ArrowLeft,
-  Sliders,
-  SlidersHorizontal,
-  Flame,
-  Star,
-  Rocket,
-  Coffee,
-  Briefcase,
-  Music,
-  Radio,
-  Eye,
-  Upload,
-  Trash2,
-  RefreshCw,
-} from 'lucide-react';
+  ArrowRight01Icon,
+  SparklesIcon,
+  Image01Icon,
+  Tick01Icon,
+  LockIcon,
+  CrownIcon,
+  ArrowLeft01Icon,
+  PreferenceHorizontalIcon,
+  FireIcon,
+  StarIcon,
+  RocketIcon,
+  Coffee01Icon,
+  Briefcase01Icon,
+  MusicNote01Icon,
+  RadioIcon,
+  Upload01Icon,
+  Delete01Icon,
+  RefreshIcon,
+  Layers01Icon,
+} from '@hugeicons/core-free-icons';
 import {
   UserProfile,
   CanvasTheme,
@@ -189,42 +185,49 @@ export const WALLPAPER_OPTIONS: Array<{
 // Curated high-resolution photography wallpaper presets
 export const WALLPAPER_PRESETS = [
   {
+    id: 'botanical',
     name: 'Minimal Botanical',
     tag: 'Flora',
     url: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=160&auto=format&fit=crop&q=60',
   },
   {
+    id: 'cyber',
     name: 'Neon Cyber',
     tag: 'Cyberpunk',
     url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=160&auto=format&fit=crop&q=60',
   },
   {
+    id: 'aurora',
     name: 'Deep Aurora',
     tag: 'Cosmic',
     url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=160&auto=format&fit=crop&q=60',
   },
   {
+    id: 'dunes',
     name: 'Golden Dunes',
     tag: 'Desert',
     url: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=160&auto=format&fit=crop&q=60',
   },
   {
+    id: 'studio',
     name: 'Warm Studio',
     tag: 'Loft',
     url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=160&auto=format&fit=crop&q=60',
   },
   {
+    id: 'obsidian',
     name: 'Obsidian Abstract',
     tag: 'Luxury',
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80',
     thumb: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=160&auto=format&fit=crop&q=60',
   },
 ];
+export const PHOTOGRAPHY_PRESETS = WALLPAPER_PRESETS;
 
 // Preset Accent Colors
 export const ACCENT_COLOR_PALETTES = [
@@ -240,14 +243,14 @@ export const ACCENT_COLOR_PALETTES = [
 
 // Available Sticker Badges
 export const STICKER_PRESETS = [
-  { id: 'trending', label: '🔥 Trending Creator', icon: Flame },
-  { id: 'verified', label: '✨ Verified Member', icon: Sparkles },
-  { id: 'featured', label: '⭐ Top Pick', icon: Star },
-  { id: 'new', label: '🚀 Just Dropped', icon: Rocket },
-  { id: 'hire', label: '⚡ Available For Hire', icon: Briefcase },
-  { id: 'coffee', label: '☕ Buy Me A Coffee', icon: Coffee },
-  { id: 'music', label: '🎵 New Track Live', icon: Music },
-  { id: 'podcast', label: '🎙️ Latest Episode', icon: Radio },
+  { id: 'trending', label: '🔥 Trending Creator', icon: FireIcon },
+  { id: 'verified', label: '✨ Verified Member', icon: SparklesIcon },
+  { id: 'featured', label: '⭐ Top Pick', icon: StarIcon },
+  { id: 'new', label: '🚀 Just Dropped', icon: RocketIcon },
+  { id: 'hire', label: '⚡ Available For Hire', icon: Briefcase01Icon },
+  { id: 'coffee', label: '☕ Buy Me A Coffee', icon: Coffee01Icon },
+  { id: 'music', label: '🎵 New Track Live', icon: MusicNote01Icon },
+  { id: 'podcast', label: '🎙️ Latest Episode', icon: RadioIcon },
 ];
 
 export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
@@ -351,7 +354,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Choose Theme</span>
@@ -396,7 +399,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                       <span className="text-xs font-bold text-[#1C1E22] truncate">{theme.name}</span>
                       {theme.isPro ? (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-[#7C3AED]/10 text-[#7C3AED] font-black text-[9px]">
-                          <Crown className="w-2.5 h-2.5" />
+                          <HugeIcon icon={CrownIcon} size={10} className="w-2.5 h-2.5" />
                           <span>PRO</span>
                         </span>
                       ) : (
@@ -412,11 +415,11 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                 <div className="shrink-0">
                   {isLocked ? (
                     <div className="p-1 rounded-lg bg-black/5 text-[#737882]">
-                      <Lock className="w-3.5 h-3.5" />
+                      <HugeIcon icon={LockIcon} size={14} className="w-3.5 h-3.5" />
                     </div>
                   ) : isSelected ? (
                     <div className="w-5 h-5 rounded-full bg-[#7C3AED] text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
+                      <HugeIcon icon={Tick01Icon} size={12} className="w-3 h-3" />
                     </div>
                   ) : null}
                 </div>
@@ -443,7 +446,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Wallpaper</span>
@@ -487,7 +490,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                       />
                     ) : wp.id === 'image' ? (
                       <div className="w-full h-full bg-gradient-to-tr from-[#1C1E22] to-[#5E4BF7] flex items-center justify-center">
-                        <ImageIcon className="w-4 h-4 text-white drop-shadow-xs" />
+                        <HugeIcon icon={Image01Icon} size={16} className="w-4 h-4 text-white drop-shadow-xs" />
                       </div>
                     ) : (
                       <div
@@ -510,7 +513,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                 </div>
                 {isSelected && (
                   <div className="w-5 h-5 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                    <Check className="w-3 h-3" />
+                    <HugeIcon icon={Tick01Icon} size={12} className="w-3 h-3" />
                   </div>
                 )}
               </div>
@@ -542,7 +545,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                   }}
                   className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <HugeIcon icon={Delete01Icon} size={12} className="w-3 h-3" />
                   <span>Remove</span>
                 </button>
               )}
@@ -586,7 +589,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             >
               {isUploadingWallpaper ? (
                 <div className="flex flex-col items-center gap-2 py-2">
-                  <RefreshCw className="w-6 h-6 text-[#5E4BF7] animate-spin" />
+                  <HugeIcon icon={RefreshIcon} size={24} className="w-6 h-6 text-[#5E4BF7] animate-spin" />
                   <span className="text-xs font-bold text-[#1C1E22]">Processing photo...</span>
                 </div>
               ) : profile.backgroundValue ? (
@@ -612,7 +615,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
               ) : (
                 <>
                   <div className="w-10 h-10 rounded-full bg-[#5E4BF7]/10 flex items-center justify-center text-[#5E4BF7]">
-                    <Upload className="w-5 h-5" />
+                    <HugeIcon icon={Upload01Icon} size={20} className="w-5 h-5" />
                   </div>
                   <div>
                     <span className="text-xs font-bold text-[#1C1E22]">
@@ -636,7 +639,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             {/* Recommended Image Size Guidelines Callout */}
             <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-black/10 space-y-1 text-[#1C1E22]">
               <div className="flex items-center gap-1.5 font-bold text-xs text-[#1C1E22]">
-                <Sparkles className="w-3.5 h-3.5 text-[#1C1E22] shrink-0" />
+                <HugeIcon icon={SparklesIcon} size={14} className="w-3.5 h-3.5 text-[#1C1E22] shrink-0" />
                 <span>Recommended Wallpaper Size</span>
               </div>
               <p className="text-[11px] text-[#737882] leading-relaxed">
@@ -652,45 +655,40 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
               <label className="text-[11px] font-bold text-[#1C1E22] uppercase tracking-wider">
                 Or Choose A Curated Photography Preset
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {WALLPAPER_PRESETS.map((preset) => {
+              <div className="grid grid-cols-4 gap-2">
+                {PHOTOGRAPHY_PRESETS.map((preset) => {
                   const isPresetActive = profile.backgroundValue === preset.url;
                   return (
                     <button
-                      key={preset.name}
+                      key={preset.id}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         applyChange({
                           wallpaperMode: 'image',
-                          backgroundValue: preset.url,
                           backgroundType: 'image',
-                          wallpaperTint: profile.wallpaperTint ?? 30,
-                        })
-                      }
-                      className={`group relative rounded-xl overflow-hidden border text-left transition-all cursor-pointer aspect-3/4 flex flex-col justify-end p-2 ${
+                          backgroundValue: preset.url,
+                        });
+                      }}
+                      className={`relative rounded-xl overflow-hidden aspect-3/4 border-2 transition-all cursor-pointer group ${
                         isPresetActive
-                          ? 'border-[#7C3AED] ring-2 ring-[#7C3AED]/30 shadow-md'
-                          : 'border-black/10 hover:border-black/30'
+                          ? 'border-[#7C3AED] ring-2 ring-[#7C3AED]/30 scale-[1.02]'
+                          : 'border-transparent hover:border-black/30 hover:scale-[1.01]'
                       }`}
                     >
                       <img
-                        src={preset.thumb}
+                        src={preset.url}
                         alt={preset.name}
                         referrerPolicy="no-referrer"
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      <div className="relative z-10">
-                        <span className="text-[9px] font-bold text-white/75 uppercase tracking-wide block">
-                          {preset.tag}
-                        </span>
-                        <span className="text-[11px] font-bold text-white leading-tight block truncate">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-1.5">
+                        <span className="text-[10px] font-bold text-white truncate drop-shadow-xs">
                           {preset.name}
                         </span>
                       </div>
                       {isPresetActive && (
                         <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shadow-xs z-10">
-                          <Check className="w-2.5 h-2.5" />
+                          <HugeIcon icon={Tick01Icon} size={10} className="w-2.5 h-2.5" />
                         </div>
                       )}
                     </button>
@@ -706,7 +704,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h4 className="text-xs font-bold text-[#1C1E22] uppercase tracking-wider flex items-center gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5E4BF7]" />
+                <HugeIcon icon={PreferenceHorizontalIcon} size={14} className="w-3.5 h-3.5 text-[#5E4BF7]" />
                 <span>Wallpaper Contrast Tint</span>
               </h4>
               <p className="text-[11px] text-[#737882]">
@@ -788,7 +786,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Buttons & Cards</span>
@@ -827,7 +825,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                   </div>
                   {isSelected && (
                     <div className="w-5 h-5 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3" />
+                      <HugeIcon icon={Tick01Icon} size={12} className="w-3 h-3" />
                     </div>
                   )}
                 </div>
@@ -880,7 +878,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Typography</span>
@@ -923,7 +921,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
                 {isSelected && (
                   <div className="w-5 h-5 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                    <Check className="w-3 h-3" />
+                    <HugeIcon icon={Tick01Icon} size={12} className="w-3 h-3" />
                   </div>
                 )}
               </div>
@@ -948,7 +946,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Colors</span>
@@ -1034,7 +1032,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <label className="text-xs font-bold text-[#1C1E22] uppercase tracking-wider flex items-center gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5E4BF7]" />
+                <HugeIcon icon={PreferenceHorizontalIcon} size={14} className="w-3.5 h-3.5 text-[#5E4BF7]" />
                 <span>Wallpaper Contrast Tint</span>
               </label>
               <p className="text-[11px] text-[#737882]">
@@ -1154,7 +1152,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Stickers</span>
@@ -1170,7 +1168,6 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
         <div className="space-y-2">
           {STICKER_PRESETS.map((sticker) => {
             const isAdded = currentStickers.includes(sticker.label);
-            const IconComp = sticker.icon;
 
             const handleToggle = () => {
               if (isAdded) {
@@ -1192,7 +1189,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center shrink-0">
-                    <IconComp className="w-4 h-4" />
+                    <HugeIcon icon={sticker.icon} size={16} className="w-4 h-4" />
                   </div>
                   <span className="text-xs font-bold text-[#1C1E22]">{sticker.label}</span>
                 </div>
@@ -1202,7 +1199,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                     isAdded ? 'bg-[#7C3AED] border-[#7C3AED] text-white' : 'border-black/20 bg-white'
                   }`}
                 >
-                  {isAdded && <Check className="w-3 h-3" />}
+                  {isAdded && <HugeIcon icon={Tick01Icon} size={12} className="w-3 h-3" />}
                 </div>
               </div>
             );
@@ -1225,7 +1222,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
             onClick={() => setSubView('menu')}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C1E22] hover:text-[#5E4BF7] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <HugeIcon icon={ArrowLeft01Icon} size={16} className="w-4 h-4" />
             <span>Design</span>
           </button>
           <span className="text-xs font-semibold text-[#737882]">Footer</span>
@@ -1333,7 +1330,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-[#1C1E22] text-white flex items-center justify-center font-bold text-xs tracking-tight shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-            <Layers className="w-5 h-5 text-white" />
+            <HugeIcon icon={Layers01Icon} size={20} className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -1350,7 +1347,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
         <div className="flex items-center gap-1.5 text-[#1C1E22] font-semibold text-xs shrink-0">
           <span className="hidden sm:inline">Browse</span>
-          <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+          <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
 
@@ -1369,7 +1366,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
         <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
           <span className="text-xs font-medium">{currentThemeLabel}</span>
-          <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+          <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
 
@@ -1397,7 +1394,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
           <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
             <span className="text-xs font-medium">{currentWallpaperLabel}</span>
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
@@ -1416,7 +1413,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
           <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
             <span className="text-xs font-medium">{currentButtonLabel}</span>
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
@@ -1435,7 +1432,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
           <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
             <span className="text-xs font-medium">{currentFontLabel}</span>
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
@@ -1460,7 +1457,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
                 style={{ backgroundColor: profile.buttonColor }}
               />
             )}
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
@@ -1482,7 +1479,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
 
           <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
             <span className="text-xs font-medium">Decorate your page</span>
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
@@ -1500,7 +1497,7 @@ export const DesignSettingsPanel: React.FC<DesignSettingsPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 text-[#737882] shrink-0">
-            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} className="w-4 h-4 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>

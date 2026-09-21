@@ -18,169 +18,214 @@ service cloud.firestore {
       );
     }
 
-    // =========================
+    // =========================================================================
     // USERS (and Subcollections: subscriptions, payments, credit_transactions)
-    // =========================
+    // =========================================================================
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      // Owner can read their own user document
+      allow read: if isOwner(userId);
+
+      // On create, owner can create, but plan must equal 'free'
+      allow create: if isOwner(userId)
+        && (!('plan' in request.resource.data) || request.resource.data.plan == 'free')
+        && (!('role' in request.resource.data) || request.resource.data.role == 'creator')
+        && !('credits' in request.resource.data)
+        && !('creditsRemaining' in request.resource.data);
+
+      // Owner can write, but CANNOT change plan, role, credits*, or anything billing-related
+      allow update: if isOwner(userId) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'plan',
+          'role',
+          'credits',
+          'creditsMonthly',
+          'creditsRemaining',
+          'creditsUsed',
+          'subscription',
+          'subscriptions',
+          'billing',
+          'razorpayCustomerId',
+          'subscriptionId'
+        ])
+      );
+
+      allow delete: if isOwner(userId);
     }
 
+    // Owner read only, NO client writes. Server-side writes use Admin SDK.
     match /users/{userId}/subscriptions/{subId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if false;
     }
 
     match /users/{userId}/payments/{paymentId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if false;
     }
 
     match /users/{userId}/credit_transactions/{txId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if false;
     }
 
-    // Root level subscription and payment fallbacks
-    match /subscriptions/{userId} {
-      allow read, write: if isOwner(userId);
+    // =========================================================================
+    // PAGES & PROFILES
+    // =========================================================================
+
+    match /pages/{pageId} {
+      // Public read
+      allow read: if true;
+
+      // Authenticated user creates their own page without forbidden billing/plan/domain attributes
+      allow create: if signedIn() && (
+        request.auth.uid == pageId ||
+        (request.resource.data != null && request.resource.data.userId == request.auth.uid)
+      ) && !request.resource.data.keys().hasAny([
+        'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
+      ]);
+
+      // Owner update, but userId, plan, role, customDomain, and whiteLabel are not client-writable
+      allow update: if isPageOwner(pageId) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
+        ])
+      );
+
+      allow delete: if isPageOwner(pageId);
     }
 
-    // Connection Test Document
-    match /test/{docId} {
+    match /profiles/{userId} {
+      // Public read
+      allow read: if true;
+
+      // Authenticated owner create without forbidden billing/plan/domain attributes
+      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny([
+        'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
+      ]);
+
+      // Owner update, but userId, plan, role, customDomain, and whiteLabel are not client-writable
+      allow update: if isOwner(userId) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
+        ])
+      );
+
+      allow delete: if isOwner(userId);
+    }
+
+    // =========================================================================
+    // USERNAMES & DOMAINS
+    // =========================================================================
+
+    match /usernames/{username} {
+      allow read: if true;
+
+      // Create only if signed in, doc doesn't exist, data.userId == auth.uid, id matches ^[a-z0-9_]{3,30}$
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/usernames/$(username))
+        && request.resource.data.userId == request.auth.uid
+        && username.matches('^[a-z0-9_]{3,30}$');
+
+      // No client updates
+      allow update: if false;
+
+      // Delete only by owner
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /domains/{domain} {
+      // Public read, NO client writes (claimed via server function / Admin SDK)
       allow read: if true;
       allow write: if false;
     }
 
-    match /payments/{paymentId} {
-      allow read, write: if signedIn() && (
-        request.auth.uid == paymentId ||
-        (request.resource.data != null && request.resource.data.userId == request.auth.uid) ||
-        (resource != null && resource.data.userId == request.auth.uid)
-      );
-    }
-
-    // =========================
-    // PAGES
-    // =========================
-
-    match /pages/{pageId} {
-      // Public can view and list creator pages
-      allow read: if true;
-
-      // Authenticated user creates their own page
-      allow create: if signedIn() && (
-        request.resource.data.userId == request.auth.uid ||
-        request.auth.uid == pageId
-      );
-
-      // Only owner can update or delete
-      allow update, delete: if isPageOwner(pageId);
-    }
-
-    // =========================
-    // LINKS (Subcollection)
-    // =========================
+    // =========================================================================
+    // PAGES SUBCOLLECTIONS: LINKS, SOCIAL LINKS, SECTIONS
+    // =========================================================================
 
     match /pages/{pageId}/links/{linkId} {
       allow read: if true;
-      allow write: if isPageOwner(pageId);
-    }
+      allow create, delete: if isPageOwner(pageId);
 
-    // =========================
-    // SOCIAL LINKS (Subcollection)
-    // =========================
+      // Owner update OR anonymous clickCount increment by exactly 1
+      allow update: if isPageOwner(pageId) || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickCount']) &&
+        request.resource.data.clickCount == resource.data.clickCount + 1
+      );
+    }
 
     match /pages/{pageId}/socialLinks/{socialId} {
       allow read: if true;
       allow write: if isPageOwner(pageId);
     }
 
-    // =========================
-    // SECTIONS (Subcollection)
-    // =========================
-
     match /pages/{pageId}/sections/{sectionId} {
       allow read: if true;
       allow write: if isPageOwner(pageId);
     }
 
-    // =========================
-    // LEADS & INQUIRIES (Subcollection & Root Fallback)
-    // =========================
+    // =========================================================================
+    // PAGES SUBCOLLECTIONS: LEADS
+    // =========================================================================
 
     match /pages/{pageId}/leads/{leadId} {
-      // Public visitors can submit showing bookings, brand inquiries, and valuation requests
-      allow create: if true;
-      // Only the page owner can view and update lead statuses (CRM)
+      // Public create with strict validation
+      allow create: if exists(/databases/$(database)/documents/pages/$(pageId))
+        && request.resource.data.type in [
+          'showing_request', 'brand_inquiry', 'home_valuation', 'general_contact',
+          'media_kit_download', 'package_booking', 'showing', 'brand', 'valuation', 'coaching'
+        ]
+        && request.resource.data.status == 'new'
+        && request.resource.data.keys().hasOnly([
+          'id', 'pageId', 'type', 'name', 'email', 'phone', 'companyOrBrand',
+          'campaignType', 'budgetOrPrice', 'timelineOrDate', 'details', 'propertyTitle',
+          'buyerStatus', 'propertyAddress', 'propertyCondition', 'selectedPackageName',
+          'status', 'createdAt', 'serverTimestamp', 'notes'
+        ])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 150
+        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 30))
+        && (!('details' in request.resource.data) || (request.resource.data.details is string && request.resource.data.details.size() <= 2000))
+        && (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 2000))
+        && (!('propertyAddress' in request.resource.data) || (request.resource.data.propertyAddress is string && request.resource.data.propertyAddress.size() <= 300))
+        && (!('companyOrBrand' in request.resource.data) || (request.resource.data.companyOrBrand is string && request.resource.data.companyOrBrand.size() <= 150));
+
+      // Owner read/update/delete
       allow read, update, delete: if isPageOwner(pageId);
     }
 
-    match /leads/{leadId} {
-      allow create: if true;
-      allow read, update, delete: if signedIn();
+    // =========================================================================
+    // PAGES SUBCOLLECTIONS: ANALYTICS
+    // =========================================================================
+
+    match /pages/{pageId}/analytics/{eventId} {
+      // Public create with type allowlist, strict keys, timestamp == request.time
+      allow create: if request.resource.data.type in [
+          'page_view', 'link_click', 'property_view', 'showing_request',
+          'brand_inquiry', 'home_valuation', 'media_kit_download', 'package_booking', 'general_contact'
+        ]
+        && request.resource.data.keys().hasOnly([
+          'type', 'linkId', 'visitorId', 'country', 'device', 'browser', 'referrer', 'timestamp'
+        ])
+        && request.resource.data.timestamp == request.time;
+
+      allow read: if isPageOwner(pageId);
+      allow update, delete: if false;
     }
 
-    // =========================
-    // THEMES
-    // =========================
+    // =========================================================================
+    // THEMES & SYSTEM
+    // =========================================================================
 
     match /themes/{themeId} {
       allow read: if true;
       allow write: if false;
     }
 
-    // =========================
-    // ANALYTICS (Subcollection)
-    // =========================
-
-    match /pages/{pageId}/analytics/{eventId} {
-      // Allow anonymous event creation for page views, link clicks, property views, showing requests, brand inquiries
-      allow create: if request.resource.data.type in [
-        "page_view", "link_click", "property_view", "showing_request", "brand_inquiry", "home_valuation", "media_kit_download"
-      ];
-      allow read: if isPageOwner(pageId);
-      allow update, delete: if false;
-    }
-
-    // =========================
-    // PROFILES & USERNAMES & LINKS (Root Collections)
-    // =========================
-
-    match /usernames/{username} {
-      allow read: if true;
-      allow write: if signedIn() && (
-        !exists(/databases/$(database)/documents/usernames/$(username)) ||
-        get(/databases/$(database)/documents/usernames/$(username)).data.userId == request.auth.uid
-      );
-    }
-
-    match /domains/{domain} {
-      allow read: if true;
-      allow write: if signedIn() && (
-        !exists(/databases/$(database)/documents/domains/$(domain)) ||
-        get(/databases/$(database)/documents/domains/$(domain)).data.userId == request.auth.uid
-      );
-    }
-    
-    match /profiles/{userId} {
-      allow read: if true;
-      allow write: if isOwner(userId);
-    }
-
-    match /links/{linkId} {
-      allow read: if true;
-      allow write: if signedIn() && (
-        !exists(/databases/$(database)/documents/links/$(linkId)) ||
-        get(/databases/$(database)/documents/links/$(linkId)).data.userId == request.auth.uid ||
-        request.resource.data.userId == request.auth.uid
-      );
-    }
-
-    // =========================
-    // DENY EVERYTHING ELSE
-    // =========================
-
+    // Deny all other access
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-

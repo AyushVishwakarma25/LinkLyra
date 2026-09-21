@@ -4,9 +4,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+
+# Build-time environment variables
+ARG VITE_RAZORPAY_KEY_ID
+ENV VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID
+ENV NODE_ENV=production
+
 RUN npm run build
 
-# Production stage with lightweight static server (nginx or caddy)
+# Production stage with lightweight static server (nginx)
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 

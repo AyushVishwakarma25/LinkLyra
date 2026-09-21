@@ -1,6 +1,6 @@
 # 📚 LinkLyra — Complete User & Developer Documentation
 
-> **Document Version**: 3.0.0  
+> **Document Version**: 3.1.0  
 > **Status**: Production Reference Manual  
 > **Target Audience**: Creators, Business Owners, Agencies & Software Engineers  
 > **Last Updated**: September 2026
@@ -57,14 +57,12 @@
 ### 3. Managing Plans, Invoices & Razorpay Billing
 1. Click **Billing** in the bottom sidebar or open the **Billing Hub**.
 2. **Upgrade to Pro**:
-   - Select **Upgrade to Pro** to unlock custom domains, white-label branding removal, AI bio generation, and priority lead routing.
-   - Complete payment securely via the Razorpay modal.
+   - Select **Upgrade to Pro** to unlock custom domains, white-label branding removal, and priority lead routing.
+   - Complete payment securely via the Razorpay checkout modal.
 3. **View & Print Tax Invoices**:
    - All past subscription payments appear in the **Invoice History** table.
    - Click the **Receipt** button next to any transaction to open the interactive invoice viewer.
    - Click **Print / Save PDF** to generate an official receipt for your accounting or tax filing.
-4. **Custom Razorpay Gateway**:
-   - If you want to accept direct customer payments or client tips on your own merchant account, enter your **Razorpay Key ID** under the Gateway tab.
 
 ---
 
@@ -79,11 +77,11 @@
 ## 💻 Part 2: Developer Architecture & Technical Reference
 
 ### Tech Stack Overview
-- **Runtime & Bundler**: React 18+ with TypeScript and Vite.
+- **Runtime & Bundler**: React 19 with TypeScript and Vite.
 - **Styling Architecture**: Tailwind CSS with CSS variables and custom elevation tokens.
 - **State Management**: React state with local storage hydration and optimistic cloud synchronization.
 - **Database & Auth**: Google Cloud Firestore & Firebase Authentication.
-- **Icons**: `lucide-react`.
+- **Icons**: HugeIcons (`@hugeicons/react` and `@hugeicons/core-free-icons`).
 
 ---
 
@@ -95,6 +93,7 @@ src/components/
 ├── BillingDashboard.tsx   # Dedicated Razorpay Billing, Invoices & PDF Receipts
 ├── BuilderSidebar.tsx     # Studio Sidebar with tab navigation and action triggers
 ├── CardEditorModal.tsx    # Vertical Card Creation & Customization Modal
+├── DesignSettingsPanel.tsx# HugeIcons theme & styling controller
 ├── LivePreview.tsx        # Simulated interactive mobile showroom stage
 ├── ProfileCard.tsx        # Dynamic tactile card dispatcher & render engine
 ├── LandingPage.tsx        # Conversational marketing homepage
@@ -102,6 +101,17 @@ src/components/
 ├── ProUpgradeModal.tsx    # Razorpay paywall & upgrade flow
 └── SocialIconsRow.tsx     # Frosted glass social link pills
 ```
+
+---
+
+## 🔮 Planned Features (Roadmap)
+
+The following capabilities are in the product roadmap and scheduled for upcoming releases:
+
+1. **AI Bio Generation**: Automated creator bio and headline copywriting powered by AI.
+2. **Custom Razorpay Gateway UI**: In-app UI tab allowing creators to connect their own custom merchant Razorpay key for client tips and direct payments.
+3. **Email Lead Notifications**: Automatic email dispatch to the creator when a new lead/inquiry is submitted (currently stored in Firestore and dispatched via WhatsApp).
+4. **Geolocation Analytics**: Geographic breakdown (country, city, region) of visitors and visual click origin maps.
 
 ---
 
@@ -114,9 +124,9 @@ npm install
 # Start local development server on Port 3000
 npm run dev
 
-# Run TypeScript and ESLint validation
+# Run TypeScript type check validation
 npm run lint
 
-# Compile production bundle to /dist
+# Compile production bundle to /dist (runs prebuild checks)
 npm run build
 ```

@@ -119,7 +119,14 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
       setSubmitted(true);
     } catch (err: any) {
       console.error('Error submitting booking inquiry:', err);
-      setErrorMessage(err?.message || 'Failed to submit booking request. Please try again.');
+      let msg = err?.message || 'Failed to submit booking request. Please try again.';
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.error) msg = parsed.error;
+      } catch {
+        // use raw message
+      }
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -150,12 +157,12 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 bg-stone-900 text-white flex items-center justify-between">
+        <div className="p-3.5 sm:p-5 bg-stone-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-full bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold shrink-0">
               <HugeiconsIcon icon={MusicNote01Icon} size={16} />
             </div>
             <div>
@@ -170,60 +177,59 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
           <button
             type="button"
             onClick={handleResetAndClose}
-            className="p-1.5 rounded-full hover:bg-white/10 text-stone-300 transition-colors"
+            className="p-1.5 rounded-full hover:bg-white/10 text-stone-300 transition-colors cursor-pointer"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} />
           </button>
         </div>
 
         {submitted ? (
-          <div className="p-6 sm:p-8 text-center space-y-4">
-            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-xs">
-              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={24} />
+          <div className="p-5 sm:p-6 text-center space-y-3">
+            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={36} />
             </div>
-            <h3 className="text-lg font-bold text-stone-900">
-              Booking Request Sent!
-            </h3>
-            <p className="text-xs text-stone-600 max-w-sm mx-auto leading-relaxed">
-              Your inquiry for <strong>{artistName}</strong> has been logged in their management dashboard. They or their team will respond via email shortly.
-            </p>
+            <div>
+              <h3 className="text-lg sm:text-xl font-bold text-stone-900">Booking Request Sent!</h3>
+              <p className="text-xs sm:text-sm text-stone-500 max-w-sm mx-auto mt-1">
+                Thank you, <span className="font-semibold text-stone-700">{organizerName}</span>! Your performance inquiry for <span className="font-semibold text-stone-700">{eventType}</span> has been dispatched to {artistName}'s team.
+              </p>
+            </div>
 
-            {artistPhone && (
-              <div className="pt-2">
+            <div className="pt-3 flex flex-col sm:flex-row gap-2 justify-center">
+              {artistPhone && (
                 <button
                   type="button"
                   onClick={handleOpenWhatsApp}
-                  className="w-full py-2.5 px-4 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-transform active:scale-95"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-sm active:scale-95 cursor-pointer"
                 >
-                  <HugeiconsIcon icon={BubbleChatIcon} size={16} className="text-white" />
-                  <span>Notify via WhatsApp Now</span>
+                  <HugeiconsIcon icon={BubbleChatIcon} size={16} />
+                  Connect on WhatsApp Now
                 </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleResetAndClose}
-              className="px-5 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900"
-            >
-              Close Window
-            </button>
+              )}
+              <button
+                type="button"
+                onClick={handleResetAndClose}
+                className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
+              >
+                Close Window
+              </button>
+            </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 max-h-[80vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 flex-1 overflow-y-auto">
             {isPreview && (
-              <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
-                <span>Preview: submissions aren't saved</span>
+              <div className="p-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <span>Preview mode: submissions are simulated</span>
               </div>
             )}
 
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
-                <span>{errorMessage}</span>
+              <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2 animate-fadeIn">
+                <span className="break-words min-w-0 flex-1 font-medium">{errorMessage}</span>
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                  className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer text-xs"
                 >
                   Retry
                 </button>

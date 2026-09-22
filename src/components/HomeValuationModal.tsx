@@ -93,10 +93,16 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
         details: `Property Type: ${propertyType}, Beds: ${bedrooms}, Condition: ${condition}, Selling Timeline: ${timeline}`,
       });
 
-      setSubmitted(true);
-    } catch (err: any) {
+      setSubmitted(true);    } catch (err: any) {
       console.error('Error submitting home valuation request:', err);
-      setErrorMessage(err?.message || 'Failed to submit valuation request. Please try again.');
+      let msg = err?.message || 'Failed to submit valuation request. Please try again.';
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.error) msg = parsed.error;
+      } catch {
+        // use raw message
+      }
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -124,54 +130,54 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div 
-        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 bg-gradient-to-br from-amber-950 via-stone-900 to-stone-900 text-white relative">
+        <div className="p-3.5 sm:p-5 bg-gradient-to-br from-amber-950 via-stone-900 to-stone-900 text-white relative shrink-0">
           <button
             onClick={handleResetAndClose}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             title="Close"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={20} />
+            <HugeiconsIcon icon={Cancel01Icon} size={18} />
           </button>
           
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-semibold uppercase tracking-wider mb-2">
-            <HugeiconsIcon icon={CalculatorIcon} size={14} />
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[11px] font-semibold uppercase tracking-wider mb-1">
+            <HugeiconsIcon icon={CalculatorIcon} size={13} />
             Free Comparative Market Analysis (CMA)
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+          <h2 className="text-base sm:text-2xl font-bold tracking-tight pr-8">
             What's Your Home Worth?
           </h2>
-          <p className="text-xs sm:text-sm text-amber-200 mt-1">
+          <p className="text-xs sm:text-sm text-amber-200 mt-0.5 leading-snug">
             Get an instant custom valuation and recent neighborhood comps report from <span className="font-semibold text-white">{agentName}</span>.
           </p>
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-stone-800 text-sm">
+        <div className="p-3.5 sm:p-5 overflow-y-auto flex-1 space-y-3 sm:space-y-3.5 text-stone-800 text-xs sm:text-sm">
           {submitted ? (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={40} />
+            <div className="py-6 text-center space-y-3">
+              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={36} />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-stone-900">Valuation Request Received!</h3>
-                <p className="text-sm text-stone-500 max-w-sm mx-auto mt-1">
+                <h3 className="text-lg sm:text-xl font-bold text-stone-900">Valuation Request Received!</h3>
+                <p className="text-xs sm:text-sm text-stone-500 max-w-sm mx-auto mt-1">
                   Thank you, <span className="font-semibold text-stone-700">{name}</span>! {agentName} is analyzing MLS recent closed sales around <span className="font-semibold text-stone-700">{address}</span> and will deliver your custom CMA report within a few hours.
                 </p>
               </div>
 
-              <div className="pt-4 flex flex-col sm:flex-row gap-2.5 justify-center">
+              <div className="pt-3 flex flex-col sm:flex-row gap-2 justify-center">
                 {agentPhone && (
                   <button
                     type="button"
                     onClick={handleOpenWhatsApp}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm transition-all shadow-sm active:scale-95"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     <HugeiconsIcon icon={BubbleChatIcon} size={16} />
                     Chat with Agent on WhatsApp
@@ -180,27 +186,27 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResetAndClose}
-                  className="px-5 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-sm transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
                 >
                   Done
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
               {isPreview && (
-                <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
-                  <span>Preview: submissions aren't saved</span>
+                <div className="p-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>Preview mode: submissions are simulated</span>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
-                  <span>{errorMessage}</span>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2 animate-fadeIn">
+                  <span className="break-words min-w-0 flex-1 font-medium">{errorMessage}</span>
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer text-xs"
                   >
                     Retry
                   </button>

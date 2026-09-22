@@ -120,7 +120,16 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
       setSubmitted(true);
     } catch (err: any) {
       console.error('Error submitting brand inquiry:', err);
-      setErrorMessage(err?.message || 'Failed to submit inquiry. Please try again.');
+      let msg = err?.message || 'Failed to submit inquiry. Please try again.';
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.error) {
+          msg = parsed.error;
+        }
+      } catch {
+        // use raw message
+      }
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -149,37 +158,37 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div 
-        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 bg-[#1C1E22] text-white relative">
+        <div className="p-3.5 sm:p-5 bg-[#1C1E22] text-white relative shrink-0">
           <button
             onClick={handleResetAndClose}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             title="Close"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={20} />
+            <HugeiconsIcon icon={Cancel01Icon} size={18} />
           </button>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-stone-300 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-stone-300 text-[11px] font-semibold uppercase tracking-wider mb-1">
             Brand Collaboration Inquiry
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+          <h2 className="text-base sm:text-2xl font-bold tracking-tight pr-8">
             Work With {creatorName}
           </h2>
-          <p className="text-xs sm:text-sm text-stone-400 mt-1">
+          <p className="text-xs sm:text-sm text-stone-400 mt-0.5 leading-snug">
             Submit your sponsorship or UGC campaign brief. Direct response within 24 hours.
           </p>
 
           {selectedPackage && (
-            <div className="mt-3 p-2.5 rounded-xl bg-white/10 border border-white/10 flex items-center justify-between text-xs">
+            <div className="mt-2 p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex items-center justify-between text-xs">
               <div>
-                <span className="text-stone-400 block">Selected Package:</span>
+                <span className="text-stone-400 block text-[10px]">Selected Package:</span>
                 <span className="font-semibold text-white">{selectedPackage.name}</span>
               </div>
-              <div className="font-bold text-amber-300 text-sm bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
+              <div className="font-bold text-amber-300 text-xs sm:text-sm bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/20">
                 {selectedPackage.price}
               </div>
             </div>
@@ -187,25 +196,25 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 text-stone-800 text-sm">
+        <div className="p-3.5 sm:p-5 overflow-y-auto flex-1 space-y-3 sm:space-y-3.5 text-stone-800 text-xs sm:text-sm">
           {submitted ? (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={40} />
+            <div className="py-6 text-center space-y-3">
+              <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={36} />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-stone-900">Inquiry Sent Successfully!</h3>
-                <p className="text-sm text-stone-500 max-w-sm mx-auto mt-1">
+                <h3 className="text-lg sm:text-xl font-bold text-stone-900">Inquiry Sent Successfully!</h3>
+                <p className="text-xs sm:text-sm text-stone-500 max-w-sm mx-auto mt-1">
                   Thank you, <span className="font-semibold text-stone-700">{contactName}</span>! Your campaign brief for <span className="font-semibold text-stone-700">{brandName}</span> has been routed directly to {creatorName}.
                 </p>
               </div>
 
-              <div className="pt-4 flex flex-col sm:flex-row gap-2.5 justify-center">
+              <div className="pt-3 flex flex-col sm:flex-row gap-2 justify-center">
                 {creatorPhone && (
                   <button
                     type="button"
                     onClick={handleOpenWhatsApp}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm transition-all shadow-sm active:scale-95"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     <HugeiconsIcon icon={BubbleChatIcon} size={16} />
                     Chat on WhatsApp Now
@@ -214,27 +223,27 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResetAndClose}
-                  className="px-5 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-sm transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
                 >
                   Done
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
               {isPreview && (
-                <div className="p-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
-                  <span>Preview: submissions aren't saved</span>
+                <div className="p-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                  <span>Preview mode: submissions are simulated</span>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
-                  <span>{errorMessage}</span>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2 animate-fadeIn">
+                  <span className="break-words min-w-0 flex-1 font-medium">{errorMessage}</span>
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer text-xs"
                   >
                     Retry
                   </button>

@@ -186,23 +186,10 @@ service cloud.firestore {
       // Public create with sanitization and validation
       allow create: if request.resource.data.name is string 
         && request.resource.data.name.size() > 0 
-        && request.resource.data.name.size() <= 100
+        && request.resource.data.name.size() <= 200
         && request.resource.data.email is string 
         && request.resource.data.email.size() > 0 
-        && request.resource.data.email.size() <= 150
-        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 50))
-        && (!('details' in request.resource.data) || (request.resource.data.details is string && request.resource.data.details.size() <= 5000))
-        && (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 5000))
-        && (!('propertyAddress' in request.resource.data) || (request.resource.data.propertyAddress is string && request.resource.data.propertyAddress.size() <= 500))
-        && (!('companyOrBrand' in request.resource.data) || (request.resource.data.companyOrBrand is string && request.resource.data.companyOrBrand.size() <= 300))
-        && (!('propertyTitle' in request.resource.data) || (request.resource.data.propertyTitle is string && request.resource.data.propertyTitle.size() <= 500))
-        && (!('buyerStatus' in request.resource.data) || (request.resource.data.buyerStatus is string && request.resource.data.buyerStatus.size() <= 200))
-        && (!('propertyCondition' in request.resource.data) || (request.resource.data.propertyCondition is string && request.resource.data.propertyCondition.size() <= 300))
-        && (!('selectedPackageName' in request.resource.data) || (request.resource.data.selectedPackageName is string && request.resource.data.selectedPackageName.size() <= 300))
-        && (!('budgetOrPrice' in request.resource.data) || (request.resource.data.budgetOrPrice is string && request.resource.data.budgetOrPrice.size() <= 200))
-        && (!('timelineOrDate' in request.resource.data) || (request.resource.data.timelineOrDate is string && request.resource.data.timelineOrDate.size() <= 200))
-        && (!('campaignType' in request.resource.data) || (request.resource.data.campaignType is string && request.resource.data.campaignType.size() <= 300))
-        && (!('sourceCardId' in request.resource.data) || (request.resource.data.sourceCardId is string && request.resource.data.sourceCardId.size() <= 200));
+        && request.resource.data.email.size() <= 200;
 
       // Owner read/update/delete
       allow read, update, delete: if isPageOwner(pageId);

@@ -183,16 +183,16 @@ service cloud.firestore {
     // =========================================================================
 
     match /pages/{pageId}/leads/{leadId} {
-      // Public create with sanitization and validation
-      allow create: if request.resource.data.name is string 
-        && request.resource.data.name.size() > 0 
-        && request.resource.data.name.size() <= 200
-        && request.resource.data.email is string 
-        && request.resource.data.email.size() > 0 
-        && request.resource.data.email.size() <= 200;
+      // Public visitors can submit inquiries
+      allow create: if true;
 
-      // Owner read/update/delete
+      // Only the page owner can view, update, or delete submitted leads
       allow read, update, delete: if isPageOwner(pageId);
+    }
+
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if signedIn();
     }
 
     // =========================================================================

@@ -4,9 +4,6 @@ import {
   ArrowUpRight01Icon,
   Location01Icon,
   Calendar03Icon,
-  Message01Icon,
-  PlayIcon,
-  Download01Icon,
   Copy01Icon,
   Tick01Icon,
   StarIcon,
@@ -40,7 +37,8 @@ import {
 } from '../types';
 import { UI_KIT } from '../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../lib/whatsapp';
-import { sanitizeUrl } from '../lib/security';
+import { safeOpenUrl } from '../lib/url';
+import { useToast } from '../context/ToastContext';
 import {
   SmartMusicCard,
   MusicLatestReleaseCard,
@@ -200,6 +198,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   interactive = true,
 }) => {
   const theme = UI_KIT.cardPalettes[color] || UI_KIT.cardPalettes.purple;
+  const toast = useToast();
   const radiusClass = getCardRadiusClass(buttonStyle);
   const [copiedCode, setCopiedCode] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -287,15 +286,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     const intent = generateWhatsAppIntentUrl(cardData, businessPhone);
 
     if (!intent.hasPhone) {
-      const safeUrl = sanitizeUrl(linkUrl);
-      if (safeUrl && safeUrl !== '#' && safeUrl !== 'https://' && safeUrl !== 'http://') {
-        window.open(safeUrl, '_blank', 'noopener,noreferrer');
-        return;
+      if (linkUrl && linkUrl !== '#' && linkUrl !== 'https://' && linkUrl !== 'http://') {
+        const opened = safeOpenUrl(linkUrl);
+        if (opened) return;
       }
       if (onMissingPhone) {
         onMissingPhone();
       } else {
-        alert(
+        toast.warning(
           'WhatsApp business phone is not configured yet. Please configure your WhatsApp number in profile settings to receive leads directly.'
         );
       }
@@ -303,7 +301,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
 
     if (intent.url) {
-      window.open(intent.url, '_blank', 'noopener,noreferrer');
+      safeOpenUrl(intent.url);
     }
   };
 
@@ -698,6 +696,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             <h4 className="text-xs sm:text-sm font-bold text-stone-900 truncate">{product}</h4>
             <div className="flex items-center gap-2 mt-1">
               <span className="font-extrabold text-xs sm:text-sm text-stone-900">{price}</span>
+              {discountText && (
+                <span className="text-[10px] text-purple-700 font-semibold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200/60">
+                  {discountText}
+                </span>
+              )}
               {code && (
                 <button
                   type="button"

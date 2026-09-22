@@ -6,7 +6,6 @@ import {
   CheckmarkCircle01Icon,
   BubbleChatIcon,
   Calendar01Icon,
-  DollarSquareIcon,
   Mail01Icon,
   UserIcon,
   Location01Icon,
@@ -15,6 +14,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProfileCardData } from '../types';
 import { profileService } from '../lib/firebase';
+import { safeOpenUrl } from '../lib/url';
 
 export interface MusicBookingModalProps {
   isOpen: boolean;
@@ -132,7 +132,7 @@ export const MusicBookingModal: React.FC<MusicBookingModalProps> = ({
     const url = cleanNumber
       ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(url);
   };
 
   const handleResetAndClose = () => {

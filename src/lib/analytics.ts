@@ -100,7 +100,7 @@ export function parseUserAgent(uaString?: string): ParsedUserAgent {
  */
 export function isBot(uaString?: string): boolean {
   // Check webdriver flag
-  if (typeof navigator !== 'undefined' && (navigator as any).webdriver) {
+  if (typeof navigator !== 'undefined' && (navigator as Navigator & { webdriver?: boolean }).webdriver) {
     return true;
   }
 

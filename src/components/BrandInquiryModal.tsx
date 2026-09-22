@@ -14,6 +14,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProfileCardData, CollaborationPackageItem } from '../types';
 import { profileService } from '../lib/firebase';
+import { safeOpenUrl } from '../lib/url';
 
 export interface BrandInquiryModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   creatorName = 'Creator',
   creatorPhone = '',
   selectedPackage = null,
-  cardData = null,
+  cardData: _cardData = null,
   isPreview = false,
 }) => {
   const [brandName, setBrandName] = useState('');
@@ -132,7 +133,7 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
     const url = cleanNumber 
       ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(url);
   };
 
   const handleResetAndClose = () => {

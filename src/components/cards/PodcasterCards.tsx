@@ -5,18 +5,13 @@ import {
   PlayIcon,
   PauseIcon,
   ArrowUpRight01Icon,
-  Download01Icon,
-  Clock01Icon,
   SentIcon,
-  Analytics01Icon,
   CheckmarkCircle02Icon,
   Mail01Icon,
   YoutubeIcon,
-  Search01Icon,
-  MoreHorizontalIcon,
 } from '@hugeicons/core-free-icons';
-import { ProfileCardData, PodcastMetadata, PodcastEpisodeItem } from '../../types';
-import { sanitizeUrl } from '../../lib/security';
+import { ProfileCardData, PodcastMetadata } from '../../types';
+import { safeOpenUrl, normalizeExternalUrl } from '../../lib/url';
 
 export interface PodcasterCardProps {
   card: ProfileCardData;
@@ -127,17 +122,19 @@ export const PodcastLatestEpisodeCard: React.FC<PodcasterCardProps> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(() => {});
-      setIsPlaying(true);
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.warn('Audio playback not allowed or failed:', err);
+          setIsPlaying(false);
+        });
     }
   };
 
   const handleOpenStream = (url?: string) => {
     const targetUrl = url || podcast.spotifyPodcastsUrl || card.linkUrl || 'https://open.spotify.com';
-    const safeUrl = sanitizeUrl(targetUrl);
-    if (safeUrl && safeUrl !== '#') {
-      window.open(safeUrl, '_blank', 'noopener,noreferrer');
-    }
+    safeOpenUrl(targetUrl);
   };
 
   return (
@@ -267,7 +264,7 @@ export const PodcastListenOnCard: React.FC<PodcasterCardProps> = ({
         {platforms.map((p) => (
           <a
             key={p.name}
-            href={p.url}
+            href={normalizeExternalUrl(p.url) || '#'}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-stone-200 flex items-center justify-between transition-colors"
@@ -296,7 +293,7 @@ export const PodcastWatchOnYouTubeCard: React.FC<PodcasterCardProps> = ({
       className="w-full max-w-full overflow-hidden bg-[#191A1E] text-white rounded-2xl border border-white/10 shadow-sm"
     >
       <a
-        href={youtubeUrl}
+        href={normalizeExternalUrl(youtubeUrl) || '#'}
         target="_blank"
         rel="noopener noreferrer"
         className="block relative w-full h-40 sm:h-44 bg-black flex items-center justify-center group cursor-pointer"

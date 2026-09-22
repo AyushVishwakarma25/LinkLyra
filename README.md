@@ -103,6 +103,52 @@ LinkLyra connects to Firebase for user authentication, cloud data storage, and m
 
 ---
 
+## 🔍 Per-Profile SEO & Social Link Previews (Task 3)
+
+LinkLyra provides comprehensive SEO metadata and link preview cards (Open Graph / Twitter Cards) for public creator pages:
+
+### Client-Side Dynamic Meta (`useDocumentMeta`)
+The `useDocumentMeta` hook dynamically injects and updates:
+- `<title>` — `Creator Name (@handle) | LinkLyra`
+- `<meta name="description">` — Creator bio or fallback
+- `<link rel="canonical">` — Profile URL
+- Open Graph tags (`og:title`, `og:description`, `og:image`, `og:url`, `og:type`)
+- Twitter Cards (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`)
+- Cleans up and restores defaults on unmount.
+
+### Server-Side Link Previews (`renderProfileMeta` Cloud Function)
+Search engine crawlers and social media link scrapers (WhatsApp, Twitter/X, LinkedIn, Facebook, Slack) do not execute client-side JavaScript. 
+
+The `renderProfileMeta` 2nd-gen Cloud Function handles this:
+1. Firebase Hosting rewrites non-asset paths to `renderProfileMeta` (configured in `firebase.json`).
+2. The function resolves the username or custom domain via the Firebase Admin SDK (`usernames`, `domains`, or `pages` collections).
+3. Injects server-rendered `<title>`, `<meta description>`, and `<meta property="og:*">` tags into the initial HTML response.
+4. Caches responses using HTTP header `Cache-Control: public, max-age=300, s-maxage=300` (~5 minutes) to minimize Firestore reads and latency.
+
+### Testing with Local Firebase Emulators
+To verify SSR SEO and link crawler preview tags locally:
+
+1. **Build Frontend and Functions**:
+   ```bash
+   npm run build
+   cd functions && npm run build && cd ..
+   ```
+
+2. **Start Firebase Emulators**:
+   ```bash
+   firebase emulators:start --only hosting,functions,firestore
+   ```
+   *(Note: Local emulator testing requires Java JRE and the Firebase CLI installed on your machine. Do not run emulator in headless CI without Java runtime).*
+
+3. **Verify Crawler HTML Output**:
+   In another terminal, simulate a social crawler request:
+   ```bash
+   curl -i http://localhost:5000/ayush
+   ```
+   Inspect the returned HTML header to confirm that `<meta property="og:title">`, `<meta property="og:description">`, and `<meta property="og:image">` contain the creator's profile data.
+
+---
+
 ## 🐳 Docker Deployment
 
 The repository includes a multi-stage `Dockerfile` running an optimized static Nginx server with SPA client-side routing.

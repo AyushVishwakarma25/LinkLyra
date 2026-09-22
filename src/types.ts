@@ -1,4 +1,4 @@
-export type CardColor = 'purple' | 'orange' | 'yellow' | 'green' | 'dark';
+export type CardColor = 'purple' | 'orange' | 'yellow' | 'green' | 'dark' | 'stone' | 'rose' | 'amber' | 'blue';
 
 export type CardTemplateType =
   | 'standard'
@@ -70,6 +70,8 @@ export interface RealEstateMetadata {
   images?: string[]; // Multiple photo gallery
   brochureUrl?: string;
   featuredAmenity?: string; // e.g. "Pool & Spa • Solar Powered"
+  specs?: string;
+  showingBooking?: boolean | ShowingBookingMetadata;
 }
 
 export interface ShowingBookingMetadata {
@@ -172,6 +174,9 @@ export interface CoachingMetadata {
   examTrack?: string; // e.g., "JEE / NEET / Spoken English"
   batchTiming?: string; // e.g., "Morning / Evening"
   feeStructure?: string; // e.g., "₹45,000 / year"
+  admissionOpen?: boolean;
+  syllabusBrochureUrl?: string;
+  customAdmissionPhone?: string;
 }
 
 // -------------------------------------------------------------
@@ -275,7 +280,7 @@ export interface DbSection {
   page_id?: string;
   title: string;
   position: number;
-  is_visible: boolean;
+  is_visible?: boolean;
 }
 
 export interface ProfileCardData {
@@ -287,6 +292,7 @@ export interface ProfileCardData {
   linkUrl: string;
   color: CardColor;
   logoSrc?: string;
+  icon?: string;
   badgeText?: string; // e.g. "NEW", "HOT", "FOR SALE", "JUST LISTED", "HIRE ME"
   expanded?: boolean;
   isActive?: boolean;
@@ -358,7 +364,7 @@ export interface UserAccountSettings {
 }
 
 export type CardStyleType = 'fill' | 'outline' | 'glass' | 'shadow' | 'soft';
-export type WallpaperMode = 'blur' | 'solid' | 'gradient' | 'mesh' | 'pattern' | 'image';
+export type WallpaperMode = 'blur' | 'solid' | 'gradient' | 'mesh' | 'pattern' | 'image' | 'color';
 
 export interface FooterSettings {
   showWatermark?: boolean;
@@ -398,8 +404,14 @@ export interface UserProfile {
   sections?: DbSection[];
   cards: ProfileCardData[];
   customDomain?: string;
+  whiteLabel?: boolean;
   accountSettings?: UserAccountSettings;
   onboardingProfile?: OnboardingProfile;
+  createdAt?: string;
+  title?: string;
+  bio?: string;
+  themeConfig?: Record<string, any>;
+  socialIcons?: Record<string, any>;
 }
 
 // -------------------------------------------------------------
@@ -447,9 +459,11 @@ export interface LeadRecord {
   propertyAddress?: string;
   propertyCondition?: string;
   selectedPackageName?: string;
+  sourceCardId?: string;
   status: LeadStatus;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // -------------------------------------------------------------

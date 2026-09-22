@@ -3,19 +3,17 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Cancel01Icon,
   Calendar01Icon,
-  Clock01Icon,
   Location01Icon,
   CheckmarkCircle01Icon,
   BubbleChatIcon,
   CallIcon,
   Mail01Icon,
   UserIcon,
-  SecurityCheckIcon,
-  Home01Icon,
   Loading03Icon,
 } from '@hugeicons/core-free-icons';
 import { ProfileCardData, RealEstateMetadata } from '../types';
 import { profileService } from '../lib/firebase';
+import { safeOpenUrl } from '../lib/url';
 
 export interface ShowingBookingModalProps {
   isOpen: boolean;
@@ -124,7 +122,7 @@ export const ShowingBookingModal: React.FC<ShowingBookingModalProps> = ({
     const url = cleanNumber 
       ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(url);
   };
 
   const handleResetAndClose = () => {

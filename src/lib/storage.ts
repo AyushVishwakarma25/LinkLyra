@@ -177,14 +177,11 @@ export async function uploadImageToStorage(
   const safeFilename = optimizedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
 
   // Adhere to storage.rules: users/{userId}/avatar/** or pages/{pageId}/images/**
-  let path = '';
-  if (type === 'avatar') {
-    const userId = targetId || currentUid;
-    path = `users/${userId}/avatar/${timestamp}_${safeFilename}`;
-  } else {
-    const pageId = targetId || currentUid;
-    path = `pages/${pageId}/images/${timestamp}_${safeFilename}`;
-  }
+  const userId = targetId || currentUid;
+  const path =
+    type === 'avatar'
+      ? `users/${userId}/avatar/${timestamp}_${safeFilename}`
+      : `pages/${userId}/images/${timestamp}_${safeFilename}`;
 
   try {
     const storageRef = ref(storage, path);
@@ -198,9 +195,12 @@ export async function uploadImageToStorage(
 
     const snapshot = await uploadBytes(storageRef, optimizedFile, metadata);
     return await getDownloadURL(snapshot.ref);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Storage upload error:', error);
-    const message = error?.message || 'Failed to upload image. Please check your network connection and try again.';
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Failed to upload image. Please check your network connection and try again.';
     throw new Error(message);
   }
 }

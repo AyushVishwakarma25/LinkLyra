@@ -6,16 +6,13 @@ import {
   PauseIcon,
   ArrowUpRight01Icon,
   Calendar03Icon,
-  Ticket02Icon,
   ShoppingBag01Icon,
   Download01Icon,
   VolumeHighIcon,
-  HeadphonesIcon,
   DiscIcon,
 } from '@hugeicons/core-free-icons';
 import { ProfileCardData, MusicMetadata, TourDateItem, MerchItem } from '../../types';
-import { UI_KIT } from '../../lib/ui-kit';
-import { sanitizeUrl } from '../../lib/security';
+import { safeOpenUrl, normalizeExternalUrl } from '../../lib/url';
 
 export interface MusicianCardProps {
   card: ProfileCardData;
@@ -37,15 +34,16 @@ export const SmartMusicCard: React.FC<MusicianCardProps> = ({
   interactive = true,
   onLinkClick,
 }) => {
+  void interactive;
   const music: MusicMetadata = card.music || {};
   const [preferredPlatform, setPreferredPlatform] = useState<string>('');
   const [showPlatformSelector, setShowPlatformSelector] = useState(false);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('linklyra_preferred_music_platform');
-      if (saved) {
-        setPreferredPlatform(saved);
+      const stored = localStorage.getItem('linklyra_preferred_music_platform');
+      if (stored) {
+        setPreferredPlatform(stored);
       } else if (music.preferredPlatformDefault) {
         setPreferredPlatform(music.preferredPlatformDefault);
       }
@@ -54,16 +52,17 @@ export const SmartMusicCard: React.FC<MusicianCardProps> = ({
 
   const selectPlatform = (plat: string, url: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (onLinkClick) {
+      onLinkClick(e);
+      return;
+    }
     try {
       localStorage.setItem('linklyra_preferred_music_platform', plat);
       setPreferredPlatform(plat);
     } catch (_) {}
 
     if (url) {
-      const safeUrl = sanitizeUrl(url);
-      if (safeUrl && safeUrl !== '#') {
-        window.open(safeUrl, '_blank', 'noopener,noreferrer');
-      }
+      safeOpenUrl(url);
     }
   };
 
@@ -217,14 +216,19 @@ export const MusicLatestReleaseCard: React.FC<MusicianCardProps> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(() => {});
-      setIsPlaying(true);
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.warn('Audio playback not allowed or failed:', err);
+          setIsPlaying(false);
+        });
     }
   };
 
   const handleOpenStream = (url?: string) => {
     const targetUrl = url || music.spotifyUrl || card.linkUrl || 'https://open.spotify.com';
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(targetUrl);
   };
 
   return (
@@ -446,7 +450,7 @@ export const MusicUpcomingShowsCard: React.FC<MusicianCardProps> = ({
                 </span>
               ) : (
                 <a
-                  href={item.ticketUrl || '#'}
+                  href={normalizeExternalUrl(item.ticketUrl) || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-white hover:bg-stone-100 text-[#191A1E] transition-colors inline-flex items-center gap-1 shadow-sm"
@@ -507,7 +511,7 @@ export const MusicMerchCard: React.FC<MusicianCardProps> = ({
         {merchItems.map((item, idx) => (
           <a
             key={idx}
-            href={item.buyUrl || card.linkUrl || '#'}
+            href={normalizeExternalUrl(item.buyUrl || card.linkUrl) || '#'}
             target="_blank"
             rel="noopener noreferrer"
             className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-stone-100 flex items-center justify-between transition-colors group"
@@ -561,7 +565,7 @@ export const MusicPressKitCard: React.FC<MusicianCardProps> = ({
       <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/10">
         <span className="text-[11px] text-stone-400">PDF • Press Assets</span>
         <a
-          href={downloadUrl}
+          href={normalizeExternalUrl(downloadUrl) || '#'}
           target="_blank"
           rel="noopener noreferrer"
           className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-[#191A1E] text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"

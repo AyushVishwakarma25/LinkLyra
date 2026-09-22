@@ -18,6 +18,10 @@ import { generateWhatsAppIntentUrl } from '../../lib/whatsapp';
 import { ProfileCardData } from '../../types';
 import { useLeadModals } from '../../hooks/useLeadModals';
 import { LeadModalHost } from '../../components/LeadModalHost';
+import { resolveRoute, getRouteTarget } from '../../lib/routing';
+import { useDocumentMeta } from '../../hooks/useDocumentMeta';
+import { safeOpenUrl } from '../../lib/url';
+import { linkToCard } from '../../lib/mappers';
 
 export interface PublicProfilePageProps {
   username?: string;
@@ -29,36 +33,26 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   username: propUsername,
   onBackToEditor,
 }) => {
-  const getUsernameFromLocation = (): string => {
-    if (propUsername) return propUsername;
-
-    const path = window.location.pathname.replace(/^\//, '');
-    const segments = path.split('/').filter(Boolean);
-
-    if (segments[0] === 'app' && segments[1]) {
-      return segments[1];
-    }
-    if (segments.length === 1 && segments[0] !== 'index.html' && segments[0] !== 'api') {
-      return segments[0];
-    }
-
-    const searchParams = new URLSearchParams(window.location.search);
-    const userParam = searchParams.get('user') || searchParams.get('u');
-    if (userParam) return userParam;
-
-    const hash = window.location.hash.replace('#/', '').replace('#', '');
-    if (hash && hash !== 'dashboard' && hash !== 'explore') return hash;
-
-    return 'creator';
-  };
-
-  const username = getUsernameFromLocation();
+  // Resolve target username or custom domain using unified routing engine
+  const resolvedRoute = resolveRoute();
+  const routeTarget = getRouteTarget();
+  const username = propUsername || routeTarget || '';
 
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [links, setLinks] = useState<DbLink[]>([]);
   const [sections, setSections] = useState<DbSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Dynamic Client SEO Metadata
+  useDocumentMeta({
+    title: profile
+      ? `${profile.full_name || profile.username} (@${profile.username}) | LinkLyra`
+      : 'LinkLyra - Bio & Links',
+    description: profile?.bio || 'Check out my links, work, and updates on LinkLyra.',
+    image: profile?.avatar_url,
+    canonical: typeof window !== 'undefined' ? window.location.href : undefined,
+  });
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,26 +63,30 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
 
   const availableColors = ['all', 'purple', 'orange', 'yellow', 'green', 'dark'];
 
-  // Fetch creator data by username from Cloud Firestore
+  // Fetch creator data by username or domain from Cloud Firestore
   useEffect(() => {
     async function loadCreatorData() {
+      if (!username) {
+        setError('No username provided.');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
         const searchParams = new URLSearchParams(window.location.search);
         const domainParam = searchParams.get('domain') || searchParams.get('d');
-        
+
         let result = null;
         if (domainParam) {
           result = await profileService.getProfileByDomain(domainParam);
-        }
-        
-        if (!result) {
-          result = await profileService.getProfileByUsername(username);
+        } else if (resolvedRoute === 'domain' || username.includes('.')) {
+          result = await profileService.getProfileByDomain(username);
         }
 
-        if (!result && username.includes('.')) {
-          result = await profileService.getProfileByDomain(username);
+        if (!result) {
+          result = await profileService.getProfileByUsername(username);
         }
 
         if (result && result.profile) {
@@ -102,65 +100,6 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           const secs = await profileService.getSections(result.profile.id);
           setSections(secs);
         } else {
-          // If no remote profile found, check if this is the current active local session
-          const saved = localStorage.getItem('linklyra_user_profile_v2') || localStorage.getItem('linkcards_user_profile_v2');
-          if (saved) {
-            try {
-              const localProfile = JSON.parse(saved);
-              if (localProfile.username === username || username === 'creator') {
-                setProfile({
-                  id: localProfile.id,
-                  username: localProfile.username,
-                  full_name: localProfile.name,
-                  bio: localProfile.headline,
-                  avatar_url: localProfile.avatarUrl,
-                  business_phone: localProfile.businessPhone,
-                  theme: localProfile.theme,
-                  socials: localProfile.socials,
-                });
-                setSections(localProfile.sections || []);
-                setLinks(
-                  localProfile.cards.map((c: any, i: number) => ({
-                    id: c.id,
-                    profile_id: localProfile.id,
-                    section_id: c.sectionId,
-                    title: c.title,
-                    subtitle: c.subtitle,
-                    link_url: c.linkUrl,
-                    color: c.color,
-                    logo_url: c.logoSrc,
-                    badge_text: c.badgeText,
-                    expanded: c.expanded,
-                    is_active: c.isActive !== false,
-                    clicks: c.clicks || 0,
-                    display_order: i,
-                    template_type: c.templateType,
-                    real_estate: c.realEstate
-                      ? {
-                          property_name: c.realEstate.propertyName,
-                          location: c.realEstate.location,
-                          price_bracket: c.realEstate.priceBracket,
-                          property_type: c.realEstate.propertyType,
-                        }
-                      : undefined,
-                    coaching: c.coaching
-                      ? {
-                          course_name: c.coaching.courseName,
-                          exam_track: c.coaching.examTrack,
-                          batch_timing: c.coaching.batchTiming,
-                          fee_structure: c.coaching.feeStructure,
-                        }
-                      : undefined,
-                    custom_whatsapp_phone: c.customWhatsappPhone,
-                  }))
-                );
-                setLoading(false);
-                return;
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          }
           setError(`Creator profile "@${username}" could not be found.`);
         }
       } catch (err: any) {
@@ -176,35 +115,6 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
 
   const [missingPhoneAlert, setMissingPhoneAlert] = useState(false);
   const leadModals = useLeadModals();
-
-  const linkToCard = (link: DbLink): ProfileCardData => ({
-    id: link.id,
-    title: link.title,
-    subtitle: link.subtitle,
-    linkUrl: link.link_url,
-    color: link.color,
-    logoSrc: link.logo_url,
-    badgeText: link.badge_text,
-    expanded: link.expanded,
-    templateType: link.template_type,
-    realEstate: link.real_estate
-      ? {
-          propertyName: link.real_estate.property_name || link.title,
-          location: link.real_estate.location || '',
-          priceBracket: link.real_estate.price_bracket || '',
-          propertyType: link.real_estate.property_type || '',
-        }
-      : undefined,
-    coaching: link.coaching
-      ? {
-          courseName: link.coaching.course_name || link.title,
-          examTrack: link.coaching.exam_track || '',
-          batchTiming: link.coaching.batch_timing || '',
-          feeStructure: link.coaching.fee_structure || '',
-        }
-      : undefined,
-    customWhatsappPhone: link.custom_whatsapp_phone,
-  });
 
   const handleShare = () => {
     const url = window.location.href;
@@ -256,27 +166,19 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
       if (!intent.hasPhone) {
         setMissingPhoneAlert(true);
         if (link.link_url && link.link_url !== '#' && link.link_url !== 'https://') {
-          const finalUrl =
-            link.link_url.startsWith('http://') || link.link_url.startsWith('https://')
-              ? link.link_url
-              : `https://${link.link_url}`;
-          window.open(finalUrl, '_blank', 'noopener,noreferrer');
+          safeOpenUrl(link.link_url);
         }
         return;
       }
 
       if (intent.url) {
-        window.open(intent.url, '_blank', 'noopener,noreferrer');
+        safeOpenUrl(intent.url);
         return;
       }
     }
 
     if (link.link_url && link.link_url !== '#' && link.link_url !== 'https://') {
-      const finalUrl =
-        link.link_url.startsWith('http://') || link.link_url.startsWith('https://')
-          ? link.link_url
-          : `https://${link.link_url}`;
-      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+      safeOpenUrl(link.link_url);
     }
   };
 
@@ -336,29 +238,42 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
           </div>
         ) : error || !profile ? (
           <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-black/10 text-center space-y-4 shadow-sm my-auto">
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-              <HugeIcon icon={AlertCircleIcon} size={24} className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl bg-[#5E4BF7]/10 text-[#5E4BF7] flex items-center justify-center mx-auto">
+              <HugeIcon icon={AlertCircleIcon} size={28} className="w-7 h-7" />
             </div>
-            <h2 className="text-lg font-bold text-[#1C1E22]">Profile Not Found</h2>
-            <p className="text-xs text-[#737882]">
-              {error || `The user @${username} does not exist or has not published any links yet.`}
-            </p>
-            {onBackToEditor ? (
-              <button
-                type="button"
-                onClick={onBackToEditor}
-                className="px-5 py-2.5 rounded-full bg-[#1C1E22] text-white text-xs font-bold hover:bg-black transition-colors cursor-pointer"
-              >
-                Back to Studio Editor
-              </button>
-            ) : (
+            <div className="space-y-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 text-[10px] font-extrabold uppercase tracking-wider">
+                404 Not Found
+              </span>
+              <h2 className="text-xl font-extrabold text-[#1C1E22]">Profile Not Found</h2>
+              <p className="text-xs text-[#737882] max-w-xs mx-auto">
+                {error || `The page @${username} does not exist or may have been renamed.`}
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
               <a
-                href="/"
-                className="inline-block px-5 py-2.5 rounded-full bg-[#5E4BF7] text-white text-xs font-bold hover:bg-[#4E3BE5] transition-colors"
+                href={username ? `/?claim=${encodeURIComponent(username)}` : '/'}
+                className="w-full py-3 px-5 rounded-xl bg-[#5E4BF7] text-white text-xs font-bold hover:bg-[#4E3BE5] transition-all shadow-xs flex items-center justify-center gap-2"
               >
-                Create Your Profile
+                <span>Claim @{username || 'handle'} & Create Yours</span>
               </a>
-            )}
+              {onBackToEditor ? (
+                <button
+                  type="button"
+                  onClick={onBackToEditor}
+                  className="w-full py-2.5 px-5 rounded-xl bg-stone-100 text-[#1C1E22] text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer"
+                >
+                  Back to Studio Editor
+                </button>
+              ) : (
+                <a
+                  href="/"
+                  className="w-full py-2.5 px-5 rounded-xl bg-transparent text-[#737882] hover:text-[#1C1E22] text-xs font-semibold transition-colors"
+                >
+                  Explore LinkLyra
+                </a>
+              )}
+            </div>
           </div>
         ) : (
           <div
@@ -618,37 +533,8 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                           }}
                         >
                           <ProfileCard
-                            id={link.id}
-                            title={link.title}
-                            subtitle={link.subtitle}
-                            linkUrl={link.link_url}
-                            color={link.color}
-                            logoSrc={link.logo_url}
-                            badgeText={link.badge_text}
-                            expanded={link.expanded}
-                            templateType={link.template_type}
-                            realEstate={
-                              link.real_estate
-                                ? {
-                                    propertyName: link.real_estate.property_name || link.title,
-                                    location: link.real_estate.location || '',
-                                    priceBracket: link.real_estate.price_bracket || '',
-                                    propertyType: link.real_estate.property_type || '',
-                                  }
-                                : undefined
-                            }
-                            coaching={
-                              link.coaching
-                                ? {
-                                    courseName: link.coaching.course_name || link.title,
-                                    examTrack: link.coaching.exam_track || '',
-                                    batchTiming: link.coaching.batch_timing || '',
-                                    feeStructure: link.coaching.fee_structure || '',
-                                  }
-                                : undefined
-                            }
+                            {...cardData}
                             businessPhone={profile.business_phone}
-                            customWhatsappPhone={link.custom_whatsapp_phone}
                             interactive={true}
                             onMissingPhone={() => setMissingPhoneAlert(true)}
                             onClick={() => handleOpenLink(link)}
@@ -732,20 +618,27 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
               )}
             </div>
 
-            {/* Footer */}
-            <footer className="pt-6 pb-1 text-center space-y-2 shrink-0">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-black/10 text-[10px] sm:text-[11px] font-bold text-[#1C1E22] shadow-2xs max-w-full truncate">
-                <span className="shrink-0 font-extrabold text-[#5E4BF7]">LinkLyra</span>
-                <span className="text-[#737882] font-normal">•</span>
-                <span className="text-[#737882] font-medium truncate">@{profile.username}</span>
-              </div>
+            {/* Footer: Shown unless page has whiteLabel === true */}
+            {!profile.whiteLabel && (
+              <footer className="pt-6 pb-1 text-center space-y-2 shrink-0">
+                <a
+                  href={`https://linklyra.web.app/?ref=${encodeURIComponent(profile.username || 'creator')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 hover:bg-white border border-black/10 text-[10px] sm:text-[11px] font-bold text-[#1C1E22] shadow-2xs hover:shadow-xs transition-all max-w-full truncate group cursor-pointer"
+                >
+                  <span className="shrink-0 font-extrabold text-[#5E4BF7] group-hover:scale-105 transition-transform">LinkLyra</span>
+                  <span className="text-[#737882] font-normal">•</span>
+                  <span className="text-[#737882] font-medium truncate">@{profile.username}</span>
+                </a>
 
-              {copied && (
-                <div className="animate-fadeIn text-xs font-semibold text-emerald-700 bg-emerald-50 py-0.5 px-3 rounded-full border border-emerald-200 inline-block">
-                  Link copied to clipboard!
-                </div>
-              )}
-            </footer>
+                {copied && (
+                  <div className="animate-fadeIn text-xs font-semibold text-emerald-700 bg-emerald-50 py-0.5 px-3 rounded-full border border-emerald-200 inline-block">
+                    Link copied to clipboard!
+                  </div>
+                )}
+              </footer>
+            )}
           </div>
         )}
       </main>

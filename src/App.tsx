@@ -12,6 +12,9 @@ import {
   Home01Icon,
   CrownIcon,
   Mail01Icon,
+  AlertCircleIcon,
+  CheckmarkCircle01Icon,
+  Loading03Icon,
 } from '@hugeicons/core-free-icons';
 import { UserProfile, ProfileCardData } from './types';
 import { DEFAULT_STARTER_PROFILE } from './data';
@@ -26,9 +29,16 @@ import { AccountSettings, AccountSubTab } from './components/AccountSettings';
 import { OnboardingModal } from './components/OnboardingModal';
 import { Button, ButtonGroup, SegmentedControl } from './components/ui';
 import { profileService, DbProfile } from './lib/firebase';
+import { linkToCard, cardToLinkDoc } from './lib/mappers';
 import { usePlan } from './hooks/usePlan';
 import { checkUserOnboardingEligibility } from './lib/onboardingService';
+import { resolveRoute, getRouteTarget } from './lib/routing';
+import { safeOpenUrl } from './lib/url';
 import { User } from 'firebase/auth';
+import { ToastProvider, useToast } from './context/ToastContext';
+import { ConfirmProvider } from './components/ConfirmDialog';
+
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const STORAGE_KEY = 'linklyra_user_profile_v2';
 
@@ -56,48 +66,13 @@ function createFreshUserProfile(user: User, claimedHandle?: string | null): User
   };
 }
 
-function getRouteUsername(): string | null {
-  const searchParams = new URLSearchParams(window.location.search);
-  const userParam = searchParams.get('user') || searchParams.get('u');
-  if (userParam) return userParam;
+function StudioApp() {
+  const initialRoute = resolveRoute();
+  const initialIsDirectPublic = initialRoute === 'profile' || initialRoute === 'domain' || initialRoute === '404';
+  const explicitStudio = initialRoute === 'studio';
+  const initialRouteTarget = getRouteTarget();
 
-  const domainParam = searchParams.get('domain') || searchParams.get('d');
-  if (domainParam) return domainParam;
-
-  const hostname = window.location.hostname;
-  const isPlatformHost =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.run.app') ||
-    hostname.endsWith('.web.app') ||
-    hostname.endsWith('.firebaseapp.com') ||
-    hostname.endsWith('.ai.studio');
-
-  if (!isPlatformHost && hostname && hostname !== '') {
-    return hostname;
-  }
-
-  const path = window.location.pathname.replace(/^\//, '');
-  const segments = path.split('/').filter(Boolean);
-  if (segments[0] === 'app' && segments[1]) {
-    return segments[1];
-  }
-  if (segments.length === 1 && segments[0] !== 'index.html' && segments[0] !== 'api') {
-    return segments[0];
-  }
-
-  const hash = window.location.hash.replace('#/', '').replace('#', '');
-  if (hash && hash !== 'dashboard' && hash !== 'explore' && hash !== 'studio' && hash !== 'landing') {
-    return hash;
-  }
-  return null;
-}
-
-export default function App() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const routeUsername = getRouteUsername();
-  const explicitStudio = searchParams.get('view') === 'studio' || searchParams.get('edit') === 'true' || window.location.hash === '#studio';
-  const initialIsDirectPublic = Boolean(routeUsername) && !explicitStudio;
+  const [routeTarget] = useState<string | null>(initialRouteTarget);
 
   // Primary App View: 'landing' (Conversational Landing Page) | 'studio' (Sidebar + Preview) | 'preview_only' (Live interactive mobile view) | 'public' (Full public page)
   const [appMode, setAppMode] = useState<'landing' | 'studio' | 'preview_only' | 'public'>(() => {
@@ -115,6 +90,9 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [lastFailedAction, setLastFailedAction] = useState<(() => void) | null>(null);
+  const toast = useToast();
   const [pendingClaimedHandle, setPendingClaimedHandle] = useState<string | null>(null);
 
   // Account Settings Modal State
@@ -234,47 +212,7 @@ export default function App() {
               customDomain: dbProf.custom_domain || '',
               accountSettings: dbProf.accountSettings,
               sections: dbSections || [],
-              cards: (dbLinks || []).map((l) => ({
-                id: l.id,
-                sectionId: l.section_id,
-                title: l.title,
-                subtitle: l.subtitle,
-                linkUrl: l.link_url,
-                color: l.color,
-                logoSrc: l.logo_url,
-                badgeText: l.badge_text,
-                expanded: l.expanded,
-                isActive: l.is_active !== false,
-                clicks: l.clicks || 0,
-                templateType: l.template_type,
-                music: l.music,
-                podcast: l.podcast,
-                isPremium: l.is_premium || Boolean(l.template_type?.startsWith('music_') || l.template_type?.startsWith('podcast_')),
-                realEstate: l.real_estate
-                  ? {
-                      propertyName: l.real_estate.property_name || l.real_estate.propertyName || l.title,
-                      location: l.real_estate.location || '',
-                      priceBracket: l.real_estate.price_bracket || l.real_estate.priceBracket || '',
-                      propertyType: l.real_estate.property_type || l.real_estate.propertyType || '',
-                    }
-                  : undefined,
-                coaching: l.coaching
-                  ? {
-                      courseName: l.coaching.course_name || l.coaching.courseName || l.title,
-                      examTrack: l.coaching.exam_track || l.coaching.examTrack || '',
-                      batchTiming: l.coaching.batch_timing || l.coaching.batchTiming || '',
-                      feeStructure: l.coaching.fee_structure || l.coaching.feeStructure || '',
-                    }
-                  : undefined,
-                creatorStats: l.creator_stats || (l as any).creatorStats,
-                creatorWork: l.creator_work || (l as any).creatorWork,
-                featuredWork: l.featured_work || (l as any).featuredWork,
-                creatorPackages: l.creator_packages || (l as any).creatorPackages,
-                brandInquiry: l.brand_inquiry || (l as any).brandInquiry,
-                recommendation: l.recommendation,
-                clientReview: l.client_review || (l as any).clientReview,
-                customWhatsappPhone: l.custom_whatsapp_phone,
-              })),
+              cards: (dbLinks || []).map(linkToCard),
             });
 
             if (eligibility.needsOnboarding) {
@@ -347,7 +285,10 @@ export default function App() {
   };
 
   const handleSaveCard = async (savedCard: ProfileCardData) => {
-    if (editingCard) {
+    const prevProfile = profile;
+    const isEditing = Boolean(editingCard);
+
+    if (isEditing) {
       // Update existing
       setProfile((prev) => ({
         ...prev,
@@ -356,125 +297,85 @@ export default function App() {
 
       if (currentUser) {
         setIsSyncing(true);
+        setSaveStatus('saving');
         try {
-          await profileService.updateLink(savedCard.id, {
-            section_id: savedCard.sectionId,
-            title: savedCard.title,
-            subtitle: savedCard.subtitle || '',
-            link_url: savedCard.linkUrl,
-            color: savedCard.color,
-            logo_url: savedCard.logoSrc || '',
-            badge_text: savedCard.badgeText || '',
-            expanded: savedCard.expanded,
-            is_active: savedCard.isActive,
-            template_type: savedCard.templateType,
-            real_estate: savedCard.realEstate
-              ? {
-                  property_name: savedCard.realEstate.propertyName,
-                  location: savedCard.realEstate.location,
-                  price_bracket: savedCard.realEstate.priceBracket,
-                  property_type: savedCard.realEstate.propertyType,
-                }
-              : undefined,
-            coaching: savedCard.coaching
-              ? {
-                  course_name: savedCard.coaching.courseName,
-                  exam_track: savedCard.coaching.examTrack,
-                  batch_timing: savedCard.coaching.batchTiming,
-                  fee_structure: savedCard.coaching.feeStructure,
-                }
-              : undefined,
-            creator_stats: savedCard.creatorStats,
-            creator_work: savedCard.creatorWork,
-            featured_work: savedCard.featuredWork,
-            creator_packages: savedCard.creatorPackages,
-            brand_inquiry: savedCard.brandInquiry,
-            recommendation: savedCard.recommendation,
-            client_review: savedCard.clientReview,
-            custom_whatsapp_phone: savedCard.customWhatsappPhone,
-            music: savedCard.music || undefined,
-            podcast: savedCard.podcast || undefined,
-            is_premium: savedCard.isPremium || Boolean(savedCard.templateType?.startsWith('music_') || savedCard.templateType?.startsWith('podcast_')),
-          });
+          const targetIndex = profile.cards.findIndex((c) => c.id === savedCard.id);
+          const linkDoc = cardToLinkDoc(savedCard, targetIndex >= 0 ? targetIndex : 0, currentUser.uid);
+          await profileService.updateLink(savedCard.id, linkDoc);
+          setSaveStatus('saved');
         } catch (err) {
           console.error('Error updating link:', err);
+          setProfile(prevProfile);
+          setSaveStatus('error');
+          const retry = () => handleSaveCard(savedCard);
+          setLastFailedAction(() => retry);
+          toast.error('Failed to update card.', { label: 'Retry', onClick: retry });
         } finally {
           setIsSyncing(false);
         }
       }
     } else {
       // Add new card
-      let createdId = savedCard.id;
+      const tempId = savedCard.id || `card_${Date.now()}`;
+      const tempCard = { ...savedCard, id: tempId };
+      setProfile((prev) => ({
+        ...prev,
+        cards: [...prev.cards, tempCard],
+      }));
+
       if (currentUser) {
         setIsSyncing(true);
+        setSaveStatus('saving');
         try {
-          const newDoc = await profileService.addLink(currentUser.uid, {
-            section_id: savedCard.sectionId,
-            title: savedCard.title,
-            subtitle: savedCard.subtitle || '',
-            link_url: savedCard.linkUrl,
-            color: savedCard.color,
-            logo_url: savedCard.logoSrc || '',
-            badge_text: savedCard.badgeText || '',
-            expanded: savedCard.expanded,
-            is_active: savedCard.isActive,
-            template_type: savedCard.templateType,
-            music: savedCard.music || undefined,
-            podcast: savedCard.podcast || undefined,
-            is_premium: savedCard.isPremium || Boolean(savedCard.templateType?.startsWith('music_') || savedCard.templateType?.startsWith('podcast_')),
-            real_estate: savedCard.realEstate
-              ? {
-                  property_name: savedCard.realEstate.propertyName,
-                  location: savedCard.realEstate.location,
-                  price_bracket: savedCard.realEstate.priceBracket,
-                  property_type: savedCard.realEstate.propertyType,
-                }
-              : undefined,
-            coaching: savedCard.coaching
-              ? {
-                  course_name: savedCard.coaching.courseName,
-                  exam_track: savedCard.coaching.examTrack,
-                  batch_timing: savedCard.coaching.batchTiming,
-                  fee_structure: savedCard.coaching.feeStructure,
-                }
-              : undefined,
-            creator_stats: savedCard.creatorStats,
-            creator_work: savedCard.creatorWork,
-            featured_work: savedCard.featuredWork,
-            creator_packages: savedCard.creatorPackages,
-            brand_inquiry: savedCard.brandInquiry,
-            recommendation: savedCard.recommendation,
-            client_review: savedCard.clientReview,
-            custom_whatsapp_phone: savedCard.customWhatsappPhone,
-            display_order: profile.cards.length,
-          });
-          createdId = newDoc.id;
+          const linkDoc = cardToLinkDoc(savedCard, profile.cards.length, currentUser.uid);
+          const newDoc = await profileService.addLink(currentUser.uid, linkDoc);
+          setProfile((prev) => ({
+            ...prev,
+            cards: prev.cards.map((c) => (c.id === tempId ? { ...c, id: newDoc.id } : c)),
+          }));
+          setSaveStatus('saved');
         } catch (err) {
           console.error('Error adding link:', err);
+          setProfile(prevProfile);
+          setSaveStatus('error');
+          const retry = () => handleSaveCard(savedCard);
+          setLastFailedAction(() => retry);
+          toast.error('Failed to add card.', { label: 'Retry', onClick: retry });
         } finally {
           setIsSyncing(false);
         }
       }
-
-      setProfile((prev) => ({
-        ...prev,
-        cards: [...prev.cards, { ...savedCard, id: createdId }],
-      }));
     }
   };
 
   const handleDeleteCard = async (id: string) => {
+    const prevProfile = profile;
     setProfile((prev) => ({
       ...prev,
       cards: prev.cards.filter((c) => c.id !== id),
     }));
 
     if (currentUser) {
-      await profileService.deleteLink(id);
+      setIsSyncing(true);
+      setSaveStatus('saving');
+      try {
+        await profileService.deleteLink(id);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Error deleting link:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleDeleteCard(id);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to delete card.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
   const handleToggleCardActive = async (id: string) => {
+    const prevProfile = profile;
     const targetCard = profile.cards.find((c) => c.id === id);
     const newStatus = targetCard ? targetCard.isActive === false : false;
 
@@ -486,7 +387,21 @@ export default function App() {
     }));
 
     if (currentUser) {
-      await profileService.updateLink(id, { is_active: newStatus });
+      setIsSyncing(true);
+      setSaveStatus('saving');
+      try {
+        await profileService.updateLink(id, { is_active: newStatus });
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Error toggling link active:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleToggleCardActive(id);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to toggle card visibility.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -495,6 +410,7 @@ export default function App() {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newCards.length) return;
 
+    const prevProfile = profile;
     const temp = newCards[index];
     newCards[index] = newCards[targetIndex];
     newCards[targetIndex] = temp;
@@ -505,33 +421,32 @@ export default function App() {
     }));
 
     if (currentUser) {
-      await profileService.reorderLinks(
-        currentUser.uid,
-        newCards.map((c) => c.id)
-      );
-    }
-  };
-
-  const handleAddSection = async (title: string) => {
-    let createdId = `sec_${Date.now()}`;
-    if (currentUser) {
       setIsSyncing(true);
+      setSaveStatus('saving');
       try {
-        const doc = await profileService.addSection(currentUser.uid, {
-          title,
-          position: (profile.sections || []).length,
-          is_visible: true,
-        });
-        createdId = doc.id;
+        await profileService.reorderLinks(
+          currentUser.uid,
+          newCards.map((c) => c.id)
+        );
+        setSaveStatus('saved');
       } catch (err) {
-        console.error('Failed to add section to cloud:', err);
+        console.error('Error reordering links:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleMoveCard(index, direction);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to reorder cards.', { label: 'Retry', onClick: retry });
       } finally {
         setIsSyncing(false);
       }
     }
+  };
 
+  const handleAddSection = async (title: string) => {
+    const prevProfile = profile;
+    const tempId = `sec_${Date.now()}`;
     const newSec = {
-      id: createdId,
+      id: tempId,
       title,
       position: (profile.sections || []).length,
       is_visible: true,
@@ -541,9 +456,36 @@ export default function App() {
       ...prev,
       sections: [...(prev.sections || []), newSec],
     }));
+
+    if (currentUser) {
+      setIsSyncing(true);
+      setSaveStatus('saving');
+      try {
+        const doc = await profileService.addSection(currentUser.uid, {
+          title,
+          position: (profile.sections || []).length,
+          is_visible: true,
+        });
+        setProfile((prev) => ({
+          ...prev,
+          sections: (prev.sections || []).map((s) => (s.id === tempId ? { ...s, id: doc.id } : s)),
+        }));
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Failed to add section to cloud:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleAddSection(title);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to add section.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   const handleDeleteSection = async (sectionId: string) => {
+    const prevProfile = profile;
     setProfile((prev) => ({
       ...prev,
       sections: (prev.sections || []).filter((s) => s.id !== sectionId),
@@ -553,46 +495,78 @@ export default function App() {
     }));
 
     if (currentUser) {
-      await profileService.deleteSection(sectionId);
+      setIsSyncing(true);
+      setSaveStatus('saving');
+      try {
+        await profileService.deleteSection(sectionId);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Failed to delete section:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleDeleteSection(sectionId);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to delete section.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
   const handleUpdateProfile = async (updated: Partial<UserProfile>) => {
+    const prevProfile = profile;
     setProfile((prev) => ({
       ...prev,
       ...updated,
     }));
 
     if (currentUser) {
-      const updates: Partial<DbProfile> = {};
-      if (updated.name !== undefined) updates.full_name = updated.name;
-      if (updated.headline !== undefined) updates.bio = updated.headline;
-      if (updated.avatarUrl !== undefined) updates.avatar_url = updated.avatarUrl;
-      if (updated.username !== undefined) updates.username = updated.username;
-      if (updated.businessPhone !== undefined) updates.business_phone = updated.businessPhone;
-      if (updated.theme !== undefined) updates.theme = updated.theme;
-      if (updated.fontFamily !== undefined) updates.font_family = updated.fontFamily;
-      if (updated.buttonStyle !== undefined) updates.button_style = updated.buttonStyle;
-      if (updated.backgroundType !== undefined) updates.background_type = updated.backgroundType;
-      if (updated.backgroundValue !== undefined) updates.background_value = updated.backgroundValue;
-      if (updated.cardStyle !== undefined) updates.card_style = updated.cardStyle;
-      if (updated.wallpaperMode !== undefined) updates.wallpaper_mode = updated.wallpaperMode;
-      if (updated.wallpaperTint !== undefined) updates.wallpaper_tint = updated.wallpaperTint;
-      if (updated.cardBgColor !== undefined) updates.card_bg_color = updated.cardBgColor;
-      if (updated.cardTextColor !== undefined) updates.card_text_color = updated.cardTextColor;
-      if (updated.buttonColor !== undefined) updates.button_color = updated.buttonColor;
-      if (updated.stickers !== undefined) updates.stickers = updated.stickers;
-      if (updated.footerSettings !== undefined) updates.footer_settings = updated.footerSettings;
-      if (updated.socials !== undefined) updates.socials = updated.socials;
-      if (updated.customDomain !== undefined) updates.custom_domain = updated.customDomain;
-      if (updated.accountSettings !== undefined) updates.accountSettings = updated.accountSettings;
-      if (updated.plan !== undefined) updates.plan = updated.plan;
+      setIsSyncing(true);
+      setSaveStatus('saving');
+      try {
+        const updates: Partial<DbProfile> = {};
+        if (updated.name !== undefined) updates.full_name = updated.name;
+        if (updated.headline !== undefined) updates.bio = updated.headline;
+        if (updated.avatarUrl !== undefined) updates.avatar_url = updated.avatarUrl;
+        if (updated.username !== undefined) updates.username = updated.username;
+        if (updated.businessPhone !== undefined) updates.business_phone = updated.businessPhone;
+        if (updated.theme !== undefined) updates.theme = updated.theme;
+        if (updated.fontFamily !== undefined) updates.font_family = updated.fontFamily;
+        if (updated.buttonStyle !== undefined) updates.button_style = updated.buttonStyle;
+        if (updated.backgroundType !== undefined) updates.background_type = updated.backgroundType;
+        if (updated.backgroundValue !== undefined) updates.background_value = updated.backgroundValue;
+        if (updated.cardStyle !== undefined) updates.card_style = updated.cardStyle;
+        if (updated.wallpaperMode !== undefined) updates.wallpaper_mode = updated.wallpaperMode;
+        if (updated.wallpaperTint !== undefined) updates.wallpaper_tint = updated.wallpaperTint;
+        if (updated.cardBgColor !== undefined) updates.card_bg_color = updated.cardBgColor;
+        if (updated.cardTextColor !== undefined) updates.card_text_color = updated.cardTextColor;
+        if (updated.buttonColor !== undefined) updates.button_color = updated.buttonColor;
+        if (updated.stickers !== undefined) updates.stickers = updated.stickers;
+        if (updated.footerSettings !== undefined) updates.footer_settings = updated.footerSettings;
+        if (updated.socials !== undefined) updates.socials = updated.socials;
+        if (updated.customDomain !== undefined) updates.custom_domain = updated.customDomain;
+        if (updated.accountSettings !== undefined) updates.accountSettings = updated.accountSettings;
+        if (updated.plan !== undefined) updates.plan = updated.plan;
 
-      await profileService.updateProfile(currentUser.uid, updates);
+        await profileService.updateProfile(currentUser.uid, updates);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Failed to update profile:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleUpdateProfile(updated);
+        setLastFailedAction(() => retry);
+        toast.error('Failed to save profile changes.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
   const handleManualSave = async () => {
+    const prevProfile = profile;
+    setSaveStatus('saving');
+    setIsSyncing(true);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
       if (currentUser) {
@@ -622,9 +596,18 @@ export default function App() {
         };
         await profileService.updateProfile(currentUser.uid, updates);
       }
+      setSaveStatus('saved');
+      toast.success('All changes saved successfully');
     } catch (err) {
       console.error('Error in manual save:', err);
+      setProfile(prevProfile);
+      setSaveStatus('error');
+      const retry = () => handleManualSave();
+      setLastFailedAction(() => retry);
+      toast.error('Failed to save changes.', { label: 'Retry', onClick: retry });
       throw err;
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -637,12 +620,8 @@ export default function App() {
       ),
     }));
 
-    if (card.linkUrl && card.linkUrl !== '#') {
-      const finalUrl =
-        card.linkUrl.startsWith('http://') || card.linkUrl.startsWith('https://')
-          ? card.linkUrl
-          : `https://${card.linkUrl}`;
-      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+    if (card.linkUrl && card.linkUrl !== '#' && card.linkUrl !== 'https://') {
+      safeOpenUrl(card.linkUrl);
     }
   };
 
@@ -695,47 +674,7 @@ export default function App() {
           customDomain: dbProf.custom_domain || '',
           accountSettings: dbProf.accountSettings,
           sections: dbSections || [],
-          cards: (dbLinks || []).map((l) => ({
-            id: l.id,
-            sectionId: l.section_id,
-            title: l.title,
-            subtitle: l.subtitle,
-            linkUrl: l.link_url,
-            color: l.color,
-            logoSrc: l.logo_url,
-            badgeText: l.badge_text,
-            expanded: l.expanded,
-            isActive: l.is_active !== false,
-            clicks: l.clicks || 0,
-            templateType: l.template_type,
-            music: l.music,
-            podcast: l.podcast,
-            isPremium: l.is_premium || Boolean(l.template_type?.startsWith('music_') || l.template_type?.startsWith('podcast_')),
-            realEstate: l.real_estate
-              ? {
-                  propertyName: l.real_estate.property_name || l.real_estate.propertyName || l.title,
-                  location: l.real_estate.location || '',
-                  priceBracket: l.real_estate.price_bracket || l.real_estate.priceBracket || '',
-                  propertyType: l.real_estate.property_type || l.real_estate.propertyType || '',
-                }
-              : undefined,
-            coaching: l.coaching
-              ? {
-                  courseName: l.coaching.course_name || l.coaching.courseName || l.title,
-                  examTrack: l.coaching.exam_track || l.coaching.examTrack || '',
-                  batchTiming: l.coaching.batch_timing || l.coaching.batchTiming || '',
-                  feeStructure: l.coaching.fee_structure || l.coaching.feeStructure || '',
-                }
-              : undefined,
-            creatorStats: l.creator_stats || (l as any).creatorStats,
-            creatorWork: l.creator_work || (l as any).creatorWork,
-            featuredWork: l.featured_work || (l as any).featuredWork,
-            creatorPackages: l.creator_packages || (l as any).creatorPackages,
-            brandInquiry: l.brand_inquiry || (l as any).brandInquiry,
-            recommendation: l.recommendation,
-            clientReview: l.client_review || (l as any).clientReview,
-            customWhatsappPhone: l.custom_whatsapp_phone,
-          })),
+          cards: (dbLinks || []).map(linkToCard),
         });
 
         if (eligibility.needsOnboarding) {
@@ -755,11 +694,14 @@ export default function App() {
   };
 
   const handleResetLinks = async () => {
+    const prevProfile = profile;
     setProfile((prev) => ({
       ...prev,
       cards: DEFAULT_STARTER_PROFILE.cards,
     }));
     if (currentUser) {
+      setIsSyncing(true);
+      setSaveStatus('saving');
       try {
         const existing = await profileService.getLinks(currentUser.uid);
         for (const l of existing) {
@@ -780,8 +722,16 @@ export default function App() {
             display_order: i,
           });
         }
+        setSaveStatus('saved');
       } catch (err) {
-        console.warn('Reset links notice:', err);
+        console.error('Reset links error:', err);
+        setProfile(prevProfile);
+        setSaveStatus('error');
+        const retry = () => handleResetLinks();
+        setLastFailedAction(() => retry);
+        toast.error('Failed to reset links.', { label: 'Retry', onClick: retry });
+      } finally {
+        setIsSyncing(false);
       }
     }
   };
@@ -839,7 +789,7 @@ export default function App() {
   if (appMode === 'public') {
     return (
       <PublicProfilePage
-        username={profile.username}
+        username={routeTarget || profile.username}
         onBackToEditor={() => setAppMode('studio')}
       />
     );
@@ -918,15 +868,35 @@ export default function App() {
           </button>
 
           {/* Cloud Status Badge */}
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 text-[11px] text-[#737882] shrink-0">
-            <HugeiconsIcon icon={CloudIcon} size={14} className={currentUser ? 'text-black' : 'text-[#737882]'} />
-            <span className="truncate text-[#191A1E] font-medium">
-              {currentUser
-                ? isSyncing
-                  ? 'Saving...'
-                  : 'Saved'
-                : 'Local Draft'}
-            </span>
+          <div className="flex items-center shrink-0">
+            {!currentUser ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 text-[11px] text-[#737882]">
+                <HugeiconsIcon icon={CloudIcon} size={14} className="text-[#737882]" />
+                <span className="truncate text-[#191A1E] font-medium">Local Draft</span>
+              </div>
+            ) : saveStatus === 'saving' || isSyncing ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-[11px] text-[#5E4BF7]">
+                <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin text-[#5E4BF7]" />
+                <span className="truncate font-semibold">Saving...</span>
+              </div>
+            ) : saveStatus === 'error' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (lastFailedAction) lastFailedAction();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-[11px] text-red-700 hover:bg-red-100 transition-colors font-semibold cursor-pointer"
+                title="Save failed. Click to retry."
+              >
+                <HugeiconsIcon icon={AlertCircleIcon} size={14} className="text-red-600" />
+                <span className="truncate">Failed to save (Retry)</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="text-emerald-600" />
+                <span className="truncate font-medium">Saved</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1260,5 +1230,15 @@ export default function App() {
         onResetLinks={handleResetLinks}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <ConfirmProvider>
+        <StudioApp />
+      </ConfirmProvider>
+    </ToastProvider>
   );
 }

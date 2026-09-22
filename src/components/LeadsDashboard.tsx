@@ -3,7 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Mail01Icon,
   Download01Icon,
-  Tick01Icon,
   CheckmarkCircle01Icon,
   Delete01Icon,
   Calendar01Icon,
@@ -24,6 +23,8 @@ import { LeadRecord, LeadType, LeadStatus, UserProfile } from '../types';
 import { profileService } from '../lib/firebase';
 import { downloadLeadsCsv } from '../lib/csvExport';
 import { User } from 'firebase/auth';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from './ConfirmDialog';
 
 export interface LeadsDashboardProps {
   profile: UserProfile;
@@ -122,14 +123,14 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [tempNotes, setTempNotes] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const pageId = profile.id || currentUser?.uid || profile.username || '';
   const localKey = `linklyra_leads_${pageId}`;
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    toast.info(msg);
   };
 
   // Fetch leads from Firestore + local cache
@@ -236,7 +237,14 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   // Delete lead
   const handleDeleteLead = async (leadId: string) => {
     if (!pageId) return;
-    if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
+    const confirmed = await confirm({
+      title: 'Delete Lead',
+      description: 'Are you sure you want to delete this lead? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     try {
       await profileService.deleteLead(pageId, leadId);
       const updated = leads.filter((l) => l.id !== leadId);
@@ -247,17 +255,17 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         console.error('Error writing leads cache', e);
       }
       if (selectedLead?.id === leadId) setSelectedLead(null);
-      showToast('Lead deleted');
+      toast.success('Lead deleted');
     } catch (err) {
       console.error('Error deleting lead:', err);
-      showToast('Failed to delete lead');
+      toast.error('Failed to delete lead');
     }
   };
 
   // Export CSV
   const handleExportCSV = () => {
     if (leads.length === 0) {
-      alert('No inbound inquiries available to export yet.');
+      toast.warning('No inbound inquiries available to export yet.');
       return;
     }
 
@@ -265,13 +273,13 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
     downloadLeadsCsv(exportDataset, profile.username || 'creator', {
       statusFilter: statusFilter !== 'all' ? (statusFilter as LeadStatus) : undefined,
     });
-    showToast(`Exported ${exportDataset.length} leads to CSV`);
+    toast.success(`Exported ${exportDataset.length} leads to CSV`);
   };
 
   // Add realistic test inquiry
   const handleAddSampleInquiry = async () => {
     if (!pageId) {
-      alert('Cannot create sample lead: Missing page ID');
+      toast.error('Cannot create sample lead: Missing page ID');
       return;
     }
 
@@ -388,13 +396,6 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
   return (
     <div className="space-y-4 max-w-full text-left">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-[#1C1E22] text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold animate-fadeIn border border-white/10">
-          <HugeiconsIcon icon={Tick01Icon} size={15} className="text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header with Title & Direct Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-black/5">

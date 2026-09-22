@@ -30,7 +30,7 @@
     "rewrites": [
       {
         "source": "**",
-        "destination": "/index.html"
+        "function": "renderProfileMeta"
       }
     ]
   },

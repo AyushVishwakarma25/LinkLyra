@@ -1,7 +1,6 @@
 import {
   OnboardingPrimaryRole,
   OnboardingGoal,
-  OnboardingLeadSource,
   OnboardingPrimaryCTA,
   GeneratedCardConfig,
   CanvasTheme,
@@ -65,8 +64,8 @@ export interface CardRecommendationRule {
   metaGenerator?: (ctx: {
     fullName: string;
     whatsapp?: string;
-    roleData?: Record<string, any>;
-  }) => Record<string, any>;
+    roleData?: Record<string, unknown>;
+  }) => Record<string, unknown>;
 }
 
 export interface VerticalDefinition {
@@ -80,7 +79,7 @@ export interface VerticalDefinition {
   goals: GoalDefinition[];
   ctas: CTADefinition[];
   cardRules: CardRecommendationRule[];
-  defaultRoleData: Record<string, any>;
+  defaultRoleData: Record<string, unknown>;
 }
 
 export interface RecommendationInput {
@@ -90,7 +89,7 @@ export interface RecommendationInput {
   fullName?: string;
   whatsapp?: string;
   country?: string;
-  roleData?: Record<string, any>;
+  roleData?: Record<string, unknown>;
 }
 
 export interface RecommendationResult {

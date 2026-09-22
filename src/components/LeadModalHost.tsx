@@ -36,7 +36,7 @@ export const LeadModalHost: React.FC<LeadModalHostProps> = ({
     bio: '',
     avatarUrl: '',
     businessPhone: creatorPhone,
-    theme: 'modern_dark',
+    theme: 'dark',
     plan: 'free',
     cards: [],
   };

@@ -30,6 +30,8 @@ import { usePlan } from '../hooks/usePlan';
 import { PLANS_CONFIG } from '../lib/razorpay';
 import { User } from 'firebase/auth';
 import { Button, ButtonGroup } from './ui';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from './ConfirmDialog';
 
 export interface BillingDashboardProps {
   profile: UserProfile;
@@ -50,6 +52,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices'>('overview');
   const [cancelingSubscription, setCancelingSubscription] = useState(false);
   const [selectedInvoiceModal, setSelectedInvoiceModal] = useState<PaymentInvoiceRecord | null>(null);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const fetchBillingData = async () => {
     if (!currentUser?.uid) {
@@ -99,15 +103,23 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
 
   const handleCancelPlan = async () => {
     if (!currentUser?.uid) return;
-    if (!window.confirm('Are you sure you want to cancel your subscription at the end of the current billing cycle?')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Cancel Subscription',
+      description: 'Are you sure you want to cancel your subscription at the end of the current billing cycle?',
+      confirmText: 'Yes, Cancel Plan',
+      cancelText: 'Keep Plan',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
+
     setCancelingSubscription(true);
     try {
       await profileService.cancelSubscription(currentUser.uid);
       setSubscription((prev) => (prev ? { ...prev, cancelAtPeriodEnd: true } : null));
-    } catch (err) {
+      toast.success('Subscription will be canceled at the end of the current billing cycle.');
+    } catch (err: any) {
       console.error('Failed to cancel subscription:', err);
+      toast.error(err?.message || 'Failed to cancel subscription.');
     } finally {
       setCancelingSubscription(false);
     }

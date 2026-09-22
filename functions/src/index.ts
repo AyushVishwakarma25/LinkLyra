@@ -1063,4 +1063,207 @@ export const aggregateAnalyticsEvent = onDocumentCreated(
   }
 );
 
+// -------------------------------------------------------------
+// 10. Callable: setWhiteLabel
+// -------------------------------------------------------------
+export const setWhiteLabel = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be logged in to configure white-label branding.');
+  }
+
+  const uid = request.auth.uid;
+  const enabled = Boolean(request.data?.enabled);
+
+  // Verify user's actual subscription plan in Firestore
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.data();
+  const plan = userData?.plan || 'free';
+
+  if (enabled && plan !== 'pro' && plan !== 'business' && plan !== 'agency') {
+    throw new HttpsError(
+      'permission-denied',
+      'White-label branding requires an active Pro or Business subscription.'
+    );
+  }
+
+  // Update pages/{uid} with server authority
+  const pageRef = db.doc(`pages/${uid}`);
+  await pageRef.set(
+    {
+      whiteLabel: enabled,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  // Also sync to profiles/{uid} if present
+  const profileRef = db.doc(`profiles/${uid}`);
+  const profileSnap = await profileRef.get();
+  if (profileSnap.exists) {
+    await profileRef.set({ whiteLabel: enabled }, { merge: true });
+  }
+
+  return { success: true, whiteLabel: enabled };
+});
+
+// -------------------------------------------------------------
+// 11. HTTP Function: renderProfileMeta (SEO & Social Crawlers)
+// -------------------------------------------------------------
+export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => {
+  const urlPath = req.path.replace(/^\/+/, '').replace(/\/+$/, '');
+
+  // Guard against static assets if accidentally routed
+  if (/\.(js|css|png|jpg|jpeg|svg|ico|json|woff2?|map|webp)$/i.test(urlPath)) {
+    res.status(404).send('Not found');
+    return;
+  }
+
+  const hostname = (req.hostname || '').toLowerCase();
+  const isPlatform =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.run.app') ||
+    hostname.endsWith('.web.app') ||
+    hostname.endsWith('.firebaseapp.com') ||
+    hostname.endsWith('.ai.studio');
+
+  let usernameOrDomain = '';
+  if (!isPlatform && hostname) {
+    usernameOrDomain = hostname;
+  } else {
+    // Check query params ?user= or ?u= or path segment
+    const qUser = (req.query.user || req.query.u || req.query.domain || req.query.d) as string | undefined;
+    if (qUser && typeof qUser === 'string') {
+      usernameOrDomain = qUser.toLowerCase().trim();
+    } else {
+      const segments = urlPath.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        if (segments[0] === 'app' && segments[1]) {
+          usernameOrDomain = segments[1].toLowerCase().trim();
+        } else {
+          usernameOrDomain = segments[0].toLowerCase().trim();
+        }
+      }
+    }
+  }
+
+  const reserved = new Set([
+    'admin', 'api', 'app', 'login', 'signup', 'studio', 'dashboard',
+    'pricing', 'terms', 'privacy', 'settings', 'billing', 'explore',
+    'landing', 'help', 'support', 'assets', 'static', 'index.html', 'creator'
+  ]);
+
+  let title = 'LinkLyra - The Link-in-Bio for Modern Creators';
+  let description = 'Create a high-converting, dynamic bio page with direct lead capture, multi-platform media routing, and real-time analytics.';
+  let image = 'https://linklyra.web.app/og-preview.png';
+  let canonicalUrl = `https://linklyra.web.app/${usernameOrDomain}`;
+
+  if (usernameOrDomain && !reserved.has(usernameOrDomain)) {
+    try {
+      let pageData: any = null;
+
+      // Check if domain
+      if (usernameOrDomain.includes('.')) {
+        const domainSnap = await db.doc(`domains/${usernameOrDomain}`).get();
+        if (domainSnap.exists) {
+          const uid = domainSnap.data()?.userId || domainSnap.data()?.pageId;
+          if (uid) {
+            const pageSnap = await db.doc(`pages/${uid}`).get();
+            if (pageSnap.exists) pageData = pageSnap.data();
+          }
+        }
+      }
+
+      // Check username lookup
+      if (!pageData) {
+        const usernameSnap = await db.doc(`usernames/${usernameOrDomain}`).get();
+        if (usernameSnap.exists) {
+          const uid = usernameSnap.data()?.userId || usernameSnap.data()?.pageId;
+          if (uid) {
+            const pageSnap = await db.doc(`pages/${uid}`).get();
+            if (pageSnap.exists) pageData = pageSnap.data();
+          }
+        }
+      }
+
+      // Query pages collection fallback
+      if (!pageData) {
+        const pageQuery = await db.collection('pages').where('username', '==', usernameOrDomain).limit(1).get();
+        if (!pageQuery.empty) {
+          pageData = pageQuery.docs[0].data();
+        }
+      }
+
+      if (pageData) {
+        const name = pageData.title || pageData.name || usernameOrDomain;
+        title = `${name} (@${usernameOrDomain}) | LinkLyra`;
+        description = pageData.bio || `Check out @${usernameOrDomain}'s official links, projects, and updates on LinkLyra.`;
+        if (pageData.avatarUrl) {
+          image = pageData.avatarUrl;
+        }
+        canonicalUrl = `https://linklyra.web.app/${usernameOrDomain}`;
+      } else {
+        title = `Profile Not Found (@${usernameOrDomain}) | LinkLyra`;
+        description = `The page @${usernameOrDomain} does not exist yet. Claim your custom username on LinkLyra.`;
+      }
+    } catch (e) {
+      console.error('[renderProfileMeta] Error fetching page:', e);
+    }
+  }
+
+  // Escape HTML entities in metadata strings
+  const escapeHtml = (str: string) =>
+    str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+  const safeTitle = escapeHtml(title);
+  const safeDesc = escapeHtml(description);
+  const safeImage = escapeHtml(image);
+  const safeCanonical = escapeHtml(canonicalUrl);
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${safeTitle}</title>
+    <meta name="description" content="${safeDesc}" />
+    <link rel="canonical" href="${safeCanonical}" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="profile" />
+    <meta property="og:site_name" content="LinkLyra" />
+    <meta property="og:url" content="${safeCanonical}" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDesc}" />
+    <meta property="og:image" content="${safeImage}" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${safeCanonical}" />
+    <meta name="twitter:title" content="${safeTitle}" />
+    <meta name="twitter:description" content="${safeDesc}" />
+    <meta name="twitter:image" content="${safeImage}" />
+
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`;
+
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+  res.status(200).send(html);
+});
+
 

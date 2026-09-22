@@ -13,7 +13,6 @@ import {
 } from '../types';
 import {
   generateOnboardingRecommendations,
-  RecommendationInput,
   RecommendationResult,
 } from './onboardingConfig';
 import {
@@ -303,11 +302,12 @@ export async function completeUserOnboarding(
       createdCardsCount,
       message: 'Onboarding completed successfully and persisted idempotently.',
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[OnboardingService] Failed to persist onboarding profile to Firestore:', err);
     // Explicitly handle failure: do NOT mask or falsely report success
     handleFirestoreError(err, OperationType.UPDATE, `users/${userId}/onboarding`);
-    throw new Error(err?.message || 'Failed to save onboarding configuration. Please check your connection.');
+    const message = err instanceof Error ? err.message : 'Failed to save onboarding configuration. Please check your connection.';
+    throw new Error(message);
   }
 }
 

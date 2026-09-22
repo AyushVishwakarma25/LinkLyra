@@ -2,19 +2,17 @@ import React, { useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Cancel01Icon,
-  Home01Icon,
   Location01Icon,
   CheckmarkCircle01Icon,
   BubbleChatIcon,
   CallIcon,
   Mail01Icon,
   UserIcon,
-  DollarSquareIcon,
   CalculatorIcon,
   Loading03Icon,
-  Building01Icon,
 } from '@hugeicons/core-free-icons';
 import { profileService } from '../lib/firebase';
+import { safeOpenUrl } from '../lib/url';
 
 export interface HomeValuationModalProps {
   isOpen: boolean;
@@ -111,7 +109,7 @@ export const HomeValuationModal: React.FC<HomeValuationModalProps> = ({
     const url = cleanNumber 
       ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(url);
   };
 
   const handleResetAndClose = () => {

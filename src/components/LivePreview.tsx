@@ -13,6 +13,7 @@ import { UI_KIT } from '../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../lib/whatsapp';
 import { useLeadModals } from '../hooks/useLeadModals';
 import { LeadModalHost } from './LeadModalHost';
+import { safeOpenUrl } from '../lib/url';
 
 export interface LivePreviewProps {
   profile: UserProfile;
@@ -82,17 +83,13 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         return;
       }
       if (intent.url) {
-        window.open(intent.url, '_blank', 'noopener,noreferrer');
+        safeOpenUrl(intent.url);
         return;
       }
     }
 
     if (card.linkUrl && card.linkUrl !== '#' && card.linkUrl !== 'https://') {
-      const finalUrl =
-        card.linkUrl.startsWith('http://') || card.linkUrl.startsWith('https://')
-          ? card.linkUrl
-          : `https://${card.linkUrl}`;
-      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+      safeOpenUrl(card.linkUrl);
     }
   };
 

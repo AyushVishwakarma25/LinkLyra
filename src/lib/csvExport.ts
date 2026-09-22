@@ -1,4 +1,4 @@
-import { LeadRecord, LeadStatus, LeadType } from '../types';
+import { LeadRecord } from '../types';
 
 export interface CsvExportOptions {
   statusFilter?: string;
@@ -15,7 +15,7 @@ export interface CsvExportOptions {
  * 3. Applies strict RFC-4180 escaping: if the value contains quotes, commas,
  *    or newlines, wraps the cell in quotes and doubles any internal quotes.
  */
-export function escapeCsvCell(val: any): string {
+export function escapeCsvCell(val: unknown): string {
   if (val === null || val === undefined) {
     return '';
   }

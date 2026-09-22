@@ -93,12 +93,9 @@ export function generateWhatsAppIntentUrl(
   const cardTitle = card.title || 'this item';
   const metadataSummary = formatIndustryMetadataSummary(card);
 
-  let messageText = '';
-  if (metadataSummary) {
-    messageText = `Hi, I am interested in ${cardTitle} (${metadataSummary}). Please share more details.`;
-  } else {
-    messageText = `Hi, I am interested in ${cardTitle}. Please share more details.`;
-  }
+  const messageText = metadataSummary
+    ? `Hi, I am interested in ${cardTitle} (${metadataSummary}). Please share more details.`
+    : `Hi, I am interested in ${cardTitle}. Please share more details.`;
 
   const encodedText = encodeURIComponent(messageText);
   const url = sanitizedPhone ? `https://wa.me/${sanitizedPhone}?text=${encodedText}` : null;

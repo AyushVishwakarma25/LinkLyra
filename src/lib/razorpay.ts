@@ -4,7 +4,7 @@ import { httpsCallable } from 'firebase/functions';
 
 declare global {
   interface Window {
-    Razorpay?: any;
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
   }
 }
 
@@ -119,7 +119,7 @@ export function loadRazorpayScript(): Promise<boolean> {
 // -------------------------------------------------------------
 
 export function getRazorpayKeyId(): string {
-  const envKey = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID;
+  const envKey = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_RAZORPAY_KEY_ID;
   if (envKey && envKey.trim() !== '' && !envKey.includes('placeholder')) {
     return envKey.trim();
   }
@@ -146,7 +146,7 @@ export interface RazorpayCheckoutOptions {
     billingCycle: BillingCycle;
     invoiceNumber?: string;
   }) => void;
-  onError?: (error: any) => void;
+  onError?: (error: Error) => void;
   onDismiss?: () => void;
 }
 
@@ -202,9 +202,10 @@ export async function initiateRazorpaySubscriptionCheckout({
 
     const orderRes = await createOrderFn({ plan, billingCycle });
     orderData = orderRes.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Server order creation failed:', err);
-    onError?.(new Error(err.message || 'Failed to create payment order on server.'));
+    const message = err instanceof Error ? err.message : 'Failed to create payment order on server.';
+    onError?.(new Error(message));
     return;
   }
 
@@ -262,9 +263,10 @@ export async function initiateRazorpaySubscriptionCheckout({
             billingCycle,
             invoiceNumber: verifyRes.data.invoiceNumber,
           });
-        } catch (verifyErr: any) {
+        } catch (verifyErr: unknown) {
           console.error('Payment verification failed on server:', verifyErr);
-          onError?.(new Error(verifyErr.message || 'Payment verification failed on server.'));
+          const message = verifyErr instanceof Error ? verifyErr.message : 'Payment verification failed on server.';
+          onError?.(new Error(message));
         }
       },
       modal: {
@@ -274,10 +276,14 @@ export async function initiateRazorpaySubscriptionCheckout({
       },
     };
 
+    if (!window.Razorpay) {
+      throw new Error('Razorpay SDK not loaded');
+    }
     const rzp = new window.Razorpay(options);
     rzp.open();
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to open Razorpay modal:', err);
-    onError?.(new Error(err.message || 'Failed to open Razorpay modal.'));
+    const message = err instanceof Error ? err.message : 'Failed to open Razorpay modal.';
+    onError?.(new Error(message));
   }
 }

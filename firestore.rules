@@ -141,6 +141,19 @@ service cloud.firestore {
     }
 
     // =========================================================================
+    // ROOT LINKS COLLECTION (mirror of pages/{pageId}/links/{linkId})
+    // addLink() writes to both subcollection AND root — this rule is required
+    // =========================================================================
+
+    match /links/{linkId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.profile_id == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.profile_id == request.auth.uid;
+    }
+
+    // =========================================================================
     // PAGES SUBCOLLECTIONS: LINKS, SOCIAL LINKS, SECTIONS
     // =========================================================================
 

@@ -5,7 +5,6 @@ import {
   SentIcon,
   CheckmarkCircle01Icon,
   BubbleChatIcon,
-  DollarSquareIcon,
   Mail01Icon,
   UserIcon,
   Mic01Icon,
@@ -16,6 +15,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { ProfileCardData } from '../types';
 import { profileService } from '../lib/firebase';
+import { safeOpenUrl, normalizeExternalUrl } from '../lib/url';
 
 export interface PodcastSponsorshipModalProps {
   isOpen: boolean;
@@ -126,7 +126,7 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
     const url = cleanNumber
       ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    safeOpenUrl(url);
   };
 
   const handleResetAndClose = () => {
@@ -184,7 +184,7 @@ export const PodcastSponsorshipModal: React.FC<PodcastSponsorshipModalProps> = (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
               {mediaKitUrl && (
                 <a
-                  href={mediaKitUrl}
+                  href={normalizeExternalUrl(mediaKitUrl) || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5"

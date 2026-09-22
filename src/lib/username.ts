@@ -57,6 +57,8 @@ export const RESERVED_USERNAMES = new Set<string>([
   'false',
 ]);
 
+export const RESERVED = RESERVED_USERNAMES;
+
 /**
  * Normalizes a raw string into a clean, safe username:
  * 1. Transliterates non-Latin characters (Cyrillic, Hindi, Chinese, etc.) to Latin.
@@ -164,7 +166,7 @@ export async function checkUsernameAvailability(
       return { available: false, reason: `Username @${clean} is already taken.` };
     }
     return { available: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn(`Username availability check error for @${clean}:`, err);
     return { available: false, reason: 'Unable to verify username availability. Please try again.' };
   }

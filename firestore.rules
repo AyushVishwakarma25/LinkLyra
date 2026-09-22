@@ -184,7 +184,11 @@ service cloud.firestore {
 
     match /pages/{pageId}/leads/{leadId} {
       // Public create with strict validation
-      allow create: if exists(/databases/$(database)/documents/pages/$(pageId))
+      allow create: if (
+          exists(/databases/$(database)/documents/pages/$(pageId)) ||
+          exists(/databases/$(database)/documents/profiles/$(pageId)) ||
+          exists(/databases/$(database)/documents/users/$(pageId))
+        )
         && request.resource.data.type in [
           'showing_request', 'brand_inquiry', 'home_valuation', 'general_contact',
           'media_kit_download', 'package_booking', 'music_booking', 'podcast_sponsorship',
@@ -195,7 +199,7 @@ service cloud.firestore {
           'id', 'pageId', 'type', 'name', 'email', 'phone', 'companyOrBrand',
           'campaignType', 'budgetOrPrice', 'timelineOrDate', 'details', 'propertyTitle',
           'buyerStatus', 'propertyAddress', 'propertyCondition', 'selectedPackageName',
-          'status', 'createdAt', 'serverTimestamp', 'notes'
+          'sourceCardId', 'status', 'createdAt', 'updatedAt', 'timestamp', 'serverTimestamp', 'notes'
         ])
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
         && request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 150
@@ -203,7 +207,15 @@ service cloud.firestore {
         && (!('details' in request.resource.data) || (request.resource.data.details is string && request.resource.data.details.size() <= 2000))
         && (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 2000))
         && (!('propertyAddress' in request.resource.data) || (request.resource.data.propertyAddress is string && request.resource.data.propertyAddress.size() <= 300))
-        && (!('companyOrBrand' in request.resource.data) || (request.resource.data.companyOrBrand is string && request.resource.data.companyOrBrand.size() <= 150));
+        && (!('companyOrBrand' in request.resource.data) || (request.resource.data.companyOrBrand is string && request.resource.data.companyOrBrand.size() <= 150))
+        && (!('propertyTitle' in request.resource.data) || (request.resource.data.propertyTitle is string && request.resource.data.propertyTitle.size() <= 300))
+        && (!('buyerStatus' in request.resource.data) || (request.resource.data.buyerStatus is string && request.resource.data.buyerStatus.size() <= 100))
+        && (!('propertyCondition' in request.resource.data) || (request.resource.data.propertyCondition is string && request.resource.data.propertyCondition.size() <= 200))
+        && (!('selectedPackageName' in request.resource.data) || (request.resource.data.selectedPackageName is string && request.resource.data.selectedPackageName.size() <= 200))
+        && (!('budgetOrPrice' in request.resource.data) || (request.resource.data.budgetOrPrice is string && request.resource.data.budgetOrPrice.size() <= 100))
+        && (!('timelineOrDate' in request.resource.data) || (request.resource.data.timelineOrDate is string && request.resource.data.timelineOrDate.size() <= 100))
+        && (!('campaignType' in request.resource.data) || (request.resource.data.campaignType is string && request.resource.data.campaignType.size() <= 150))
+        && (!('sourceCardId' in request.resource.data) || (request.resource.data.sourceCardId is string && request.resource.data.sourceCardId.size() <= 100));
 
       // Owner read/update/delete
       allow read, update, delete: if isPageOwner(pageId);

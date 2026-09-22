@@ -351,6 +351,29 @@ describe('LinkLyra Firestore Security Rules', () => {
           status: 'new',
         })
       );
+
+      // Valid full production lead with timestamps, card ID and optional details succeeds
+      await assertSucceeds(
+        setDoc(doc(db, 'pages', 'target_page', 'leads', 'lead_full'), {
+          id: 'lead_full',
+          pageId: 'target_page',
+          type: 'brand_inquiry',
+          name: 'Acme Partner',
+          email: 'partner@acme.com',
+          phone: '+1 555-0199',
+          status: 'new',
+          companyOrBrand: 'Acme Corp',
+          campaignType: 'Sponsored Reel',
+          budgetOrPrice: '$2,500',
+          timelineOrDate: 'Next Month',
+          propertyTitle: 'Lead Title',
+          details: 'Looking for collaboration details.',
+          sourceCardId: 'card_123',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          timestamp: serverTimestamp(),
+        })
+      );
     });
   });
 

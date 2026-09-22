@@ -790,7 +790,6 @@ function StudioApp() {
     return (
       <PublicProfilePage
         username={routeTarget || profile.username}
-        onBackToEditor={() => setAppMode('studio')}
       />
     );
   }
@@ -905,6 +904,11 @@ function StudioApp() {
           <SegmentedControl
             value={appMode}
             onChange={(val) => {
+              if (val === 'public') {
+                const url = profile.username ? `/?user=${encodeURIComponent(profile.username)}` : '/';
+                window.open(url, '_blank');
+                return;
+              }
               if ((val === 'studio' || val === 'preview_only') && !currentUser) {
                 setIsAuthModalOpen(true);
                 return;
@@ -998,7 +1002,10 @@ function StudioApp() {
             onDeleteCard={handleDeleteCard}
             onMoveCard={handleMoveCard}
             onToggleCardActive={handleToggleCardActive}
-            onOpenPublicView={() => setAppMode('public')}
+            onOpenPublicView={() => {
+              const url = profile.username ? `/?user=${encodeURIComponent(profile.username)}` : '/';
+              window.open(url, '_blank');
+            }}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             currentUser={currentUser}
             activeSidebarTab={activeSidebarTab}

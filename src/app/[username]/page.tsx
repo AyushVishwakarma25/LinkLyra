@@ -6,7 +6,6 @@ import {
   Share01Icon,
   Tick01Icon,
   AlertCircleIcon,
-  ArrowLeft01Icon,
   Cancel01Icon,
   Home01Icon,
 } from '@hugeicons/core-free-icons';
@@ -208,27 +207,6 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#ECE7DC] flex flex-col antialiased text-[#1C1E22] overflow-x-hidden">
-      {/* Top Floating Banner */}
-      {onBackToEditor && (
-        <div className="w-full bg-[#1C1E22] text-white px-3 sm:px-4 py-2 flex items-center justify-between text-xs shadow-md z-30 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/80 shrink-0" />
-            <span className="font-semibold truncate">Visitor View</span>
-            <span className="text-white/60 font-mono hidden sm:inline truncate">
-              /{username}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onBackToEditor}
-            className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
-          >
-            <HugeIcon icon={ArrowLeft01Icon} size={14} className="w-3.5 h-3.5" />
-            <span>Editor</span>
-          </button>
-        </div>
-      )}
-
       {/* Main Visitor Canvas */}
       <main className="flex-1 flex flex-col items-center justify-start p-3 sm:p-6 md:p-10">
         {loading ? (

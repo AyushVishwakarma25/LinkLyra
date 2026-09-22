@@ -186,12 +186,21 @@ function StudioApp() {
 
           if (dbProf) {
             const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
+            const resolvedAvatar =
+              dbProf.avatar_url && !dbProf.avatar_url.includes('unsplash.com')
+                ? dbProf.avatar_url
+                : user.photoURL || dbProf.avatar_url || '';
+
+            // If user has a photo from Google Auth / user.photoURL that isn't yet persisted in Firestore pages doc, auto-sync it
+            if (user.photoURL && (!dbProf.avatar_url || dbProf.avatar_url.includes('unsplash.com'))) {
+              profileService.updateProfile(user.uid, { avatar_url: user.photoURL }).catch(() => {});
+            }
             
             setProfile({
               id: dbProf.id,
               name: dbProf.full_name || 'My Page',
               headline: dbProf.bio || '',
-              avatarUrl: dbProf.avatar_url || '',
+              avatarUrl: resolvedAvatar,
               username: dbProf.username || `creator_${user.uid.slice(0, 5)}`,
               businessPhone: dbProf.business_phone,
               theme: dbProf.theme || 'warm',
@@ -657,11 +666,20 @@ function StudioApp() {
 
       if (dbProf) {
         const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
+        const resolvedAvatar =
+          dbProf.avatar_url && !dbProf.avatar_url.includes('unsplash.com')
+            ? dbProf.avatar_url
+            : user.photoURL || dbProf.avatar_url || '';
+
+        if (user.photoURL && (!dbProf.avatar_url || dbProf.avatar_url.includes('unsplash.com'))) {
+          profileService.updateProfile(user.uid, { avatar_url: user.photoURL }).catch(() => {});
+        }
+
         setProfile({
           id: dbProf.id,
           name: dbProf.full_name || 'My Page',
           headline: dbProf.bio || '',
-          avatarUrl: dbProf.avatar_url || '',
+          avatarUrl: resolvedAvatar,
           username: dbProf.username || `creator_${user.uid.slice(0, 5)}`,
           businessPhone: dbProf.business_phone,
           theme: dbProf.theme || 'warm',

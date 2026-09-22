@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { HugeIcon } from '../../components/HugeIcon';
 import {
-  Search01Icon,
-  PreferenceHorizontalIcon,
   Share01Icon,
-  Tick01Icon,
   AlertCircleIcon,
   Cancel01Icon,
-  Home01Icon,
 } from '@hugeicons/core-free-icons';
 import { profileService, DbProfile, DbLink, DbSection } from '../../lib/firebase';
 import { ProfileCard } from '../../components/ProfileCard';
@@ -53,14 +49,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
     canonical: typeof window !== 'undefined' ? window.location.href : undefined,
   });
 
-  // Search & Filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(false);
-  const [colorFilter, setColorFilter] = useState<string>('all');
   const [copied, setCopied] = useState(false);
-
-  const availableColors = ['all', 'purple', 'orange', 'yellow', 'green', 'dark'];
 
   // Fetch creator data by username or domain from Cloud Firestore
   useEffect(() => {
@@ -181,19 +170,8 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
     }
   };
 
-  // Filter links by active status, search query, and color
+  // Filter links by active status
   const activeLinks = links.filter((l) => l.is_active !== false);
-
-  const filteredLinks = activeLinks.filter((link) => {
-    const q = (searchQuery || '').trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      (link.title || '').toLowerCase().includes(q) ||
-      (link.subtitle || '').toLowerCase().includes(q) ||
-      (link.badge_text || '').toLowerCase().includes(q);
-    const matchesColor = colorFilter === 'all' || link.color === colorFilter;
-    return matchesSearch && matchesColor;
-  });
 
   const themeKey = profile?.theme || 'warm';
   const themeConfig = UI_KIT.canvasThemes[themeKey] || UI_KIT.canvasThemes.warm;
@@ -280,125 +258,21 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
             )}
 
             <div className="space-y-4 max-w-full relative z-10">
-              {/* Top Navigation Breadcrumb Bar */}
-              <div className="flex items-center justify-between gap-2 pb-1 border-b border-black/5">
-                <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[#737882] min-w-0 font-medium">
-                  <a
-                    href="/"
-                    className="hover:text-[#1C1E22] transition-colors truncate flex items-center gap-1"
-                  >
-                    <HugeIcon icon={Home01Icon} size={13} className="w-3.5 h-3.5 shrink-0" />
-                    <span>Home</span>
-                  </a>
-                  <span className={`text-[10px] shrink-0 ${isDarkTheme ? 'text-white/30' : 'text-black/20'}`}>
-                    /
-                  </span>
-                  <span className="font-bold text-[#5E4BF7] truncate">
-                    @{profile.username || 'creator'}
-                  </span>
-                </nav>
-
-                {/* Breadcrumb Menu: 3 lines button opening Search, Filter, Share dropdown */}
-                <div className="shrink-0 relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickActions(!showQuickActions)}
-                    aria-label="Menu"
-                    title="Search, Filter, Share menu"
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-lg border shadow-2xs flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
-                      showQuickActions
-                        ? 'bg-[#1C1E22] text-white border-black'
-                        : 'bg-white/95 text-[#1C1E22] border-black/10 hover:bg-black/5'
-                    }`}
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="4" y1="6.5" x2="20" y2="6.5" />
-                      <line x1="4" y1="12" x2="20" y2="12" />
-                      <line x1="4" y1="17.5" x2="20" y2="17.5" />
-                    </svg>
-                  </button>
-
-                  {/* Floating Dropdown Menu with names: Search, Filter, Share */}
-                  {showQuickActions && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setShowQuickActions(false)}
-                      />
-                      <div className="absolute right-0 top-9 w-48 bg-white/98 backdrop-blur-md rounded-2xl shadow-xl border border-black/10 py-1.5 z-40 animate-fadeIn text-xs text-[#1C1E22]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowSearch((prev) => !prev);
-                            setShowQuickActions(false);
-                          }}
-                          className="w-full px-3.5 py-2.5 text-left font-semibold hover:bg-black/5 flex items-center justify-between transition-colors cursor-pointer"
-                        >
-                          <span className={showSearch ? 'text-[#5E4BF7]' : 'text-[#1C1E22]'}>
-                            Search
-                          </span>
-                          {showSearch && (
-                            <span className="text-[10px] text-[#5E4BF7] font-bold px-1.5 py-0.5 rounded bg-[#5E4BF7]/10">
-                              Active
-                            </span>
-                          )}
-                        </button>
-
-                        <div className="h-px bg-black/5 my-1" />
-
-                        <div className="px-3.5 py-2">
-                          <div className="flex items-center justify-between mb-1.5 font-semibold text-[#1C1E22]">
-                            <span>Filter</span>
-                            <span className="text-[10px] text-[#5E4BF7] font-bold capitalize">
-                              {colorFilter === 'all' ? 'All' : colorFilter}
-                            </span>
-                          </div>
-                          <select
-                            value={colorFilter}
-                            onChange={(e) => {
-                              setColorFilter(e.target.value);
-                              setShowQuickActions(false);
-                            }}
-                            className="w-full bg-[#FAF8F5] border border-black/10 rounded-lg px-2 py-1.5 text-xs text-[#1C1E22] font-medium outline-hidden focus:border-[#5E4BF7] cursor-pointer"
-                          >
-                            <option value="all">All Colors</option>
-                            <option value="purple">Purple</option>
-                            <option value="orange">Orange</option>
-                            <option value="yellow">Yellow</option>
-                            <option value="green">Green</option>
-                            <option value="dark">Dark</option>
-                          </select>
-                        </div>
-
-                        <div className="h-px bg-black/5 my-1" />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleShare();
-                            setShowQuickActions(false);
-                          }}
-                          className="w-full px-3.5 py-2.5 text-left font-semibold hover:bg-black/5 flex items-center justify-between transition-colors cursor-pointer"
-                        >
-                          <span>Share</span>
-                          {copied && (
-                            <span className="text-[10px] text-emerald-600 font-bold">
-                              Copied!
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+              {/* Top Bar: Share Icon Only (matches LivePreview) */}
+              <div className="flex items-center justify-end py-1 px-0.5 pb-2">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  aria-label="Share"
+                  title="Share profile link"
+                  className={`p-2 rounded-full border shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center justify-center ${
+                    isDarkTheme || (isCustomImageWallpaper && tintPercent >= 30)
+                      ? 'bg-black/40 text-white border-white/20 hover:bg-black/60'
+                      : 'bg-white/90 text-[#1C1E22] border-black/10 hover:bg-white'
+                  }`}
+                >
+                  <HugeIcon icon={Share01Icon} size={15} className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Creator Profile Header (Full Width, Host of The Founders title fully visible!) */}
@@ -444,51 +318,32 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                 </div>
               )}
 
-              {/* Search Bar if toggled */}
-              {showSearch && (
-                <div className="relative animate-fadeIn">
-                  <input
-                    type="text"
-                    placeholder="Search links, keywords, topics..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    autoFocus
-                    className="w-full bg-white pl-3.5 pr-8 py-2 rounded-2xl border border-black/10 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#5E4BF7] shadow-xs"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737882] hover:text-[#1C1E22] cursor-pointer"
+              {/* Optional Profile Badges & Stickers */}
+              {profile.stickers && profile.stickers.length > 0 && (
+                <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5">
+                  {profile.stickers.map((sticker, idx) => (
+                    <span
+                      key={idx}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-2xs border ${
+                        isDarkTheme
+                          ? 'bg-white/10 text-white border-white/15'
+                          : 'bg-white/90 text-[#1C1E22] border-black/10'
+                      } animate-fadeIn`}
                     >
-                      <HugeIcon icon={Cancel01Icon} size={14} className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      {sticker}
+                    </span>
+                  ))}
                 </div>
               )}
 
               {/* Links Stack */}
               <div className="space-y-3 pt-1 max-w-full">
-                {filteredLinks.length === 0 ? (
+                {activeLinks.length === 0 ? (
                   <div className="text-center py-10 bg-white/70 rounded-3xl border border-dashed border-black/15 p-5">
                     <p className="text-xs sm:text-sm font-bold text-[#1C1E22]">No links found</p>
                     <p className="text-[11px] sm:text-xs text-[#737882] mt-1 max-w-xs mx-auto">
-                      {searchQuery || colorFilter !== 'all'
-                        ? 'No links match the active filters.'
-                        : 'This profile has no public links published.'}
+                      This profile has no public links published.
                     </p>
-                    {(searchQuery || colorFilter !== 'all') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setColorFilter('all');
-                        }}
-                        className="mt-3 px-3.5 py-1 rounded-full bg-black/5 hover:bg-black/10 text-xs font-semibold text-[#1C1E22]"
-                      >
-                        Clear Filters
-                      </button>
-                    )}
                   </div>
                 ) : (
                   (() => {
@@ -531,14 +386,14 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                       );
                     };
 
-                    if (!hasSections || searchQuery || colorFilter !== 'all') {
-                      return filteredLinks.map(renderCardItem);
+                    if (!hasSections) {
+                      return activeLinks.map(renderCardItem);
                     }
 
-                    const unsectioned = filteredLinks.filter((l) => !l.section_id);
+                    const unsectioned = activeLinks.filter((l) => !l.section_id);
                     const sectionGroups = sections.map((sec) => ({
                       section: sec,
-                      links: filteredLinks.filter((l) => l.section_id === sec.id),
+                      links: activeLinks.filter((l) => l.section_id === sec.id),
                     }));
 
                     return (

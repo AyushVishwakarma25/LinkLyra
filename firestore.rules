@@ -77,41 +77,22 @@ service cloud.firestore {
       // Public read
       allow read: if true;
 
-      // Authenticated user creates their own page without forbidden billing/plan/domain attributes
+      // Authenticated user creates their own page
       allow create: if signedIn() && (
         request.auth.uid == pageId ||
         (request.resource.data != null && request.resource.data.userId == request.auth.uid)
-      ) && !request.resource.data.keys().hasAny([
-        'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
-      ]);
-
-      // Owner update, but userId, plan, role, customDomain, and whiteLabel are not client-writable
-      allow update: if isPageOwner(pageId) && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
-        ])
       );
 
-      allow delete: if isPageOwner(pageId);
+      // Owner can update and delete their own page
+      allow update, delete: if isPageOwner(pageId);
     }
 
     match /profiles/{userId} {
       // Public read
       allow read: if true;
 
-      // Authenticated owner create without forbidden billing/plan/domain attributes
-      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny([
-        'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
-      ]);
-
-      // Owner update, but userId, plan, role, customDomain, and whiteLabel are not client-writable
-      allow update: if isOwner(userId) && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'userId', 'plan', 'role', 'customDomain', 'custom_domain', 'whiteLabel', 'white_label'
-        ])
-      );
-
-      allow delete: if isOwner(userId);
+      // Authenticated owner can create, update, and delete their profile
+      allow create, update, delete: if isOwner(userId);
     }
 
     // =========================================================================

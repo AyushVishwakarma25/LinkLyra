@@ -36,13 +36,11 @@ export const pagesService = {
       const pageSnap = await getDoc(pageRef);
 
       let userData: Partial<FirestoreUser> | null = null;
-      if (auth.currentUser?.uid === userId) {
-        try {
-          const userSnap = await getDoc(doc(db, 'users', userId));
-          if (userSnap.exists()) userData = userSnap.data() as FirestoreUser;
-        } catch {
-          // ignore if user doc cannot be read in background
-        }
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        if (userSnap.exists()) userData = userSnap.data() as FirestoreUser;
+      } catch {
+        // ignore if user doc cannot be read in background
       }
 
       if (pageSnap.exists()) {
@@ -93,7 +91,18 @@ export const pagesService = {
       if (!qPageSnap.empty) {
         const pageDoc = qPageSnap.docs[0];
         const pageId = pageDoc.id;
-        const profile = pageToProfile({ ...pageDoc.data(), id: pageId });
+        const pageData = pageDoc.data();
+        let userDocData: any = null;
+        const targetUserId = pageData.userId || pageId;
+        if (targetUserId) {
+          try {
+            const uSnap = await getDoc(doc(db, 'users', targetUserId));
+            if (uSnap.exists()) userDocData = uSnap.data();
+          } catch {
+            // ignore
+          }
+        }
+        const profile = pageToProfile({ ...pageData, id: pageId }, userDocData || undefined);
         const links = await linksService.getLinks(pageId);
         return { profile, links };
       }
@@ -161,7 +170,11 @@ export const pagesService = {
     // Map public fields to canonical camelCase
     if (updates.full_name !== undefined) pageUpdates.title = updates.full_name;
     if (updates.bio !== undefined) pageUpdates.bio = updates.bio;
-    if (updates.avatar_url !== undefined) pageUpdates.avatarUrl = updates.avatar_url;
+    if (updates.avatar_url !== undefined) {
+      pageUpdates.avatarUrl = updates.avatar_url;
+      pageUpdates.avatar_url = updates.avatar_url;
+      pageUpdates.photoURL = updates.avatar_url;
+    }
     if (updates.username !== undefined) pageUpdates.username = updates.username;
     if (updates.business_phone !== undefined) pageUpdates.businessPhone = updates.business_phone;
     if (updates.theme !== undefined) pageUpdates.themeId = updates.theme;
@@ -180,17 +193,16 @@ export const pagesService = {
     if (updates.socials !== undefined) pageUpdates.socials = updates.socials;
     if (updates.custom_domain !== undefined) pageUpdates.customDomain = updates.custom_domain;
     if (updates.whiteLabel !== undefined) pageUpdates.whiteLabel = updates.whiteLabel;
-    if (updates.role !== undefined) pageUpdates.role = updates.role;
-    if (updates.plan !== undefined) pageUpdates.plan = updates.plan;
 
     try {
       await setDoc(doc(db, 'pages', userId), sanitizeForFirestore(pageUpdates), { merge: true });
 
-      // If user account fields were included, sync them to users/{userId}
-      if (updates.plan !== undefined || updates.accountSettings !== undefined) {
-        const userUpdates: Record<string, unknown> = { updatedAt: serverTimestamp() };
-        if (updates.plan !== undefined) userUpdates.plan = updates.plan;
-        if (updates.accountSettings !== undefined) userUpdates.accountSettings = updates.accountSettings;
+      // If user account settings are included, sync them safely to users/{userId} without plan/role
+      if (updates.accountSettings !== undefined) {
+        const userUpdates: Record<string, unknown> = {
+          updatedAt: serverTimestamp(),
+          accountSettings: updates.accountSettings,
+        };
         await setDoc(doc(db, 'users', userId), sanitizeForFirestore(userUpdates), { merge: true });
       }
     } catch (err) {

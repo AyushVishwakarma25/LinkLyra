@@ -555,7 +555,6 @@ function StudioApp() {
         if (updated.socials !== undefined) updates.socials = updated.socials;
         if (updated.customDomain !== undefined) updates.custom_domain = updated.customDomain;
         if (updated.accountSettings !== undefined) updates.accountSettings = updated.accountSettings;
-        if (updated.plan !== undefined) updates.plan = updated.plan;
 
         await profileService.updateProfile(currentUser.uid, updates);
         setSaveStatus('saved');
@@ -601,7 +600,6 @@ function StudioApp() {
           socials: profile.socials,
           custom_domain: profile.customDomain,
           accountSettings: profile.accountSettings,
-          plan: profile.plan,
         };
         await profileService.updateProfile(currentUser.uid, updates);
       }

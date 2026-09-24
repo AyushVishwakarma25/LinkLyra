@@ -97,14 +97,14 @@ const LEAD_TYPE_LABELS: Record<LeadType, { label: string; icon: any; colorClass:
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; badgeClass: string }> = {
   new: { label: 'New', badgeClass: 'bg-[#1C1E22] text-white border-[#1C1E22]' },
-  contacted: { label: 'Contacted', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
-  won: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  lost: { label: 'Lost', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
-  qualified: { label: 'Qualified', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
+  contacted: { label: 'In Discussion', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
+  won: { label: 'Booked', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  lost: { label: 'Archived', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
+  qualified: { label: 'In Discussion', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
   in_progress: { label: 'In Discussion', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
-  closed: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  booked: { label: 'Won', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  archived: { label: 'Lost', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
+  closed: { label: 'Booked', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  booked: { label: 'Booked', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  archived: { label: 'Archived', badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
 };
 
 const PAGE_SIZE = 10;
@@ -286,7 +286,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
     let sampleLead: any = {
       name: 'Sahil Mehta',
       email: 'sahil.mehta@nexusagency.com',
-      phone: '+91 98201 44552',
+      phone: '+1 (555) 019-1123',
       companyOrBrand: 'Nexus Brand Studios',
       budgetOrPrice: '₹35,000 - ₹50,000',
       timelineOrDate: 'Next Month (Q3 Campaign)',
@@ -298,7 +298,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         type: 'music_booking',
         name: 'Aarav Singhania',
         email: 'aarav@solsticefest.in',
-        phone: '+91 98112 33441',
+        phone: '+1 (555) 019-9942',
         companyOrBrand: 'Solstice Music Festival',
         campaignType: 'Live Concert (60-90 min headliner)',
         budgetOrPrice: '₹75,000 - ₹1,20,000',
@@ -311,7 +311,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         type: 'podcast_sponsorship',
         name: 'Pooja Verma',
         email: 'pooja.v@growfintech.io',
-        phone: '+91 98765 43210',
+        phone: '+1 (555) 019-2834',
         companyOrBrand: 'GrowFintech India',
         campaignType: 'Mid-Roll 60s Host-Read Ad',
         budgetOrPrice: '₹25,000 / episode (3-episode bundle)',
@@ -323,7 +323,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         type: 'showing_request',
         name: 'Vikram & Ananya Malhotra',
         email: 'v.malhotra@corporate.com',
-        phone: '+91 98450 12345',
+        phone: '+1 (555) 019-4821',
         propertyTitle: 'The Lumina 4BHK Penthouse',
         buyerStatus: 'Pre-Approved Mortgage Buyer',
         timelineOrDate: 'This Sunday, 11:00 AM',
@@ -402,7 +402,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base sm:text-lg font-bold text-[#1C1E22] tracking-tight">
-              Inquiries & Leads CRM
+              Inquiries & Leads
             </h2>
             {newInquiriesCount > 0 && (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1C1E22] text-white tracking-wide uppercase">
@@ -411,7 +411,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             )}
           </div>
           <p className="text-xs text-[#737882] mt-0.5">
-            Incoming booking requests, brand sponsorship deals, showing appointments, and inquiries.
+            Incoming messages, collaboration requests, and client bookings.
           </p>
         </div>
 
@@ -420,10 +420,10 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             type="button"
             onClick={handleAddSampleInquiry}
             className="px-3 py-1.5 rounded-xl border border-black/10 bg-white text-[#1C1E22] hover:bg-[#FAF8F5] text-xs font-semibold shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-            title="Generate a sample test lead to preview the CRM"
+            title="Generate a sample test inquiry"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={13} className="shrink-0" />
-            <span>Test Lead</span>
+            <span>Sample Inquiry</span>
           </button>
 
           <button
@@ -439,80 +439,80 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         </div>
       </div>
 
-      {/* CRM Stats Metric Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
-          <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            Total Leads
+      {/* Stats Metric Cards - 2 Column Grid for perfect fit in all sidebar widths */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
+          <span className="text-[11px] font-semibold text-[#737882]">
+            Total Inquiries
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
             <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{totalInquiries}</span>
-            <span className="text-[10px] font-medium text-[#737882]">All Time</span>
+            <span className="text-[11px] font-medium text-[#737882]">All time</span>
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
-          <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            Unread / New
+        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
+          <span className="text-[11px] font-semibold text-[#737882]">
+            New
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
             <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{newInquiriesCount}</span>
-            <span className="text-[10px] font-medium text-[#737882]">Needs Response</span>
+            <span className="text-[11px] font-semibold text-amber-600">Unread</span>
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
-          <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            Contacted
+        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
+          <span className="text-[11px] font-semibold text-[#737882]">
+            In Discussion
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
             <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{inProgressCount}</span>
-            <span className="text-[10px] font-medium text-[#737882]">In Pipeline</span>
+            <span className="text-[11px] font-medium text-[#737882]">Replied</span>
           </div>
         </div>
 
-        <div className="p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
-          <span className="text-[11px] font-bold text-[#737882] uppercase tracking-wider">
-            Won / Converted
+        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-black/10 shadow-2xs flex flex-col justify-between transition-all hover:border-black/20">
+          <span className="text-[11px] font-semibold text-[#737882]">
+            Booked
           </span>
           <div className="flex items-baseline justify-between mt-1.5">
             <span className="text-xl sm:text-2xl font-extrabold text-[#1C1E22] tracking-tight">{wonCount}</span>
-            <span className="text-[10px] font-medium text-[#737882]">Closed Deals</span>
+            <span className="text-[11px] font-semibold text-emerald-600">Confirmed</span>
           </div>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
+      {/* Filter & Search Bar - Full width search with clean 2-column filters */}
       <div className="space-y-2 pt-1">
-        <div className="flex flex-col sm:flex-row gap-2">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, company, email, or brief..."
-              className="w-full pl-9 pr-8 py-2 bg-white border border-black/10 rounded-xl text-xs font-medium text-[#1C1E22] placeholder:text-[#737882] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] transition-all"
-            />
-            <div className="absolute left-3 top-2.5 text-[#737882] pointer-events-none">
-              <HugeiconsIcon icon={FilterIcon} size={14} />
-            </div>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2.5 text-[11px] font-bold text-[#737882] hover:text-[#1C1E22] cursor-pointer"
-              >
-                Clear
-              </button>
-            )}
+        {/* Search Input */}
+        <div className="relative w-full">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search inquiries..."
+            className="w-full pl-9 pr-14 py-2 bg-white border border-black/10 rounded-xl text-xs font-medium text-[#1C1E22] placeholder:text-[#737882] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] transition-all"
+          />
+          <div className="absolute left-3 top-2.5 text-[#737882] pointer-events-none">
+            <HugeiconsIcon icon={FilterIcon} size={14} />
           </div>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-2.5 text-[11px] font-bold text-[#737882] hover:text-[#1C1E22] cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
+        </div>
 
-          {/* Type Filter Select */}
+        {/* Filter Dropdowns */}
+        <div className="grid grid-cols-2 gap-2">
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-white border border-black/10 rounded-xl text-xs font-semibold text-[#1C1E22] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-black/10 rounded-xl text-xs font-semibold text-[#1C1E22] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] cursor-pointer truncate"
           >
             <option value="all">All Inquiry Types</option>
             <option value="brand_inquiry">Brand Partnerships</option>
@@ -525,17 +525,16 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             <option value="media_kit_download">Media Kit Leads</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-white border border-black/10 rounded-xl text-xs font-semibold text-[#1C1E22] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-black/10 rounded-xl text-xs font-semibold text-[#1C1E22] focus:outline-none focus:ring-2 focus:ring-[#1C1E22] cursor-pointer truncate"
           >
             <option value="all">All Statuses</option>
             <option value="new">New</option>
-            <option value="contacted">Contacted</option>
-            <option value="won">Won</option>
-            <option value="lost">Lost</option>
+            <option value="contacted">In Discussion</option>
+            <option value="won">Booked</option>
+            <option value="lost">Archived</option>
           </select>
         </div>
       </div>
@@ -607,9 +606,9 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors ${statusConfig.badgeClass}`}
                       >
                         <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="won">Won</option>
-                        <option value="lost">Lost</option>
+                        <option value="contacted">In Discussion</option>
+                        <option value="won">Booked</option>
+                        <option value="lost">Archived</option>
                       </select>
                     </div>
                   </div>
@@ -644,7 +643,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       type="button"
                       onClick={() => setSelectedLead(lead)}
                       className="p-2 rounded-xl bg-[#FAF8F5] border border-black/10 text-[#1C1E22] hover:bg-black hover:text-white transition-all shadow-2xs flex items-center justify-center shrink-0 cursor-pointer"
-                      title="View full lead details drawer"
+                      title="View details"
                     >
                       <HugeiconsIcon icon={ViewIcon} size={14} className="shrink-0" />
                     </button>
@@ -677,7 +676,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       type="button"
                       onClick={() => handleDeleteLead(lead.id)}
                       className="p-2 rounded-xl bg-[#FAF8F5] border border-black/10 text-[#737882] hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all shadow-2xs cursor-pointer flex items-center justify-center shrink-0"
-                      title="Delete lead"
+                      title="Delete inquiry"
                     >
                       <HugeiconsIcon icon={Delete01Icon} size={14} className="shrink-0" />
                     </button>
@@ -685,13 +684,13 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 </div>
 
                 {/* Lead Attributes / Deal Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs">
                   {lead.budgetOrPrice && (
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#737882] block tracking-wider">
-                        Budget / Value
+                        Budget
                       </span>
-                      <span className="font-bold text-[#1C1E22] mt-0.5 block truncate">
+                      <span className="font-bold text-[#1C1E22] mt-0.5 block break-words">
                         {lead.budgetOrPrice}
                       </span>
                     </div>
@@ -700,20 +699,20 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                   {lead.timelineOrDate && (
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#737882] block tracking-wider">
-                        Timeline / Target Date
+                        Timeline
                       </span>
-                      <span className="font-medium text-[#1C1E22] mt-0.5 block truncate">
+                      <span className="font-medium text-[#1C1E22] mt-0.5 block break-words">
                         {lead.timelineOrDate}
                       </span>
                     </div>
                   )}
 
                   {(lead.campaignType || lead.propertyTitle || lead.selectedPackageName) && (
-                    <div>
+                    <div className="sm:col-span-2">
                       <span className="text-[10px] uppercase font-bold text-[#737882] block tracking-wider">
-                        Format / Deliverable
+                        Deliverable / Item
                       </span>
-                      <span className="font-medium text-[#1C1E22] mt-0.5 block truncate">
+                      <span className="font-medium text-[#1C1E22] mt-0.5 block break-words">
                         {lead.selectedPackageName || lead.campaignType || lead.propertyTitle}
                       </span>
                     </div>
@@ -724,7 +723,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 {lead.details && (
                   <div className="p-3 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs text-[#1C1E22] leading-relaxed">
                     <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider mb-1">
-                      Inquiry Note & Brief
+                      Message & Brief
                     </span>
                     <p className="whitespace-pre-wrap break-words">{lead.details}</p>
                   </div>
@@ -853,7 +852,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               <div className="flex items-center justify-between p-3 bg-[#FAF8F5] rounded-2xl border border-black/5">
                 <div>
                   <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider mb-1">
-                    Lead Status
+                    Status
                   </span>
                   <select
                     value={selectedLead.status === 'booked' || selectedLead.status === 'closed' ? 'won' : selectedLead.status === 'archived' ? 'lost' : selectedLead.status === 'in_progress' || selectedLead.status === 'qualified' ? 'contacted' : selectedLead.status}
@@ -861,9 +860,9 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                     className="text-xs font-bold px-3 py-1 rounded-xl border border-black/10 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1C1E22]"
                   >
                     <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="won">Won</option>
-                    <option value="lost">Lost</option>
+                    <option value="contacted">In Discussion</option>
+                    <option value="won">Booked</option>
+                    <option value="lost">Archived</option>
                   </select>
                 </div>
                 <div className="text-right">
@@ -898,20 +897,20 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-[#FAF8F5] rounded-2xl border border-black/5">
                 {selectedLead.budgetOrPrice && (
                   <div>
-                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Budget / Price</span>
-                    <span className="font-bold text-[#1C1E22] mt-0.5 block">{selectedLead.budgetOrPrice}</span>
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Budget</span>
+                    <span className="font-bold text-[#1C1E22] mt-0.5 block break-words">{selectedLead.budgetOrPrice}</span>
                   </div>
                 )}
                 {selectedLead.timelineOrDate && (
                   <div>
-                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Timeline / Date</span>
-                    <span className="font-semibold text-[#1C1E22] mt-0.5 block">{selectedLead.timelineOrDate}</span>
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Timeline</span>
+                    <span className="font-semibold text-[#1C1E22] mt-0.5 block break-words">{selectedLead.timelineOrDate}</span>
                   </div>
                 )}
                 {(selectedLead.campaignType || selectedLead.selectedPackageName || selectedLead.propertyTitle) && (
                   <div>
-                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Deliverable / Item</span>
-                    <span className="font-semibold text-[#1C1E22] mt-0.5 block truncate">
+                    <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">Deliverable</span>
+                    <span className="font-semibold text-[#1C1E22] mt-0.5 block break-words">
                       {selectedLead.selectedPackageName || selectedLead.campaignType || selectedLead.propertyTitle}
                     </span>
                   </div>
@@ -922,7 +921,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               {selectedLead.details && (
                 <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-black/5 space-y-1">
                   <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">
-                    Full Submission Brief
+                    Inquiry Message
                   </span>
                   <p className="text-xs text-stone-800 leading-relaxed whitespace-pre-wrap">{selectedLead.details}</p>
                 </div>
@@ -931,11 +930,11 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               {/* Internal Notes Editor */}
               <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-black/5 space-y-2">
                 <span className="text-[10px] font-bold text-[#737882] uppercase block tracking-wider">
-                  Internal Creator Notes
+                  Private Notes
                 </span>
                 <textarea
                   defaultValue={selectedLead.notes || ''}
-                  placeholder="Record private deal progress, phone discussion notes, or next steps..."
+                  placeholder="Record private notes, discussion details, or next steps..."
                   className="w-full p-2.5 text-xs bg-white border border-black/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1C1E22]"
                   rows={3}
                   id="drawer-lead-notes"
@@ -948,7 +947,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                   }}
                   className="px-3.5 py-1.5 rounded-xl bg-[#1C1E22] text-white text-xs font-bold hover:bg-black transition-all cursor-pointer shadow-2xs"
                 >
-                  Save Internal Note
+                  Save Note
                 </button>
               </div>
 
@@ -960,7 +959,7 @@ export const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                   className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <HugeiconsIcon icon={Delete01Icon} size={14} />
-                  <span>Delete Lead</span>
+                  <span>Delete Inquiry</span>
                 </button>
 
                 <div className="flex items-center gap-2">

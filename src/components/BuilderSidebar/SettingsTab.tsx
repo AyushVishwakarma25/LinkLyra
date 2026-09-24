@@ -38,18 +38,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   return (
     <div className="space-y-4 max-w-full">
-      {/* Top Settings Summary Bar */}
-      <div className="flex items-center justify-between gap-3 p-3 bg-stone-50 rounded-2xl border border-stone-200/80">
-        <div className="min-w-0">
-          <h3 className="text-xs font-bold text-[#1C1E22] flex items-center gap-1.5">
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="text-emerald-600 shrink-0" />
-            <span>Profile Identity & Details</span>
-          </h3>
-          <p className="text-[11px] text-[#737882] mt-0.5 truncate">
-            Changes preview in real-time. Save anytime from the top bar.
-          </p>
-        </div>
-      </div>
 
       <div className="space-y-3.5 max-w-full">
         {/* Profile Photo / Avatar Upload */}
@@ -191,7 +179,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="tel"
                 value={profile.businessPhone || ''}
                 onChange={(e) => onUpdateProfile({ businessPhone: e.target.value })}
-                placeholder="+91 98765 43210"
+                placeholder="e.g. +1 (555) 019-2834"
                 className="w-full px-3 py-2 bg-white/10 rounded-xl border border-white/15 text-white placeholder-white/40 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 shadow-xs font-mono"
               />
             </div>

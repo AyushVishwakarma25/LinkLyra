@@ -60,7 +60,7 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   creatorName = 'Creator',
   creatorPhone = '',
   selectedPackage = null,
-  cardData: _cardData = null,
+  cardData = null,
   isPreview = false,
 }) => {
   const [brandName, setBrandName] = useState('');
@@ -81,6 +81,8 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const modalTitle = cardData?.title || 'Brand Partnership Inquiry';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,37 +160,37 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs overflow-y-auto">
       <div 
-        className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col animate-fadeIn"
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-xl border border-black/10 overflow-hidden my-auto max-h-[92vh] flex flex-col animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-3.5 sm:p-5 bg-[#1C1E22] text-white relative shrink-0">
+        {/* Minimal Header */}
+        <div className="p-4 sm:p-5 bg-[#FAF8F5] border-b border-black/5 relative shrink-0">
           <button
             onClick={handleResetAndClose}
-            className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-black/5 text-[#737882] hover:text-[#1C1E22] transition-colors cursor-pointer"
             title="Close"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={18} />
           </button>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-stone-300 text-[11px] font-semibold uppercase tracking-wider mb-1">
-            Brand Collaboration Inquiry
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white border border-black/10 text-[#737882] text-[10px] font-semibold uppercase tracking-wider mb-1.5 shadow-2xs">
+            Brand Collaboration
           </div>
-          <h2 className="text-base sm:text-2xl font-bold tracking-tight pr-8">
-            Work With {creatorName}
+          <h2 className="text-base sm:text-lg font-bold text-[#1C1E22] tracking-tight pr-8">
+            {modalTitle}
           </h2>
-          <p className="text-xs sm:text-sm text-stone-400 mt-0.5 leading-snug">
-            Submit your sponsorship or UGC campaign brief. Direct response within 24 hours.
+          <p className="text-xs text-[#737882] mt-0.5 leading-relaxed">
+            Submit your collaboration brief. Direct response within 24 hours.
           </p>
 
           {selectedPackage && (
-            <div className="mt-2 p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex items-center justify-between text-xs">
+            <div className="mt-2.5 p-2 sm:p-2.5 rounded-xl bg-white border border-black/10 flex items-center justify-between text-xs shadow-2xs">
               <div>
-                <span className="text-stone-400 block text-[10px]">Selected Package:</span>
-                <span className="font-semibold text-white">{selectedPackage.name}</span>
+                <span className="text-[#737882] block text-[10px] font-medium">Selected Package:</span>
+                <span className="font-semibold text-[#1C1E22]">{selectedPackage.name}</span>
               </div>
-              <div className="font-bold text-amber-300 text-xs sm:text-sm bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/20">
+              <div className="font-bold text-[#1C1E22] text-xs bg-[#FAF8F5] px-2 py-1 rounded-lg border border-black/5">
                 {selectedPackage.price}
               </div>
             </div>
@@ -196,54 +198,54 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-3.5 sm:p-5 overflow-y-auto flex-1 space-y-3 sm:space-y-3.5 text-stone-800 text-xs sm:text-sm">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-3.5 text-xs text-[#1C1E22]">
           {submitted ? (
-            <div className="py-6 text-center space-y-3">
-              <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={36} />
+            <div className="py-8 text-center space-y-3">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-200 flex items-center justify-center mx-auto shadow-2xs">
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={24} />
               </div>
               <div>
-                <h3 className="text-lg sm:text-xl font-bold text-stone-900">Inquiry Sent Successfully!</h3>
-                <p className="text-xs sm:text-sm text-stone-500 max-w-sm mx-auto mt-1">
-                  Thank you, <span className="font-semibold text-stone-700">{contactName}</span>! Your campaign brief for <span className="font-semibold text-stone-700">{brandName}</span> has been routed directly to {creatorName}.
+                <h3 className="text-base font-bold text-[#1C1E22]">Inquiry Sent Successfully!</h3>
+                <p className="text-xs text-[#737882] max-w-xs mx-auto mt-1 leading-relaxed">
+                  Thank you, <span className="font-semibold text-[#1C1E22]">{contactName}</span>! Your brief for <span className="font-semibold text-[#1C1E22]">{brandName}</span> has been received.
                 </p>
               </div>
 
-              <div className="pt-3 flex flex-col sm:flex-row gap-2 justify-center">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
                 {creatorPhone && (
                   <button
                     type="button"
                     onClick={handleOpenWhatsApp}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-sm active:scale-95 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-2xs active:scale-95 cursor-pointer"
                   >
-                    <HugeiconsIcon icon={BubbleChatIcon} size={16} />
-                    Chat on WhatsApp Now
+                    <HugeiconsIcon icon={BubbleChatIcon} size={15} />
+                    Chat on WhatsApp
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={handleResetAndClose}
-                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#FAF8F5] border border-black/10 hover:bg-black hover:text-white text-[#1C1E22] font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Done
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {isPreview && (
-                <div className="p-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <div className="p-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-medium flex items-center gap-1.5">
                   <span>Preview mode: submissions are simulated</span>
                 </div>
               )}
 
               {errorMessage && (
-                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2 animate-fadeIn">
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-center justify-between gap-2">
                   <span className="break-words min-w-0 flex-1 font-medium">{errorMessage}</span>
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer text-xs"
+                    className="underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
                   >
                     Retry
                   </button>
@@ -263,73 +265,73 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
               />
 
               {/* Brand & Contact Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Brand / Company Name *
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
+                    Brand / Company *
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={Building01Icon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={Building01Icon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Nike, Notion, Plum"
+                      placeholder="e.g. Acme Studio, Nova Labs"
                       value={brandName}
                       onChange={(e) => setBrandName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Contact Person Name *
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
+                    Contact Person *
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={UserIcon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={UserIcon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Sarah Connor"
+                      placeholder="e.g. Alex Morgan"
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Email & Phone Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
                     Work Email *
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={Mail01Icon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={Mail01Icon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="email"
                       required
-                      placeholder="sarah@brand.com"
+                      placeholder="e.g. alex@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    WhatsApp / Phone Number
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
+                    Phone / WhatsApp
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={BubbleChatIcon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={BubbleChatIcon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="tel"
-                      placeholder="+91 98765 43210"
+                      placeholder="e.g. +1 (555) 019-2834"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] transition-colors"
                     />
                   </div>
                 </div>
@@ -337,13 +339,13 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
 
               {/* Campaign Type Select */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Deliverable / Campaign Format
+                <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
+                  Deliverable Format
                 </label>
                 <select
                   value={campaignType}
                   onChange={(e) => setCampaignType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] cursor-pointer"
                 >
                   {CAMPAIGN_TYPES.map((type) => (
                     <option key={type} value={type}>
@@ -354,17 +356,17 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
               </div>
 
               {/* Budget & Timeline Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Budget Bracket
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
+                    Budget Estimate
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={DollarSquareIcon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={DollarSquareIcon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <select
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] cursor-pointer"
                     >
                       {BUDGET_OPTIONS.map((b) => (
                         <option key={b} value={b}>
@@ -376,15 +378,15 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
                     Target Timeline
                   </label>
                   <div className="relative">
-                    <HugeiconsIcon icon={Clock01Icon} size={16} className="text-stone-400 absolute left-3 top-2.5" />
+                    <HugeiconsIcon icon={Clock01Icon} size={14} className="text-[#737882] absolute left-3 top-2.5 pointer-events-none" />
                     <select
                       value={timeline}
                       onChange={(e) => setTimeline(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] cursor-pointer"
                     >
                       {TIMELINE_OPTIONS.map((t) => (
                         <option key={t} value={t}>
@@ -398,34 +400,34 @@ export const BrandInquiryModal: React.FC<BrandInquiryModalProps> = ({
 
               {/* Campaign Brief */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label className="block text-[11px] font-semibold text-[#1C1E22] mb-1">
                   Campaign Brief & Goal (Optional)
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Tell us about your product, target audience, angle, or any specific requirements..."
+                  placeholder="Describe your product, target audience, angle, or any specific requirements..."
                   value={details}
                   onChange={(e) => setDetails(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-black/10 bg-[#FAF8F5] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1C1E22] resize-none"
                 />
               </div>
 
               {/* Submit CTA */}
-              <div className="pt-2">
+              <div className="pt-1.5">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition-all shadow-md active:scale-[0.99] disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1C1E22] hover:bg-black text-white font-bold text-xs sm:text-sm transition-all shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
-                      <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
-                      Sending Brief...
+                      <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
+                      <span>Sending Brief...</span>
                     </>
                   ) : (
                     <>
-                      <HugeiconsIcon icon={SentIcon} size={16} />
-                      Submit Brand Inquiry
+                      <HugeiconsIcon icon={SentIcon} size={15} />
+                      <span>Submit Brand Inquiry</span>
                     </>
                   )}
                 </button>

@@ -1134,14 +1134,14 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     // Check query params ?user= or ?u= or path segment
     const qUser = (req.query.user || req.query.u || req.query.domain || req.query.d) as string | undefined;
     if (qUser && typeof qUser === 'string') {
-      usernameOrDomain = qUser.toLowerCase().trim();
+      usernameOrDomain = qUser.toLowerCase().trim().replace(/^@/, '');
     } else {
       const segments = urlPath.split('/').filter(Boolean);
       if (segments.length > 0) {
         if (segments[0] === 'app' && segments[1]) {
-          usernameOrDomain = segments[1].toLowerCase().trim();
+          usernameOrDomain = segments[1].toLowerCase().trim().replace(/^@/, '');
         } else {
-          usernameOrDomain = segments[0].toLowerCase().trim();
+          usernameOrDomain = segments[0].toLowerCase().trim().replace(/^@/, '');
         }
       }
     }

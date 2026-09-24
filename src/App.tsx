@@ -619,14 +619,8 @@ function StudioApp() {
   };
 
   const handleCardClick = (card: ProfileCardData) => {
-    // In studio builder preview, only update local state, do not write to analytics
-    setProfile((prev) => ({
-      ...prev,
-      cards: prev.cards.map((c) =>
-        c.id === card.id ? { ...c, clicks: (c.clicks || 0) + 1 } : c
-      ),
-    }));
-
+    // In studio builder preview, do NOT mutate click counts or record analytics.
+    // Only navigate to the target URL if it's a valid link.
     if (card.linkUrl && card.linkUrl !== '#' && card.linkUrl !== 'https://') {
       safeOpenUrl(card.linkUrl);
     }

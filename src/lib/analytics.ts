@@ -143,7 +143,7 @@ export function getVisitorId(): string {
 }
 
 const VIEW_DEDUPE_PREFIX = 'linklyra_view_';
-const VIEW_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+const VIEW_WINDOW_MS = 10 * 1000; // 10 seconds (prevents rapid double-click flooding while capturing separate visits)
 
 /**
  * Deduplicates page views within a 30-minute window per page per visitor using sessionStorage.

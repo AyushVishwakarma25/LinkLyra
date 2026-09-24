@@ -30,6 +30,7 @@ const DEMO_AUDIO_URL = 'https://actions.google.com/sounds/v1/ambiences/rain_heav
 export const PodcastSponsorMeCard: React.FC<PodcasterCardProps> = ({
   card,
   onOpenPodcastSponsorModal,
+  onLinkClick,
 }) => {
   const podcast: PodcastMetadata = card.podcast || {};
   const downloads = podcast.monthlyDownloads || '120,000+';
@@ -94,7 +95,10 @@ export const PodcastSponsorMeCard: React.FC<PodcasterCardProps> = ({
       <div className="pt-1 border-t border-white/10">
         <button
           type="button"
-          onClick={() => onOpenPodcastSponsorModal && onOpenPodcastSponsorModal(card)}
+          onClick={(e) => {
+            if (onLinkClick) onLinkClick(e);
+            if (onOpenPodcastSponsorModal) onOpenPodcastSponsorModal(card);
+          }}
           className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-stone-100 text-[#191A1E] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
         >
           <span>Inquire About Sponsorship</span>

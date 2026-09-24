@@ -186,7 +186,7 @@ export function resolveRoute(
   // 4. Explicit user query param override (?user=... or ?u=...)
   const userParam = searchParams.get('user') || searchParams.get('u');
   if (userParam && userParam.trim()) {
-    const cleanUser = userParam.trim().toLowerCase();
+    const cleanUser = userParam.trim().toLowerCase().replace(/^@/, '');
     if (RESERVED.has(cleanUser)) {
       return '404';
     }
@@ -197,14 +197,15 @@ export function resolveRoute(
   const segments = pathname.split('/').filter(Boolean);
 
   if (segments.length === 0 || pathname === '' || pathname === 'index.html') {
-    // Hash-based profile route (e.g. #/johndoe or #johndoe)
+    // Hash-based profile route (e.g. #/johndoe or #johndoe or #@johndoe)
     if (
       hash &&
       hash !== 'dashboard' &&
       hash !== 'explore' &&
       hash !== 'landing'
     ) {
-      if (RESERVED.has(hash)) {
+      const cleanHash = hash.replace(/^@/, '');
+      if (RESERVED.has(cleanHash)) {
         return '404';
       }
       return 'profile';
@@ -218,7 +219,7 @@ export function resolveRoute(
       return 'studio';
     }
     if (segments[1]) {
-      const cleanUser = segments[1].toLowerCase();
+      const cleanUser = segments[1].toLowerCase().replace(/^@/, '');
       if (RESERVED.has(cleanUser)) {
         return '404';
       }
@@ -228,7 +229,7 @@ export function resolveRoute(
   }
 
   // Reserved path check
-  const first = segments[0].toLowerCase();
+  const first = segments[0].toLowerCase().replace(/^@/, '');
   if (RESERVED.has(first)) {
     if (first === 'studio') return 'studio';
     return '404';
@@ -239,7 +240,7 @@ export function resolveRoute(
     return '404';
   }
 
-  // Single valid username segment (e.g. /johndoe)
+  // Single valid username segment (e.g. /johndoe or /@johndoe)
   return 'profile';
 }
 
@@ -276,18 +277,18 @@ export function getRouteTarget(
     );
     const userParam = searchParams.get('user') || searchParams.get('u');
     if (userParam && userParam.trim()) {
-      return userParam.trim().toLowerCase();
+      return userParam.trim().toLowerCase().replace(/^@/, '');
     }
 
     const segments = pathname.split('/').filter(Boolean);
     if (segments[0]?.toLowerCase() === 'app' && segments[1]) {
-      return segments[1].toLowerCase();
+      return segments[1].toLowerCase().replace(/^@/, '');
     }
     if (segments[0]) {
-      return segments[0].toLowerCase();
+      return segments[0].toLowerCase().replace(/^@/, '');
     }
     if (hash) {
-      return hash.toLowerCase();
+      return hash.toLowerCase().replace(/^@/, '');
     }
   }
 

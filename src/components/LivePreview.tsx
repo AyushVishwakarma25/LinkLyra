@@ -36,7 +36,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   const activeCards = profile.cards.filter((c) => c.isActive !== false);
 
   const handleShare = () => {
-    const url = `${window.location.origin}?user=${profile.username}`;
+    const url = profile.username ? `${window.location.origin}/@${profile.username}` : `${window.location.origin}?user=${profile.username}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
       setCopied(true);

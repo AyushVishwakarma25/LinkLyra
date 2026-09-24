@@ -170,7 +170,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   }, [profile]);
 
   const handleCopyProfileUrl = () => {
-    const url = `${window.location.origin}?user=${username || profile.username}`;
+    const targetUser = username || profile.username;
+    const url = targetUser ? `${window.location.origin}/@${targetUser}` : `${window.location.origin}?user=${targetUser}`;
     navigator.clipboard.writeText(url);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);

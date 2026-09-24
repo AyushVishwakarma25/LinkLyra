@@ -246,6 +246,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const handleOpenLead = (e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // Ensure click analytics is recorded for any lead or modal interaction
+    if (onLinkClick) {
+      onLinkClick(e);
+    } else if (onClick) {
+      onClick();
+    }
+
     // Trigger specialized modals if applicable
     if (templateType === 'showing_booking' && onOpenShowingModal) {
       onOpenShowingModal(cardData);
@@ -272,13 +279,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       return;
     }
 
-    if (onLinkClick) {
-      onLinkClick(e);
-      return;
-    }
-
-    if (onClick) {
-      onClick();
+    if (onLinkClick || onClick) {
       return;
     }
 
@@ -389,6 +390,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                if (onLinkClick) onLinkClick(e);
+                else if (onClick) onClick();
                 if (onOpenShowingModal) {
                   onOpenShowingModal(cardData);
                 } else {
@@ -736,7 +739,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // -------------------------------------------------------------
   if (templateType === 'client_reviews') {
     const rating = clientReview?.rating || 5;
-    const reviewText = clientReview?.reviewText || subtitle || 'Ayush helped us find our dream home in Austin $50k under budget. Highly recommended!';
+    const reviewText = clientReview?.reviewText || subtitle || 'They helped us find our dream home in Austin $50k under budget. Highly recommended!';
     const clientName = clientReview?.clientName || title || 'Sarah & Michael M.';
     const propertyInfo = clientReview?.clientTitleOrProperty || 'Buyer • 1204 Pine Street';
 
@@ -1081,6 +1084,88 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   // -------------------------------------------------------------
   const surfaceClass = getCardSurfaceClass(cardStyle, theme, cardBgColor, customAccentColor);
 
+  // If card is expanded, show top row (icon, title, badges, action) + full body text below
+  if (expanded) {
+    return (
+      <div
+        id={id}
+        onClick={handleOpenLead}
+        style={{
+          backgroundColor:
+            cardBgColor ||
+            (cardStyle === 'fill' && customAccentColor && (!color || color === 'purple')
+              ? customAccentColor
+              : undefined),
+          color: cardTextColor || undefined,
+        }}
+        className={`w-full max-w-full overflow-hidden ${surfaceClass} ${getButtonRadiusClass(buttonStyle)} p-3.5 sm:p-4 transition-all duration-150 select-none space-y-2.5 ${
+          interactive ? 'cursor-pointer hover:opacity-95 active:scale-[0.99]' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white flex items-center justify-center p-1.5 shrink-0 shadow-2xs">
+              {logoSrc && logoSrc.trim() !== '' && !logoError ? (
+                <img
+                  src={logoSrc}
+                  alt=""
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={() => setLogoError(true)}
+                />
+              ) : isWhatsAppLink ? (
+                <HugeIcon icon={WhatsappIcon} size={18} className="w-4 h-4 text-[#25D366]" />
+              ) : (
+                <HugeIcon icon={GalleryThumbnailsIcon} size={16} className={color === 'purple' ? 'text-[#584CE4]' : 'text-[#191A1E]'} />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="text-xs sm:text-sm font-bold tracking-tight truncate leading-tight">
+                {title}
+              </h3>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {badgeText && (
+              <span
+                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${theme.badgeBgClass}`}
+              >
+                {badgeText}
+              </span>
+            )}
+            <div
+              style={{
+                backgroundColor:
+                  cardStyle === 'fill'
+                    ? undefined
+                    : (customAccentColor || undefined),
+              }}
+              className={`px-3 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold transition-colors shrink-0 shadow-2xs ${
+                cardStyle === 'fill'
+                  ? theme.arrowBtnClass
+                  : customAccentColor
+                  ? 'text-white'
+                  : theme.arrowBtnClass
+              }`}
+              title={isWhatsAppLink ? 'WhatsApp' : 'Connect'}
+            >
+              <span>{isWhatsAppLink ? 'WhatsApp' : 'Connect'}</span>
+              <HugeIcon icon={isWhatsAppLink ? WhatsappIcon : ArrowUpRight01Icon} size={13} className="w-3 h-3" />
+            </div>
+          </div>
+        </div>
+
+        {subtitle && (
+          <p className={`text-xs font-normal leading-relaxed ${cardStyle === 'outline' || cardStyle === 'glass' ? 'opacity-85' : theme.subtextClass}`}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       id={id}
@@ -1132,7 +1217,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       <div className="flex items-center gap-2 shrink-0">
         {badgeText && (
           <span
-            className={`hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${theme.badgeBgClass}`}
+            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${theme.badgeBgClass}`}
           >
             {badgeText}
           </span>

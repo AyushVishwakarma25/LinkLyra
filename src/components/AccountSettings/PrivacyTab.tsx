@@ -154,7 +154,7 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({
               </span>
             </div>
             <p className="text-xs text-[#737882] mt-0.5">
-              Connect your own branded domain (e.g., <code className="font-mono text-[#5E4BF7]">links.ayush.design</code>).
+              Connect your own branded domain (e.g., <code className="font-mono text-[#5E4BF7]">links.yourbrand.com</code>).
             </p>
           </div>
         </div>
@@ -178,7 +178,7 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({
                       },
                     });
                   }}
-                  placeholder="e.g. links.yourdomain.com or bio.ayush.design"
+                  placeholder="e.g. links.yourdomain.com or bio.yourbrand.com"
                   className="flex-1 px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono text-[#1C1E22] focus:outline-none focus:border-[#5E4BF7]"
                 />
                 <button

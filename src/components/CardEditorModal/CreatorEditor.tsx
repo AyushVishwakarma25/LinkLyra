@@ -190,7 +190,7 @@ export const CreatorEditor: React.FC<CreatorEditorProps> = ({
               <label className="text-xs font-semibold text-stone-700 block mb-1">Discount Code (1-Tap Copy)</label>
               <input
                 type="text"
-                placeholder="e.g. AYUSH20"
+                placeholder="e.g. CREATOR20"
                 value={discountCode}
                 onChange={(e) => setDiscountCode(e.target.value)}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-mono font-bold text-purple-700"

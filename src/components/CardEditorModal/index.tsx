@@ -130,7 +130,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
 
   // 7. Client Review
   const [clientReviewName, setClientReviewName] = useState('Sarah & Michael M.');
-  const [clientReviewText, setClientReviewText] = useState('Ayush sold our home in 4 days for $50k over asking price. Incredible negotiation!');
+  const [clientReviewText, setClientReviewText] = useState('They sold our home in 4 days for $50k over asking price. Incredible negotiation!');
   const [clientTitleOrProperty, setClientTitleOrProperty] = useState('Seller • 1204 Pine Street');
   const [rating, setRating] = useState(5);
 

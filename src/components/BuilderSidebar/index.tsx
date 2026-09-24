@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Link01Icon,
@@ -96,11 +96,13 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [analyticsDays, setAnalyticsDays] = useState<7 | 30 | 90>(30);
   const [copiedAnalyticsLink, setCopiedAnalyticsLink] = useState(false);
+  const [isResettingAnalytics, setIsResettingAnalytics] = useState(false);
 
-  useEffect(() => {
-    if (currentUser?.uid && (activeSidebarTab === 'analytics' || internalTab === 'analytics')) {
+  const refreshAnalytics = useCallback(() => {
+    const targetId = currentUser?.uid || profile.id;
+    if (targetId) {
       setIsLoadingStats(true);
-      profileService.getAnalyticsSummary(currentUser.uid, analyticsDays).then((summary) => {
+      profileService.getAnalyticsSummary(targetId, analyticsDays).then((summary) => {
         if (summary) {
           setAnalyticsData(summary);
         }
@@ -110,7 +112,44 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
         setIsLoadingStats(false);
       });
     }
-  }, [currentUser, activeSidebarTab, internalTab, analyticsDays]);
+  }, [currentUser?.uid, profile.id, analyticsDays]);
+
+  const handleResetAnalytics = async () => {
+    const targetId = currentUser?.uid || profile.id;
+    if (!targetId) return;
+    if (!window.confirm('Reset past test metrics to clean 0? Going forward, only real audience visits to your published URL will be tracked.')) {
+      return;
+    }
+    setIsResettingAnalytics(true);
+    try {
+      await profileService.resetAnalytics(targetId);
+      refreshAnalytics();
+    } catch (err) {
+      console.error('Failed to reset analytics:', err);
+    } finally {
+      setIsResettingAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSidebarTab === 'analytics' || internalTab === 'analytics') {
+      refreshAnalytics();
+
+      // Auto-refresh when user returns to this window tab
+      const onFocus = () => refreshAnalytics();
+      window.addEventListener('focus', onFocus);
+
+      // 10-second polling interval while on analytics tab
+      const timer = setInterval(() => {
+        refreshAnalytics();
+      }, 10000);
+
+      return () => {
+        window.removeEventListener('focus', onFocus);
+        clearInterval(timer);
+      };
+    }
+  }, [activeSidebarTab, internalTab, refreshAnalytics]);
 
   const handleAvatarFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -142,7 +181,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   };
 
   const getPublicUrl = () => {
-    return `${window.location.origin}?user=${profile.username}`;
+    return profile.username ? `${window.location.origin}/@${profile.username}` : `${window.location.origin}?user=${profile.username}`;
   };
 
   const handleCopyLink = () => {
@@ -452,6 +491,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             setAnalyticsDays={setAnalyticsDays}
             copiedAnalyticsLink={copiedAnalyticsLink}
             setCopiedAnalyticsLink={setCopiedAnalyticsLink}
+            onRefresh={refreshAnalytics}
           />
         )}
 

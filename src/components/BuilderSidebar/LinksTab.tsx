@@ -82,10 +82,10 @@ export const LinksTab: React.FC<LinksTabProps> = ({
 
         <div className="min-w-0 flex-1">
           <h3 className="text-sm sm:text-base font-bold text-[#1C1E22] truncate leading-tight">
-            {profile.name || 'Ayush Vishwakarma'}
+            {profile.name || 'Your Name'}
           </h3>
           <p className="text-xs text-[#737882] mt-0.5 leading-snug break-words">
-            {profile.headline || 'Host of The Founders'}
+            {profile.headline || 'Add your bio or headline'}
           </p>
 
           {/* Social icons row */}

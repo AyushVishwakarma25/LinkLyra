@@ -493,7 +493,7 @@ export interface SpecializedAnalyticsSummary {
   browserCounts?: Record<string, number>;
   referrerCounts?: Record<string, number>;
   linkClickCounts?: Record<string, number>;
-  topLinks?: { linkId: string; title?: string; clicks: number }[];
+  topLinks?: { linkId: string; title?: string; clicks: number; url?: string; color?: string }[];
   dailyStats?: { date: string; views: number; clicks: number }[];
 }
 

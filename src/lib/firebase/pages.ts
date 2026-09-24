@@ -69,7 +69,7 @@ export const pagesService = {
     username: string
   ): Promise<{ profile: DbProfile; links: DbLink[] } | null> {
     if (!username) return null;
-    const cleanUsername = username.toLowerCase().trim();
+    const cleanUsername = username.toLowerCase().trim().replace(/^@/, '');
 
     try {
       // 1. Check usernames index collection

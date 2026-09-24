@@ -79,6 +79,7 @@ export const profileService = {
   getAnalyticsSummary: analyticsService.getAnalyticsSummary.bind(analyticsService),
   getSpecializedAnalyticsSummary: analyticsService.getSpecializedAnalyticsSummary.bind(analyticsService),
   getRecentEvents: analyticsService.getRecentEvents.bind(analyticsService),
+  resetAnalytics: analyticsService.resetAnalytics.bind(analyticsService),
 
   // Billing & Credits
   getSubscriptionStatus: billingService.getSubscriptionStatus.bind(billingService),

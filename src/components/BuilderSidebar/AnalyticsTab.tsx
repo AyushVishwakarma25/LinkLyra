@@ -9,6 +9,7 @@ import {
   Tablet01Icon,
   Copy01Icon,
   CheckmarkCircle01Icon,
+  RefreshIcon,
 } from '@hugeicons/core-free-icons';
 import { UserProfile, SpecializedAnalyticsSummary } from '../../types';
 import { COLOR_CONFIG } from '../ProfileCard';
@@ -21,6 +22,9 @@ export interface AnalyticsTabProps {
   setAnalyticsDays: (days: 7 | 30 | 90) => void;
   copiedAnalyticsLink: boolean;
   setCopiedAnalyticsLink: (val: boolean) => void;
+  onRefresh?: () => void;
+  onResetMetrics?: () => void;
+  isResetting?: boolean;
 }
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
@@ -31,32 +35,59 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   setAnalyticsDays,
   copiedAnalyticsLink,
   setCopiedAnalyticsLink,
+  onRefresh,
 }) => {
   return (
     <div className="space-y-4 max-w-full">
-      {/* Header with Date Range Selector */}
-      <div className="flex items-center justify-between gap-2">
+
+      {/* Header with Live Status & Date Range Selector */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="min-w-0">
-          <h3 className="text-xs font-bold text-[#1C1E22] truncate">Traffic & Performance</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold text-[#1C1E22] truncate">Traffic & Performance</h3>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[9px] font-bold text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
+          </div>
           <p className="text-[11px] text-[#737882] mt-0.5">
-            Daily rollups & link performance
+            Real-time verified page views & card clicks
           </p>
         </div>
-        <div className="flex items-center bg-black/5 p-0.5 rounded-xl text-[10px] font-bold shrink-0">
-          {([7, 30, 90] as const).map((days) => (
+
+        <div className="flex items-center gap-1.5">
+          {onRefresh && (
             <button
-              key={days}
               type="button"
-              onClick={() => setAnalyticsDays(days)}
-              className={`px-2 py-1 rounded-lg transition-all ${
-                analyticsDays === days
-                  ? 'bg-white text-[#1C1E22] shadow-2xs'
-                  : 'text-[#737882] hover:text-[#1C1E22]'
-              }`}
+              onClick={onRefresh}
+              disabled={isLoadingStats}
+              title="Refresh live metrics"
+              className="p-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-[#737882] hover:text-[#1C1E22] transition-colors cursor-pointer disabled:opacity-50"
             >
-              {days}D
+              <HugeiconsIcon
+                icon={RefreshIcon}
+                size={13}
+                className={isLoadingStats ? 'animate-spin text-[#5E4BF7]' : ''}
+              />
             </button>
-          ))}
+          )}
+
+          <div className="flex items-center bg-black/5 p-0.5 rounded-xl text-[10px] font-bold shrink-0">
+            {([7, 30, 90] as const).map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => setAnalyticsDays(days)}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  analyticsDays === days
+                    ? 'bg-white text-[#1C1E22] shadow-2xs'
+                    : 'text-[#737882] hover:text-[#1C1E22]'
+                }`}
+              >
+                {days}D
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -231,7 +262,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 {analyticsData.topLinks.slice(0, 5).map((item, idx) => {
                   const matchedCard = profile.cards.find((c) => c.id === item.linkId);
                   const title = matchedCard?.title || item.title || `Link #${idx + 1}`;
-                  const url = matchedCard?.linkUrl || '';
+                  const url = matchedCard?.linkUrl || item.url || '';
                   const cardColor = (matchedCard && COLOR_CONFIG[matchedCard.color]) || COLOR_CONFIG.purple;
 
                   return (

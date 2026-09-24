@@ -9,28 +9,28 @@ export const UI_KIT = {
   // Brand identity
   brand: {
     name: 'LinkLyra',
-    tagline: 'The modular, high-converting bio page for modern creators',
+    tagline: 'Your link. Your world.',
     shortName: 'LL',
     version: '2.0',
   },
 
   // Base canvas colors & neutrals
   colors: {
-    canvas: '#ECE7DC',
-    canvasWarm: '#F5F2EB',
-    canvasCream: '#FAF8F5',
+    canvas: '#FAFAF7',
+    canvasWarm: '#FAFAF7',
+    canvasCream: '#FDFCFA',
     canvasLight: '#FFFFFF',
-    canvasDark: '#191A1E',
-    canvasClay: '#EFEBE4',
+    canvasDark: '#111111',
+    canvasClay: '#F4F2EB',
     
     // Core text tones
-    textDark: '#1C1E22',
-    textMuted: '#737882',
+    textDark: '#111111',
+    textMuted: '#666666',
     textLight: '#FFFFFF',
     textLightMuted: 'rgba(255, 255, 255, 0.75)',
 
     // Accent colors
-    accentPurple: '#5E4BF7',
+    accentPurple: '#4F46E5',
     accentCoral: '#E75646',
     accentYellow: '#F8BA38',
     accentSage: '#D2EAA5',
@@ -39,14 +39,14 @@ export const UI_KIT = {
 
   // Clean architectural styling without heavy glassmorphism or AI blobs
   glass: {
-    header: 'bg-[#ECE7DC] border-b border-black/10',
-    headerDark: 'bg-[#191A1E] border-b border-white/10',
-    headerWhite: 'bg-white border-b border-black/10',
-    card: 'bg-white border border-black/10 shadow-2xs',
+    header: 'bg-[#18181B] text-white',
+    headerDark: 'bg-[#111111] text-white',
+    headerWhite: 'bg-white border-b border-[#E8E8E8]',
+    card: 'bg-white border border-[#E8E8E8] shadow-2xs',
     cardHover: 'hover:border-black/20 hover:shadow-xs transition-all duration-150',
-    modal: 'bg-[#F4F0E8] border border-black/10 shadow-xl',
-    pill: 'bg-white border border-black/10 text-[#1C1E22]',
-    footer: 'bg-transparent border-t border-black/5',
+    modal: 'bg-[#FAFAF7] border border-[#E8E8E8] shadow-xl',
+    pill: 'bg-white border border-[#E8E8E8] text-[#111111]',
+    footer: 'bg-transparent border-t border-[#E8E8E8]',
   },
 
   // Card color design tokens - Clean, non-gradient editorial palettes

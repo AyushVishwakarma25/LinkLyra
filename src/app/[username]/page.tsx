@@ -31,7 +31,8 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
   // Resolve target username or custom domain using unified routing engine
   const resolvedRoute = resolveRoute();
   const routeTarget = getRouteTarget();
-  const username = propUsername || routeTarget || '';
+  const rawTarget = propUsername || routeTarget || '';
+  const username = rawTarget.replace(/^@/, '').trim();
 
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [links, setLinks] = useState<DbLink[]>([]);

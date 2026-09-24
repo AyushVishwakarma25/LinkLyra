@@ -54,7 +54,6 @@ export const SmartMusicCard: React.FC<MusicianCardProps> = ({
     e.stopPropagation();
     if (onLinkClick) {
       onLinkClick(e);
-      return;
     }
     try {
       localStorage.setItem('linklyra_preferred_music_platform', plat);

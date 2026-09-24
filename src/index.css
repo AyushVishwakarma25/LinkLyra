@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --color-canvas: #F5F2EB;
-  --color-card-purple: #5E4BF7;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-canvas: #FAFAF7;
+  --color-card-purple: #4F46E5;
   --color-card-orange: #E75646;
   --color-card-yellow: #F8BA38;
   --color-card-green: #D2EAA5;
-  --color-card-dark: #1C1E22;
+  --color-card-dark: #111111;
 }
 
 body {
-  background-color: #F5F2EB;
-  color: #1A1A1A;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #FAFAF7;
+  color: #111111;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;

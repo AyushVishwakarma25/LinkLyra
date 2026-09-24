@@ -372,6 +372,7 @@ export const TileRevealTestimonials: React.FC<TileRevealTestimonialsProps> = ({
         </motion.div>
 
         {/* 2. MID-STAGE INTRO OVERLAY (appears while tiles are assembled) */}
+        {/* 2. MID-STAGE INTRO OVERLAY (appears while tiles are assembled) */}
         <motion.div
           style={{
             opacity: introOverlayOpacity,
@@ -379,9 +380,8 @@ export const TileRevealTestimonials: React.FC<TileRevealTestimonialsProps> = ({
           }}
           className="absolute z-20 pointer-events-none text-center px-4 max-w-2xl mx-auto"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 backdrop-blur-md border border-black/10 text-xs font-black text-[#1C1E22] shadow-lg mb-3">
-            <span className="w-2 h-2 rounded-full bg-[#5E4BF7]" />
-            <span>24,000+ CREATORS POWERED WORLDWIDE</span>
+          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-black/10 text-xs font-black text-[#1C1E22] shadow-lg mb-3">
+            <span className="font-mono uppercase tracking-wider text-[11px]">24,000+ CREATORS POWERED WORLDWIDE</span>
           </div>
           <h3 className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] tracking-tight">
             Designed for Creators.
@@ -393,43 +393,42 @@ export const TileRevealTestimonials: React.FC<TileRevealTestimonialsProps> = ({
           </p>
         </motion.div>
 
-        {/* 3. REVEALED HEADLINE & CALL TO ACTION (Zoomed past edges) */}
+        {/* 3. REVEALED HEADLINE & CALL TO ACTION (New Multi-Card Bento UI) */}
         <motion.div
           style={{
             opacity: revealOpacity,
             scale: revealScale,
             y: revealY,
           }}
-          className="relative z-30 max-w-5xl w-full mx-auto px-4 sm:px-6 flex flex-col items-center justify-center my-auto pointer-events-auto"
+          className="relative z-30 max-w-6xl w-full mx-auto px-4 sm:px-6 flex flex-col items-center justify-center my-auto pointer-events-auto"
         >
-          {/* Rating Proof Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-stone-200 text-xs font-bold text-stone-900 mb-3 sm:mb-4 shadow-2xs">
+          {/* Rating Proof Badge (No Dot) */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-stone-200 text-xs font-bold text-stone-900 mb-2 sm:mb-3 shadow-2xs">
             <div className="flex items-center gap-0.5 text-amber-500">
-              <HugeiconsIcon icon={StarIcon} size={14} className="text-amber-400" />
-              <HugeiconsIcon icon={StarIcon} size={14} className="text-amber-400" />
-              <HugeiconsIcon icon={StarIcon} size={14} className="text-amber-400" />
-              <HugeiconsIcon icon={StarIcon} size={14} className="text-amber-400" />
-              <HugeiconsIcon icon={StarIcon} size={14} className="text-amber-400" />
+              <HugeiconsIcon icon={StarIcon} size={13} className="text-amber-400" />
+              <HugeiconsIcon icon={StarIcon} size={13} className="text-amber-400" />
+              <HugeiconsIcon icon={StarIcon} size={13} className="text-amber-400" />
+              <HugeiconsIcon icon={StarIcon} size={13} className="text-amber-400" />
+              <HugeiconsIcon icon={StarIcon} size={13} className="text-amber-400" />
             </div>
-            <span>Rated 4.9/5 from 2,400+ verified creators & founders</span>
+            <span className="font-mono text-[11px] uppercase tracking-wider">RATED 4.9/5 FROM 2,400+ VERIFIED PROFILES</span>
           </div>
 
           {/* Revealed Headline */}
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-[#1C1E22] tracking-tight text-center leading-tight">
             Why Creators Are Switching to LinkLyra
           </h2>
-          <p className="mt-2 text-xs sm:text-base text-[#555962] text-center max-w-xl mx-auto">
-            From YouTubers and writers to indie founders and coaches — transform passive bio clicks into engaged fans and buyers.
+          <p className="mt-1.5 text-xs sm:text-base text-[#555962] text-center max-w-xl mx-auto">
+            From YouTubers and specialty roasteries to luxury brokers and indie founders — see how real creators convert bio traffic.
           </p>
 
-          {/* Category Tabs */}
-          <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+          {/* Category Filter Pills (No Dots) */}
+          <div className="mt-3 sm:mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
             {[
               { id: 'all', label: 'All Reviews' },
               { id: 'creators', label: 'Video & Media' },
               { id: 'business', label: 'Coaches & Services' },
               { id: 'tech', label: 'Founders & Devs' },
-              { id: 'music', label: 'Music & Audio' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -449,109 +448,141 @@ export const TileRevealTestimonials: React.FC<TileRevealTestimonialsProps> = ({
             ))}
           </div>
 
-          {/* Testimonial Spotlight Card */}
-          <div className="mt-5 w-full max-w-3xl">
-            <div className="relative p-6 sm:p-8 rounded-3xl bg-white/95 backdrop-blur-md border border-black/10 shadow-xl flex flex-col sm:flex-row items-center gap-6">
-              {/* Creator Photo + Verified Tag */}
-              <div className="relative shrink-0 text-center sm:text-left">
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-[#5E4BF7] shadow-md mx-auto sm:mx-0">
-                  <img
-                    src={
-                      activeTestimonial.avatar && activeTestimonial.avatar.trim() !== ''
-                        ? activeTestimonial.avatar
-                        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
-                    }
-                    alt={activeTestimonial.name}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                {activeTestimonial.platformIcon && activeTestimonial.platformIcon.trim() !== '' && (
-                  <div className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-white shadow border border-black/10">
-                    <img
-                      src={activeTestimonial.platformIcon}
-                      alt="Platform"
-                      className="w-4 h-4 object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Quote & Metrics Details */}
-              <div className="flex-1 min-w-0 flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1 text-amber-400">
-                    {[...Array(5)].map((_, i) => (
-                      <HugeiconsIcon key={i} icon={StarIcon} size={14} className="text-amber-400" />
-                    ))}
+          {/* NEW BENTO GRID TESTIMONIALS UI */}
+          <div className="mt-5 w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+            {/* Spotlight Card (8 cols) */}
+            <div className="lg:col-span-7 p-6 sm:p-7 rounded-[28px] bg-white/95 backdrop-blur-md border border-black/10 shadow-lg flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-xs shrink-0">
+                      <img
+                        src={activeTestimonial.avatar}
+                        alt={activeTestimonial.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-black text-sm text-[#1C1E22]">
+                          {activeTestimonial.name}
+                        </h4>
+                        <span className="w-3.5 h-3.5 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-[8px] font-bold">
+                          ✓
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#737882] font-mono">{activeTestimonial.handle} • {activeTestimonial.role}</p>
+                    </div>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-stone-900 text-xs font-black">
-                    <HugeiconsIcon icon={TrendingUpIcon} size={14} className="text-emerald-600" />
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black shrink-0">
+                    <HugeiconsIcon icon={TrendingUpIcon} size={13} className="text-emerald-600" />
                     <span>{activeTestimonial.metric}</span>
-                    <span className="text-[10px] font-medium text-stone-500">({activeTestimonial.metricLabel})</span>
+                    <span className="text-[10px] font-medium text-emerald-700 hidden sm:inline">({activeTestimonial.metricLabel})</span>
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm font-medium text-[#1C1E22] leading-relaxed italic line-clamp-3 sm:line-clamp-none">
+                <div className="flex items-center gap-0.5 text-amber-400 mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <HugeiconsIcon key={i} icon={StarIcon} size={13} className="text-amber-400" />
+                  ))}
+                </div>
+
+                <p className="text-xs sm:text-sm font-medium text-[#1C1E22] leading-relaxed italic">
                   "{activeTestimonial.quote}"
                 </p>
+              </div>
 
-                <div className="mt-4 pt-3 border-t border-black/5 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="font-black text-xs sm:text-sm text-[#1C1E22]">
-                        {activeTestimonial.name}
-                      </h4>
-                      <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-[#5E4BF7]" />
-                      <span className="text-[10px] font-bold text-[#8C919D] hidden sm:inline">
-                        • {activeTestimonial.platform}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#737882] font-mono">{activeTestimonial.handle} — {activeTestimonial.role}</p>
-                  </div>
-
-                  {/* Navigation Arrows */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handlePrev}
-                      className="p-2 rounded-full bg-black/5 hover:bg-black/10 text-[#1C1E22] transition-colors cursor-pointer active:scale-95 flex items-center justify-center"
-                      title="Previous review"
-                    >
-                      <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
-                    </button>
-                    <span className="text-xs font-mono font-bold text-[#737882]">
-                      {(activeTestimonialIndex % filteredTestimonials.length) + 1}/{filteredTestimonials.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="p-2 rounded-full bg-black/5 hover:bg-black/10 text-[#1C1E22] transition-colors cursor-pointer active:scale-95 flex items-center justify-center"
-                      title="Next review"
-                    >
-                      <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
-                    </button>
-                  </div>
+              <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs text-[#737882]">
+                <span className="font-semibold text-stone-700">{activeTestimonial.platform}</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    className="p-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-[#111111] transition-colors cursor-pointer"
+                    title="Previous"
+                  >
+                    <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+                  </button>
+                  <span className="font-mono text-[11px]">
+                    {(activeTestimonialIndex % filteredTestimonials.length) + 1}/{filteredTestimonials.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="p-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-[#111111] transition-colors cursor-pointer"
+                    title="Next"
+                  >
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+                  </button>
                 </div>
               </div>
             </div>
+
+            {/* Supporting Review Cards (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col gap-3">
+              {filteredTestimonials
+                .filter((t) => t.id !== activeTestimonial.id)
+                .slice(0, 2)
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      const idx = filteredTestimonials.findIndex((x) => x.id === item.id);
+                      if (idx >= 0) setActiveTestimonialIndex(idx);
+                    }}
+                    className="p-4 rounded-[22px] bg-white/90 backdrop-blur-xs border border-black/10 hover:border-black/25 transition-all cursor-pointer shadow-2xs space-y-2 select-none group"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={item.avatar}
+                          alt={item.name}
+                          className="w-8 h-8 rounded-full object-cover border border-black/10"
+                        />
+                        <div>
+                          <h5 className="font-black text-xs text-[#111111] group-hover:text-[#4F46E5] transition-colors">
+                            {item.name}
+                          </h5>
+                          <span className="text-[10px] text-stone-500 font-mono">{item.handle}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-[#111111] border border-black/5 font-mono">
+                        {item.metric}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#444444] line-clamp-2 leading-relaxed">
+                      "{item.quote}"
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* High-Trust Aggregate Proof Bar (No Dots) */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-stone-500">
+            <span className="px-3 py-1 rounded-full bg-white border border-stone-200 text-stone-700">
+              90-SECOND SETUP
+            </span>
+            <span className="px-3 py-1 rounded-full bg-white border border-stone-200 text-stone-700">
+              ZERO MONTHLY FEES ON STARTER
+            </span>
+            <span className="px-3 py-1 rounded-full bg-white border border-stone-200 text-stone-700">
+              REAL-TIME ZERO-FAKE ANALYTICS
+            </span>
           </div>
 
           {/* CTA Button */}
-          <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row items-center gap-3">
+          <div className="mt-4 flex items-center justify-center">
             <button
               type="button"
               onClick={onOpenStudio}
-              className="px-6 py-3 rounded-full bg-[#1C1E22] hover:bg-black text-white text-xs sm:text-sm font-black shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+              className="px-7 py-3 rounded-full bg-[#1C1E22] hover:bg-black text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
             >
-              <span>Claim Your Free Bio Link</span>
-              <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+              <span>Create your LinkLyra →</span>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={15} />
             </button>
-            <span className="text-[11px] text-[#737882] font-medium">
-              Takes 60 seconds • Zero monthly fees
-            </span>
           </div>
         </motion.div>
       </div>

@@ -131,7 +131,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Ayush Sharma"
+              placeholder="e.g. Alex Morgan"
               required
               className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs text-[#1C1E22] focus:outline-none focus:border-[#5E4BF7] focus:ring-1 focus:ring-[#5E4BF7] transition-all"
             />
@@ -183,7 +183,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
               type="text"
               value={businessPhone}
               onChange={(e) => setBusinessPhone(e.target.value)}
-              placeholder="+91 98765 43210"
+              placeholder="e.g. +1 (555) 019-2834"
               className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs text-[#1C1E22] focus:outline-none focus:border-[#1C1E22] focus:ring-1 focus:ring-[#1C1E22] transition-all font-mono"
             />
           </div>

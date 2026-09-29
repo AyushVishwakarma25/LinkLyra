@@ -8,6 +8,9 @@ import {
   GlobeIcon,
   CheckmarkCircle01Icon,
   SparklesIcon,
+  Settings01Icon,
+  Logout01Icon,
+  UserIcon,
 } from '@hugeicons/core-free-icons';
 import { ProfileCard } from './ProfileCard';
 import { ProfileCardData, CanvasTheme, UserProfile } from '../types';
@@ -16,7 +19,8 @@ import { User as FirebaseUser } from 'firebase/auth';
 import { TileRevealTestimonials } from './TileRevealTestimonials';
 import { IPhoneMockup3D } from './IPhoneMockup3D';
 import { CreatorScrollStack } from './CreatorScrollStack';
-import { TemplateCardsSection } from './TemplateCardsSection';
+import { ScrollVelocity } from './ScrollVelocity';
+import { AccountSubTab } from './AccountSettings';
 
 export interface LandingPageProps {
   onOpenStudio: (claimedHandle?: string) => void;
@@ -26,6 +30,7 @@ export interface LandingPageProps {
   currentUser?: FirebaseUser | null;
   userProfile?: UserProfile | null;
   onSignOut?: () => void;
+  onOpenAccountSettings?: (initialTab?: AccountSubTab) => void;
 }
 
 interface CreatorArchetype {
@@ -263,11 +268,27 @@ const ARCHETYPES: CreatorArchetype[] = [
 export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenStudio,
   onOpenAuth,
+  onOpenVisitorDemo,
   currentUser,
+  userProfile,
+  onSignOut,
+  onOpenAccountSettings,
 }) => {
   const [handleInput, setHandleInput] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clickedCardId, setClickedCardId] = useState<string | null>(null);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleClaimSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,9 +445,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#product" className="hover:text-white transition-colors cursor-pointer">
               Product
             </a>
-            <a href="#templates" className="hover:text-white transition-colors cursor-pointer">
-              Templates
-            </a>
             <a href="#creators" className="hover:text-white transition-colors cursor-pointer">
               Creators
             </a>
@@ -435,17 +453,108 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </a>
           </nav>
 
-          {/* Right: Log in & CTA */}
+          {/* Right: Log in & CTA / Profile Dropdown */}
           <div className="hidden md:flex items-center gap-4">
             {currentUser ? (
-              <button
-                type="button"
-                onClick={() => onOpenStudio()}
-                className="px-4 py-2 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all active:scale-95 shadow-xs cursor-pointer flex items-center gap-1.5"
-              >
-                <span>Dashboard</span>
-                <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-              </button>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-2.5 pl-2.5 pr-3.5 py-1.5 rounded-full bg-zinc-800/90 hover:bg-zinc-700/90 border border-white/15 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-400 to-indigo-500 text-white flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0 border border-white/20">
+                    {userProfile?.avatarUrl ? (
+                      <img src={userProfile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (userProfile?.name || currentUser.displayName || currentUser.email || 'U')[0].toUpperCase()
+                    )}
+                  </div>
+                  <span className="max-w-[120px] truncate font-bold text-white">
+                    {userProfile?.name || currentUser.displayName || currentUser.email?.split('@')[0] || 'Account'}
+                  </span>
+                  <span className={`text-[10px] text-zinc-400 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {userDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-[#18181B] border border-white/10 shadow-2xl text-white py-2 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl">
+                    {/* User Profile Header */}
+                    <div className="px-4 py-2.5 border-b border-white/10">
+                      <p className="text-xs font-bold text-white truncate">
+                        {userProfile?.name || currentUser.displayName || 'Creator Account'}
+                      </p>
+                      <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
+                        {currentUser.email}
+                      </p>
+                    </div>
+
+                    {/* Navigation Actions */}
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          onOpenStudio();
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-200 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-between cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="text-amber-400" />
+                          <span>Studio Dashboard</span>
+                        </span>
+                        <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">Ctrl+D</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          if (onOpenAccountSettings) {
+                            onOpenAccountSettings('profile');
+                          } else {
+                            onOpenStudio();
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-200 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <HugeiconsIcon icon={Settings01Icon} size={14} className="text-zinc-400" />
+                        <span>User & Account Settings</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          onOpenVisitorDemo();
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-200 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <HugeiconsIcon icon={GlobeIcon} size={14} className="text-zinc-400" />
+                        <span>View Public Profile</span>
+                      </button>
+                    </div>
+
+                    {/* Sign out */}
+                    {onSignOut && (
+                      <div className="pt-1 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            onSignOut();
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          <HugeiconsIcon icon={Logout01Icon} size={14} />
+                          <span>Sign out</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <button
@@ -489,13 +598,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Product
               </a>
               <a
-                href="#templates"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-white transition-colors py-1 cursor-pointer"
-              >
-                Templates
-              </a>
-              <a
                 href="#creators"
                 onClick={() => setMobileMenuOpen(false)}
                 className="hover:text-white transition-colors py-1 cursor-pointer"
@@ -511,18 +613,70 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </a>
             </nav>
 
-            <div className="pt-3 border-t border-white/10 flex flex-col gap-3">
+            <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
               {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenStudio();
-                  }}
-                  className="w-full py-3 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all text-center cursor-pointer"
-                >
-                  Go to Studio Dashboard →
-                </button>
+                <>
+                  <div className="px-1 py-1.5 mb-1 border-b border-white/10">
+                    <p className="text-xs font-bold text-white truncate">
+                      {userProfile?.name || currentUser.displayName || 'Creator Account'}
+                    </p>
+                    <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
+                      {currentUser.email}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenStudio();
+                    }}
+                    className="w-full py-2.5 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>Launch Studio Dashboard →</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onOpenAccountSettings) {
+                        onOpenAccountSettings('profile');
+                      } else {
+                        onOpenStudio();
+                      }
+                    }}
+                    className="w-full py-2.5 rounded-full text-xs font-semibold bg-zinc-800 text-white hover:bg-zinc-700 transition-all text-center cursor-pointer flex items-center justify-center gap-2 border border-white/10"
+                  >
+                    <HugeiconsIcon icon={Settings01Icon} size={14} />
+                    <span>User & Account Settings</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenVisitorDemo();
+                    }}
+                    className="w-full py-2 text-xs font-medium text-zinc-300 hover:text-white text-center cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <HugeiconsIcon icon={GlobeIcon} size={14} />
+                    <span>View Public Profile</span>
+                  </button>
+
+                  {onSignOut && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onSignOut();
+                      }}
+                      className="w-full py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 text-center cursor-pointer flex items-center justify-center gap-2 pt-1 border-t border-white/10"
+                    >
+                      <HugeiconsIcon icon={Logout01Icon} size={14} />
+                      <span>Sign out</span>
+                    </button>
+                  )}
+                </>
               ) : (
                 <>
                   <button
@@ -587,10 +741,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <span>Create your LinkLyra →</span>
               </button>
               <a
-                href="#templates"
+                href="#creators"
                 className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-white hover:bg-stone-50 text-[#111111] text-xs sm:text-sm font-bold border border-[#E8E8E8] shadow-2xs hover:border-black/20 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
               >
-                <span>Explore templates</span>
+                <span>Explore creators</span>
               </a>
             </div>
 
@@ -631,6 +785,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* ========================================================================= */}
+      {/* SCROLL VELOCITY BANNER — Creator Roles & Key Platform Capabilities        */}
+      {/* ========================================================================= */}
+      <section className="w-full bg-[#111111] text-white py-6 sm:py-8 border-y border-zinc-800 relative overflow-hidden my-4 shadow-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/40 via-transparent to-transparent pointer-events-none" />
+        <ScrollVelocity
+          texts={[
+            'Content Creator ✦ Visual Designer ✦ Podcast Host ✦ Studio Founder ✦ Digital Artist ✦ Live Streamer ✦ Real Estate Pro ✦ Musician & Producer ✦ Indie Builder ✦',
+            'Bio Link Reimagined ⚡ 1-Tap Bookings ⚡ Custom Portfolios ⚡ Digital Media Kits ⚡ Instant Product Sales ⚡ Tactile UI Canvas ⚡ Monetize Audience ⚡'
+          ]}
+          velocity={70}
+          className="text-[#FAFAF7] font-black tracking-tight drop-shadow-md hover:text-[#F8BA38] transition-colors"
+          numCopies={6}
+        />
+      </section>
+
+      {/* ========================================================================= */}
       {/* SECTION 2: CREATORS — Progressive Card Stacking Scroll Effect (Mockup)     */}
       {/* ========================================================================= */}
       <CreatorScrollStack
@@ -640,16 +810,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* SECTION 3: TEMPLATES — "For Whom It's For" (6 Archetype Cards)             */}
-      {/* ========================================================================= */}
-      <TemplateCardsSection
-        onOpenStudio={(handle) => onOpenStudio(handle)}
-        onOpenAuth={onOpenAuth}
-        currentUser={currentUser}
-      />
-
-      {/* ========================================================================= */}
-      {/* SECTION 4: PROFESSIONALS — Real Profile (David Sterling) -> Label -> Copy */}
+      {/* SECTION 3: PROFESSIONALS — Real Profile (David Sterling) -> Label -> Copy */}
       {/* ========================================================================= */}
       <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full border-t border-[#E8E8E8]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">

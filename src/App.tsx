@@ -768,6 +768,7 @@ function StudioApp() {
           currentUser={currentUser}
           userProfile={profile}
           onSignOut={handleSignOut}
+          onOpenAccountSettings={(tab) => handleOpenAccountSettings(tab || 'profile')}
         />
         <AuthModal
           isOpen={isAuthModalOpen}

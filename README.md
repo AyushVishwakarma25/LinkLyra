@@ -1,21 +1,15 @@
-# 🌟 LinkLyra
+# 🌟 LinkLyra — Built for Content Creators
 
-LinkLyra is a next-generation, high-converting Link-in-Bio showroom platform built with **React 19**, **TypeScript**, and **Vite**.
+LinkLyra is the next-generation link-in-bio platform built specifically for **Content Creators** using **React 19**, **TypeScript**, and **Vite**.
 
-Unlike traditional flat link aggregators, LinkLyra transforms bio links into interactive, specialized vertical conversion engines for **Content Creators** ("Hire Me" UGC & brand deals), **Real Estate Agents** (property listings, showings, valuations), and **Coaches & Educators** (batch schedules, admission routing). It includes built-in **Firebase Authentication**, **Cloud Firestore**, and **Razorpay** billing integration.
-
----
-
-## 🚀 Key Features
-
-- **Specialized Vertical Engines**:
-  - **Content Creators**: Highlight community stats (reach, engagement), collaboration packages (UGC, Reels, Story combos), interactive media kits, and brand inquiry forms.
-  - **Real Estate Agents**: Property showcase cards, direct showing booking modal, and seller home valuation forms.
-  - **Coaches & Educators**: Program batch cards with exam tracks, fee structures, and direct WhatsApp admission chats.
-- **Modern Interactive Studio**: Real-time mobile device preview with tactile animations, themes, and card customization.
-- **Account & Settings Hub**: Centralized management for creator identity, security credentials, SEO meta tags, and data backups (JSON archive & CSV lead exports).
-- **Integrated Billing Dashboard**: Razorpay payment processing for Free and Pro subscriptions, live GST-compliant tax invoices, and printable PDF receipts.
-- **Firebase Backend**: Real-time cloud persistence with Google Cloud Firestore and secure user authentication (Google One-Click & Email/Password).
+Unlike traditional flat link aggregators, LinkLyra transforms bio links into interactive, high-converting creator showrooms:
+- **Instant Video Media Detection**: Automatically detects YouTube videos/shorts and Instagram Reels to generate high-resolution video covers with custom badges.
+- **Direct 1-Tap UPI Tip Jar**: 0% platform fee. Fans can tip creators directly into their bank accounts via mobile Google Pay, PhonePe, or Paytm with preset amount chips (`₹100`, `₹250`, `₹500`, `₹1000`).
+- **Live Tour Dates Card**: For Stand-Up Comedians and Musicians to announce tour stops and link ticket bookings.
+- **Creator-First Niches**: Specialized templates tailored for Comedians, Fashion & Lifestyle, Tech & Finance, Fitness Coaches, Musicians, and Podcasters.
+- **Magic AI Bio Writer**: Generates captivating, tone-tailored profile bios and headlines in 1 tap.
+- **Audience Geography Analytics**: View real-time visitor country breakdown and top global locations with country flags.
+- **Integrated Pro Billing & Custom Domains**: Razorpay payment processing for Free and Pro subscriptions, live GST-compliant tax invoices, and 1-click DNS record verification.
 
 ---
 

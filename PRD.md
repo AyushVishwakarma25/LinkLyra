@@ -49,25 +49,27 @@ Traditional "link-in-bio" tools (Linktree, Beacons, Bio.fm) treat every creator 
 
 ## 🚀 3. Functional Requirements & Specifications
 
-### 3.1. Vertical Feature Set
+### 3.1. Creator-First Vertical Engine & Niche Templates
 
-#### A. Content Creators ("Hire Me" Engine)
-1. **Creator Stats Card**: Highlight verified metrics (Follower count, Engagement rate %, Monthly impressions/reach).
-2. **Featured Work Reels**: Interactive visual video/reel cards with play modal and metric badges.
-3. **Collaboration Packages**: Clear rate cards (UGC Video, Instagram Reel, Reel + Story combo, Dedicated Review) with instant booking CTA.
-4. **Brand Inquiry Modal**: Mini-form capturing Brand Name, Campaign Type, Budget Bracket (₹10K-₹50K+), Timeline, and Contact Email—saved to Firestore and routed to WhatsApp.
-5. **Interactive Media Kit**: Downloadable/viewable creator portfolio modal with audience demographics.
-6. **Affiliate Recommendations**: Product showcase cards with affiliate tag and discounted coupon badge.
+LinkLyra is purpose-built for **Content Creators** across specialized creator categories:
+1. **🎬 Video Creators & YouTubers**: Auto-thumbnail extraction from YouTube (videos, shorts, live, embeds) and Instagram Reels, rendering high-res 16:9 and 9:16 spotlight cards with 1-tap playback.
+2. **💰 Instant Tip & Support Jar**: Direct UPI payment card (`upi://pay?pa=...`) with customizable preset chips (₹100, ₹250, ₹500, ₹1000 or custom), creator thank-you note, and instant 1-tap mobile payment with 0% platform fee and zero KYC friction.
+3. **🎤 Stand-Up Comedians & Entertainers**: Live Tour Dates card displaying upcoming city stops, venues, dates, and ticket booking links with instant "Sold Out" badges.
+4. **👗 Fashion & Lifestyle Creators**: "Shop My Look" affiliate cards with discount coupon badges, 1-tap copy code, and direct brand collaboration packages.
+5. **📈 Tech, SaaS & Finance Creators**: Verified reach and engagement statistics, media kit one-sheets, and 1-on-1 strategy booking cards.
+6. **💪 Fitness & Wellness Coaches**: Workout program cards, diet consultations, and 1-tap WhatsApp intake.
+7. **🎵 Musicians & Recording Artists**: Smart streaming hubs (Spotify, Apple Music, YouTube), in-card audio snippets, tour dates, and concert booking inquiries.
+8. **🎙️ Podcasters & Audio Shows**: "Sponsor Me" killer card with verified monthly download statistics, latest episode embed, multi-platform streaming, and sponsor pitch deck.
 
-#### B. Real Estate Agents
-1. **Property Showcase Cards**: High-res property photo, BHK configuration, location tag, and pricing bracket.
-2. **Schedule a Showing Modal**: Captures buyer name, phone, preferred date, time slot, and pre-approval status.
-3. **Free Home Valuation Modal**: Captures property address, square footage, property type, and timeline for sellers.
-4. **Client Reviews & Sold Badges**: Verified testimonials reinforcing realtor authority.
+### 3.2. Magic AI Bio Assistant
+- **1-Click AI Bio Generator**: Accessible directly from the profile settings with tone options (High-Energy, Aesthetic, Brand-Ready, Witty) and category filtering.
+- **Instant Preview & Application**: Generates 4 diverse, tailored bios with character count checks and 1-tap profile application.
 
-#### C. Coaching & Educators
-1. **Course / Batch Cards**: Course title, target exam track (JEE / NEET / SAT), batch timings, and fee structure.
-2. **1-Tap Admission Chat**: Pre-populated WhatsApp inquiry mentioning exact course and batch details.
+### 3.3. Advanced Audience Analytics & Geography
+- Real-time page views and link click tracking.
+- Device distribution (Mobile, Desktop, Tablet).
+- Top Audience Locations and Geography breakdown with regional percentages.
+- Referrer traffic sources (Instagram, YouTube, Twitter/X, Direct).
 
 ---
 

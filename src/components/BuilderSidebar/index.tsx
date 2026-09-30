@@ -39,6 +39,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
   onEditCard,
   onDeleteCard,
   onMoveCard,
+  onReorderCards,
   onToggleCardActive,
   onOpenPublicView,
   onOpenAuth,
@@ -395,37 +396,38 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Dedicated Save Progress Button using Universal UI Kit */}
             <Button
               id="header-save-button"
               variant="primary"
-              size="md"
+              size="sm"
               onClick={handleTriggerSave}
               disabled={isSaving}
               isLoading={isSaving}
-              className={justSaved ? '!bg-emerald-600 !border-emerald-600 shadow-xs' : ''}
+              className={`rounded-xl ${justSaved ? '!bg-emerald-600 !border-emerald-600 shadow-xs' : ''}`}
               title="Save all changes"
             >
               {!isSaving && (
                 justSaved ? (
-                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={15} className="text-emerald-200" />
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="text-emerald-200" />
                 ) : (
-                  <HugeiconsIcon icon={FloppyDiskIcon} size={15} />
+                  <HugeiconsIcon icon={FloppyDiskIcon} size={14} />
                 )
               )}
               <span>{isSaving ? 'Saving...' : justSaved ? 'Saved!' : 'Save'}</span>
             </Button>
 
-            {/* Preview Button using Universal UI Kit */}
+            {/* Preview Button (Desktop only to prevent mobile clutter since mobile has bottom Preview tab) */}
             <Button
-              size="md"
+              size="sm"
               variant="secondary"
               onClick={onOpenPublicView}
+              className="hidden sm:inline-flex rounded-xl"
               title="Open live visitor view"
             >
-              <HugeiconsIcon icon={ViewIcon} size={15} />
-              <span className="hidden sm:inline">Preview</span>
+              <HugeiconsIcon icon={ViewIcon} size={14} />
+              <span>Preview</span>
             </Button>
           </div>
         </div>
@@ -440,6 +442,7 @@ export const BuilderSidebar: React.FC<BuilderSidebarProps> = ({
             onEditCard={onEditCard}
             onDeleteCard={onDeleteCard}
             onMoveCard={onMoveCard}
+            onReorderCards={onReorderCards}
             onToggleCardActive={onToggleCardActive}
             onDeleteSection={onDeleteSection}
             setTab={setTab}

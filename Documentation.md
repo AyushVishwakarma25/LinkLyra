@@ -32,25 +32,41 @@
 
 ---
 
-### 2. Specialized Vertical Cards & Lead Engines
+### 2. Specialized Creator Cards & Monetization Engines
 
-#### A. For Content Creators ("Hire Me" Engine)
-1. **Creator Stats**: Highlight your community size (e.g. `82K Instagram`), engagement rate (`4.8%`), and monthly reach (`1.2M`).
-2. **Collaboration Packages**: Add rate cards for `UGC Video (₹8,000)`, `Instagram Reel (₹15,000)`, and `Reel + Story (₹20,000)`.
-3. **Featured Video Reels**: Showcase visual portfolio work with thumbnail previews and view counters.
-4. **Brand Inquiry Modal**: Allows brand managers to submit campaign details, budget bracket, and timeline directly to your inbox and WhatsApp.
-5. **Interactive Media Kit**: Let brands preview or download your verified media kit and audience demographics.
-6. **Affiliate Recommendations**: Highlight products with affiliate discount coupons and direct buy links.
+#### A. Automatic Video Media Spotlight (YouTube & Reels)
+- **Instant Cover Detection**: Simply paste any YouTube link (`watch?v=...`, `youtu.be/...`, `/shorts/...`, or `/live/...`) or Instagram Reel URL.
+- **Cinematic Display**: LinkLyra automatically pulls high-resolution video covers, video duration, and platform badges.
+- **Custom Player Options**: Choose between 16:9 widescreen or 9:16 vertical reels with glowing play indicators.
 
-#### B. For Real Estate Agents
-1. **Property Showcase Cards**: Display property photos, BHK configuration, location pill, and pricing tag.
-2. **Schedule a Showing**: In-app modal enabling prospective buyers to choose a date, time slot, and pre-approval status.
-3. **Free Home Valuation**: Modal capturing property address, square footage, and condition for homeowners seeking to sell.
-4. **Client Reviews & Sold Badges**: Verified testimonials reinforcing local credibility.
+#### B. Direct 1-Tap UPI Tip Jar (0% Platform Fee)
+- **Instant Bank Deposit**: Enter your UPI ID (e.g. `creator@upi`). 100% of fan contributions land directly into your bank account with zero fees.
+- **Preset Amount Chips**: Customize suggested chips (`₹100`, `₹250`, `₹500`, `₹1000`) or allow fans to enter any custom amount.
+- **Deep Mobile Intent**: Automatically opens Google Pay, PhonePe, or Paytm on mobile devices, or provides 1-tap clipboard copying on desktop.
+- **Custom Thank-You Note**: Display a personalized thank-you message to your supporters.
 
-#### C. For Coaches & Educators
-1. **Batch Schedules**: Display course title, target exam track (JEE/NEET/UPSC), timings, and fee breakdown.
-2. **1-Tap Admission Chat**: Pre-populated WhatsApp message citing exact batch and course details.
+#### C. Live Tour Dates Card (Comedians & Performers)
+- **Tour Announcements**: Showcase your upcoming tour or live performance schedule with dates, cities, and venues.
+- **Ticket Links**: Direct fans to BookMyShow, Paytm Insider, or your own ticket portal.
+- **Availability Badges**: Mark sold-out venues or highlight high-demand tour stops.
+
+#### D. Creator Niches & Specialized Templates
+1. **Stand-Up Comedians & Entertainers**: Showcase viral comedy clips, upcoming live tour stops, tip jar, and college/corporate WhatsApp booking.
+2. **Fashion & Lifestyle Creators**: Drop affiliate lookbooks, beauty routines, media kit rate cards, and personal styling consultation chats.
+3. **Tech, Finance & SaaS Creators**: Share free spreadsheets, tutorials, 1-tap brand sponsorship packages, and deep-dive video breakdowns.
+4. **Musicians & Performing Artists**: Embed smart audio snippets, multi-platform streaming hubs (Spotify, Apple Music, YouTube), and merch drops.
+5. **Podcasters**: Feature latest episode releases, multi-directory listen hubs, listener demographics, and sponsor inquiry kits.
+6. **Fitness Coaches & Athletes**: Share workout programs, transformation showcases, and 1-on-1 coaching consultations.
+
+#### E. Magic AI Profile Bio & Headline Assistant
+- **1-Click Generation**: Transform simple notes into engaging, professional bios.
+- **Tone Personalities**: Select from *High-Energy*, *Aesthetic & Minimal*, *Brand-Ready*, or *Witty & Relatable*.
+- **Instant Apply**: Review suggestions and apply them directly to your live profile in 1 tap.
+
+#### F. Audience Geography & Analytics
+- **Top Locations Breakdown**: See where your audience is visiting from across the globe with country flags and percentage shares.
+- **Real-Time Counters**: Track total link clicks, page views, and click-through rates.
+- **Domain & Email Verification**: 1-click DNS record verification for custom domains and sample test email alerts.
 
 ---
 

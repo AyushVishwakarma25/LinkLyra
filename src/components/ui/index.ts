@@ -7,3 +7,5 @@ export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlProps, SegmentedControlOption } from './SegmentedControl';
 export { Badge } from './Badge';
 export type { BadgeProps } from './Badge';
+export { SpecularButton } from './SpecularButton';
+export type { SpecularButtonProps } from './SpecularButton';

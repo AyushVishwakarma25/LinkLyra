@@ -155,9 +155,17 @@ export function linkToCard(linkDoc: DocumentInput = {}): ProfileCardData {
     creatorPackages: linkDoc.creatorPackages || linkDoc.creator_packages,
     brandInquiry: linkDoc.brandInquiry || linkDoc.brand_inquiry,
     recommendation: linkDoc.recommendation,
+    mediaKit: linkDoc.mediaKit || linkDoc.media_kit,
+    showingBooking: linkDoc.showingBooking || linkDoc.showing_booking,
+    homeValuation: linkDoc.homeValuation || linkDoc.home_valuation,
     clientReview: linkDoc.clientReview || linkDoc.client_review,
     music: linkDoc.music,
     podcast: linkDoc.podcast,
+    tipSupport: linkDoc.tipSupport || linkDoc.tip_support,
+    liveTour: linkDoc.liveTour || linkDoc.live_tour,
+    videoMedia: linkDoc.videoMedia || linkDoc.video_media,
+    cardBgColor: linkDoc.cardBgColor || linkDoc.card_bg_color,
+    cardTextColor: linkDoc.cardTextColor || linkDoc.card_text_color,
     customWhatsappPhone: linkDoc.customWhatsappPhone || linkDoc.custom_whatsapp_phone,
   };
 }
@@ -293,6 +301,38 @@ export function cardToLinkDoc(
   }
   if (card.podcast) {
     linkDoc.podcast = card.podcast;
+  }
+  if (card.tipSupport) {
+    linkDoc.tipSupport = card.tipSupport;
+    linkDoc.tip_support = card.tipSupport;
+  }
+  if (card.liveTour) {
+    linkDoc.liveTour = card.liveTour;
+    linkDoc.live_tour = card.liveTour;
+  }
+  if (card.videoMedia) {
+    linkDoc.videoMedia = card.videoMedia;
+    linkDoc.video_media = card.videoMedia;
+  }
+  if (card.mediaKit) {
+    linkDoc.mediaKit = card.mediaKit;
+    linkDoc.media_kit = card.mediaKit;
+  }
+  if (card.showingBooking) {
+    linkDoc.showingBooking = card.showingBooking;
+    linkDoc.showing_booking = card.showingBooking;
+  }
+  if (card.homeValuation) {
+    linkDoc.homeValuation = card.homeValuation;
+    linkDoc.home_valuation = card.homeValuation;
+  }
+  if (card.cardBgColor) {
+    linkDoc.cardBgColor = card.cardBgColor;
+    linkDoc.card_bg_color = card.cardBgColor;
+  }
+  if (card.cardTextColor) {
+    linkDoc.cardTextColor = card.cardTextColor;
+    linkDoc.card_text_color = card.cardTextColor;
   }
 
   return linkDoc;

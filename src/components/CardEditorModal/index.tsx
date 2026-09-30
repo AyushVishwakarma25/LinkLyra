@@ -15,6 +15,10 @@ import {
   CoachingMetadata,
   MusicMetadata,
   PodcastMetadata,
+  TipSupportMetadata,
+  VideoSpotlightMetadata,
+  LiveTourMetadata,
+  TourDateItem,
   DbSection,
 } from '../../types';
 import { UI_KIT } from '../../lib/ui-kit';
@@ -22,6 +26,7 @@ import { ProfileCard } from '../ProfileCard';
 import { generateWhatsAppIntentUrl } from '../../lib/whatsapp';
 import { uploadImageToStorage } from '../../lib/storage';
 import { isValidExternalUrl, normalizeExternalUrl } from '../../lib/url';
+import { detectVideoMedia } from '../../lib/video';
 import { HugeIcon } from '../HugeIcon';
 import {
   ArrowLeft01Icon,
@@ -169,6 +174,21 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const [mediaKitUrl, setMediaKitUrl] = useState('');
   const [sponsorPitch, setSponsorPitch] = useState('Put your product in front of thousands of high-earning decision makers every week.');
 
+  // 11. Direct UPI & Tip Jar
+  const [upiId, setUpiId] = useState('');
+  const [creatorTipName, setCreatorTipName] = useState('');
+  const [thankYouMessage, setThankYouMessage] = useState('Thanks for supporting my creative work! ☕');
+  const [presetAmountsStr, setPresetAmountsStr] = useState('100, 250, 500, 1000');
+  const [paymentLink, setPaymentLink] = useState('');
+
+  // 12. Comedian & Live Tour Dates
+  const [tourTitle, setTourTitle] = useState('🎤 Live Comedy & Tour Dates');
+  const [tourDatesList, setTourDatesList] = useState<TourDateItem[]>([
+    { id: '1', date: 'Sat, Nov 14', city: 'Mumbai', venue: 'NCPA Theatre', ticketUrl: 'https://insider.in' },
+    { id: '2', date: 'Fri, Nov 20', city: 'Bengaluru', venue: 'Good Shepherd Hall', ticketUrl: 'https://bookmyshow.com' },
+    { id: '3', date: 'Sun, Nov 29', city: 'Delhi NCR', venue: 'Siri Fort Auditorium', ticketUrl: 'https://bookmyshow.com', soldOut: true },
+  ]);
+
   // Image Upload state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -277,6 +297,23 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
         setMediaKitUrl(initialCard.podcast.mediaKitUrl || '');
         setSponsorPitch(initialCard.podcast.sponsorPitch || '');
       }
+
+      if (initialCard.tipSupport) {
+        setUpiId(initialCard.tipSupport.upiId || '');
+        setCreatorTipName(initialCard.tipSupport.creatorName || '');
+        setThankYouMessage(initialCard.tipSupport.thankYouMessage || 'Thanks for supporting my creative work! ☕');
+        if (initialCard.tipSupport.presetAmounts) {
+          setPresetAmountsStr(initialCard.tipSupport.presetAmounts.join(', '));
+        }
+        setPaymentLink(initialCard.tipSupport.paymentLink || '');
+      }
+
+      if (initialCard.liveTour) {
+        setTourTitle(initialCard.liveTour.tourTitle || '🎤 Live Comedy & Tour Dates');
+        if (initialCard.liveTour.dates) {
+          setTourDatesList(initialCard.liveTour.dates);
+        }
+      }
     } else {
       setActiveView('picker');
       setSelectedCategoryTab('for_you');
@@ -291,6 +328,12 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       setExpanded(false);
       setIsActive(true);
       setCustomWhatsappPhone('');
+      setUpiId('');
+      setCreatorTipName('');
+      setThankYouMessage('Thanks for supporting my creative work! ☕');
+      setPresetAmountsStr('100, 250, 500, 1000');
+      setPaymentLink('');
+      setTourTitle('🎤 Live Comedy & Tour Dates');
     }
   }, [initialCard, isOpen]);
 
@@ -321,7 +364,27 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   // Switch template archetype with smart presets
   const handleSelectTemplate = (type: CardTemplateType) => {
     setTemplateType(type);
-    if (type === 'work_with_me') {
+    if (type === 'video_spotlight' || type === 'youtube' || type === 'instagram') {
+      setTitle('🎬 Watch Featured Video / Reel');
+      setSubtitle('Click to watch full video with high-res preview');
+      setColor('stone');
+      setExpanded(true);
+      setBadgeText('FEATURED');
+    } else if (type === 'tip_support') {
+      setTitle('☕ Support My Creative Journey');
+      setSubtitle('Fuel my creative content with an instant tip via UPI');
+      setColor('stone');
+      setExpanded(true);
+      setBadgeText('TIP JAR');
+      setThankYouMessage('Thanks for fueling my creative journey! ☕');
+    } else if (type === 'live_tour') {
+      setTitle('🎤 Live Comedy & Tour Dates 2026');
+      setSubtitle('Upcoming show dates, cities & ticket links');
+      setColor('stone');
+      setExpanded(true);
+      setBadgeText('TOUR DATES');
+      setTourTitle('🎤 Live Comedy & Tour Dates 2026');
+    } else if (type === 'work_with_me') {
       setTitle('🔥 Work With Me');
       setSubtitle('Available for UGC, Sponsored Reels & Creative Campaigns');
       setColor('purple');
@@ -598,6 +661,41 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       }
     : undefined;
 
+  const previewTipSupport: TipSupportMetadata | undefined =
+    templateType === 'tip_support'
+      ? {
+          upiId: upiId.trim(),
+          creatorName: creatorTipName.trim() || title.trim(),
+          thankYouMessage: thankYouMessage.trim(),
+          presetAmounts: presetAmountsStr
+            .split(',')
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n) && n > 0),
+          paymentLink: paymentLink.trim() || undefined,
+        }
+      : undefined;
+
+  const previewLiveTour: LiveTourMetadata | undefined =
+    templateType === 'live_tour'
+      ? {
+          tourTitle: tourTitle.trim() || title.trim(),
+          dates: tourDatesList,
+        }
+      : undefined;
+
+  const detectedVideo = detectVideoMedia(linkUrl);
+  const previewVideoMedia: VideoSpotlightMetadata | undefined =
+    detectedVideo.platform !== 'other' || templateType === 'video_spotlight'
+      ? {
+          platform: detectedVideo.platform !== 'other' ? detectedVideo.platform : 'youtube',
+          videoId: detectedVideo.videoId,
+          videoUrl: linkUrl,
+          thumbnailUrl: logoSrc || detectedVideo.thumbnailUrl,
+          isShortOrReel: detectedVideo.isShortOrReel,
+          aspectRatio: detectedVideo.aspectRatio || '16:9',
+        }
+      : undefined;
+
   const previewCard: ProfileCardData = {
     id: initialCard ? initialCard.id : 'preview-card',
     title: title.trim() || 'Card Title',
@@ -619,6 +717,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     coaching: previewCoaching,
     music: previewMusic,
     podcast: previewPodcast,
+    tipSupport: previewTipSupport,
+    liveTour: previewLiveTour,
+    videoMedia: previewVideoMedia,
     isPremium: isMusicianType || isPodcastType,
     customWhatsappPhone: customWhatsappPhone.trim() || undefined,
   };
@@ -649,6 +750,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       coaching: previewCoaching,
       music: previewMusic,
       podcast: previewPodcast,
+      tipSupport: previewTipSupport,
+      liveTour: previewLiveTour,
+      videoMedia: previewVideoMedia,
       isPremium: isMusicianType || isPodcastType,
       customWhatsappPhone: customWhatsappPhone.trim() || undefined,
       clicks: initialCard?.clicks || 0,
@@ -670,34 +774,49 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       count: ALL_TEMPLATES.filter((t) => t.category === normalized.category || t.category === 'standard').length,
     },
     {
-      id: 'creator',
-      label: 'Content Creator',
-      count: ALL_TEMPLATES.filter((t) => t.category === 'creator').length,
+      id: 'video',
+      label: '🎬 Video & Reels',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'video').length,
+    },
+    {
+      id: 'monetize',
+      label: '💰 Tip Jar & Income',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'monetize').length,
+    },
+    {
+      id: 'comedian',
+      label: '🎤 Comedy & Shows',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'comedian').length,
+    },
+    {
+      id: 'fashion',
+      label: '👗 Fashion & Style',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'fashion').length,
+    },
+    {
+      id: 'tech_finance',
+      label: '📈 Tech & Finance',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'tech_finance').length,
+    },
+    {
+      id: 'fitness',
+      label: '💪 Fitness & Coaching',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'fitness').length,
     },
     {
       id: 'musician',
-      label: 'Musicians & Artists',
+      label: '🎵 Musicians & Bands',
       count: ALL_TEMPLATES.filter((t) => t.category === 'musician').length,
     },
     {
       id: 'podcast',
-      label: 'Podcasters & Shows',
+      label: '🎙️ Podcasts & Shows',
       count: ALL_TEMPLATES.filter((t) => t.category === 'podcast').length,
     },
     {
-      id: 'real_estate',
-      label: 'Real Estate Engine',
-      count: ALL_TEMPLATES.filter((t) => t.category === 'real_estate').length,
-    },
-    {
-      id: 'coach',
-      label: 'Coaches & Academies',
-      count: ALL_TEMPLATES.filter((t) => t.category === 'coach').length,
-    },
-    {
       id: 'standard',
-      label: 'Standard Link',
-      count: 1,
+      label: '🔗 Standard Link',
+      count: ALL_TEMPLATES.filter((t) => t.category === 'standard').length,
     },
   ];
 
@@ -846,6 +965,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     coaching={previewCard.coaching}
                     music={previewCard.music}
                     podcast={previewCard.podcast}
+                    tipSupport={previewCard.tipSupport}
+                    liveTour={previewCard.liveTour}
+                    videoMedia={previewCard.videoMedia}
                     businessPhone={businessPhone}
                     customWhatsappPhone={previewCard.customWhatsappPhone}
                     interactive={false}
@@ -874,7 +996,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   />
                 )}
 
-                {/* 2-4. CREATOR STATS, FEATURED WORK, RECOMMENDATION FIELDS */}
+                {/* 2-4. CREATOR STATS, FEATURED WORK, RECOMMENDATION FIELDS, TIP JAR, TOUR DATES */}
                 <CreatorEditor
                   templateType={templateType}
                   instagramFollowers={instagramFollowers}
@@ -900,6 +1022,18 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   productPrice={productPrice}
                   setProductPrice={setProductPrice}
                   setTitle={setTitle}
+                  upiId={upiId}
+                  setUpiId={setUpiId}
+                  creatorTipName={creatorTipName}
+                  setCreatorTipName={setCreatorTipName}
+                  thankYouMessage={thankYouMessage}
+                  setThankYouMessage={setThankYouMessage}
+                  presetAmountsStr={presetAmountsStr}
+                  setPresetAmountsStr={setPresetAmountsStr}
+                  tourTitle={tourTitle}
+                  setTourTitle={setTourTitle}
+                  tourDatesList={tourDatesList}
+                  setTourDatesList={setTourDatesList}
                 />
 
                 {/* 5. MUSICIAN / RECORDING ARTIST FORM */}
@@ -1001,11 +1135,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 {/* Destination URL */}
                 <div>
                   <label className="text-xs font-bold text-[#1C1E22] block mb-1">
-                    Destination URL / Listing Link
+                    Destination URL / Video or Social Link
                   </label>
                   <input
                     type="text"
-                    placeholder="https://... or example.com"
+                    placeholder="https://... or youtube.com/watch?v=..."
                     value={linkUrl}
                     onChange={(e) => setLinkUrl(e.target.value)}
                     className={`w-full px-3.5 py-2 bg-white rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 shadow-xs transition-colors ${
@@ -1024,6 +1158,43 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       ✓ Target: {normalizeExternalUrl(linkUrl)}
                     </p>
                   ) : null}
+
+                  {/* Auto-detected Video Banner */}
+                  {detectedVideo.platform !== 'other' && detectedVideo.thumbnailUrl && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-purple-50/90 border border-purple-200 flex items-center justify-between gap-3 animate-fadeIn">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={detectedVideo.thumbnailUrl}
+                          alt="Video Cover"
+                          className="w-14 h-9 rounded-lg object-cover border border-purple-200 shadow-2xs shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-purple-950 truncate flex items-center gap-1">
+                            <span>🎬</span>
+                            <span>
+                              {detectedVideo.platform === 'youtube'
+                                ? detectedVideo.isShortOrReel
+                                  ? 'YouTube Short Detected'
+                                  : 'YouTube Video Detected'
+                                : 'Instagram Reel Detected'}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-purple-700">
+                            Cover thumbnail automatically extracted and linked!
+                          </p>
+                        </div>
+                      </div>
+                      {logoSrc !== detectedVideo.thumbnailUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoSrc(detectedVideo.thumbnailUrl || '')}
+                          className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold shrink-0 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          Use as Card Image
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Photo / Image URL */}

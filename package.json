@@ -27,6 +27,7 @@
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.18.0",
     "motion": "^12.23.24",
+    "ogl": "^1.0.11",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "transliteration": "^2.6.1"

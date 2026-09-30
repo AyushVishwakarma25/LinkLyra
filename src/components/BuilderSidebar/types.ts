@@ -20,6 +20,7 @@ export interface BuilderSidebarProps {
   onEditCard: (card: ProfileCardData) => void;
   onDeleteCard: (id: string) => void;
   onMoveCard: (index: number, direction: 'up' | 'down') => void;
+  onReorderCards?: (newCards: ProfileCardData[]) => void;
   onToggleCardActive: (id: string) => void;
   onOpenPublicView: () => void;
   onOpenAuth?: () => void;

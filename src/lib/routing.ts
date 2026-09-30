@@ -1,6 +1,6 @@
 import { RESERVED } from './username';
 
-export type RouteType = 'landing' | 'studio' | 'profile' | 'domain' | '404';
+export type RouteType = 'landing' | 'studio' | 'profile' | 'domain' | 'terms' | 'privacy' | 'contact' | '404';
 
 export interface RouteOptions {
   hostname?: string;
@@ -172,6 +172,29 @@ export function resolveRoute(
     return 'studio';
   }
 
+  // 1b. Terms, Privacy and Contact routes (?view=terms, ?view=privacy, ?view=contact, #terms, #privacy, #contact, /terms, /privacy, /contact)
+  if (
+    searchParams.get('view') === 'terms' ||
+    hash === 'terms' ||
+    pathname === 'terms'
+  ) {
+    return 'terms';
+  }
+  if (
+    searchParams.get('view') === 'privacy' ||
+    hash === 'privacy' ||
+    pathname === 'privacy'
+  ) {
+    return 'privacy';
+  }
+  if (
+    searchParams.get('view') === 'contact' ||
+    hash === 'contact' ||
+    pathname === 'contact'
+  ) {
+    return 'contact';
+  }
+
   // 2. Custom domain check: any hostname not in platform hosts and not VITE_APP_HOST
   if (hostname && !isPlatformHost(hostname)) {
     return 'domain';
@@ -188,6 +211,9 @@ export function resolveRoute(
   if (userParam && userParam.trim()) {
     const cleanUser = userParam.trim().toLowerCase().replace(/^@/, '');
     if (RESERVED.has(cleanUser)) {
+      if (cleanUser === 'terms') return 'terms';
+      if (cleanUser === 'privacy') return 'privacy';
+      if (cleanUser === 'contact') return 'contact';
       return '404';
     }
     return 'profile';
@@ -205,6 +231,9 @@ export function resolveRoute(
       hash !== 'landing'
     ) {
       const cleanHash = hash.replace(/^@/, '');
+      if (cleanHash === 'terms') return 'terms';
+      if (cleanHash === 'privacy') return 'privacy';
+      if (cleanHash === 'contact') return 'contact';
       if (RESERVED.has(cleanHash)) {
         return '404';
       }
@@ -220,6 +249,9 @@ export function resolveRoute(
     }
     if (segments[1]) {
       const cleanUser = segments[1].toLowerCase().replace(/^@/, '');
+      if (cleanUser === 'terms') return 'terms';
+      if (cleanUser === 'privacy') return 'privacy';
+      if (cleanUser === 'contact') return 'contact';
       if (RESERVED.has(cleanUser)) {
         return '404';
       }
@@ -232,6 +264,9 @@ export function resolveRoute(
   const first = segments[0].toLowerCase().replace(/^@/, '');
   if (RESERVED.has(first)) {
     if (first === 'studio') return 'studio';
+    if (first === 'terms') return 'terms';
+    if (first === 'privacy') return 'privacy';
+    if (first === 'contact') return 'contact';
     return '404';
   }
 

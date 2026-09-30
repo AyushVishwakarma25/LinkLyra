@@ -2,14 +2,10 @@ import React from 'react';
 import { HugeIcon } from '../HugeIcon';
 import { ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { CardTemplateType } from '../../types';
-import { CategoryTab, TemplateCardItem } from './templateData';
+import { CategoryTab, TemplateCardItem, normalizeRole } from './templateData';
 
 export interface TemplatePickerProps {
-  normalizedRole: {
-    category: 'creator' | 'musician' | 'podcast' | 'real_estate' | 'coach';
-    roleName: string;
-    roleHeadline: string;
-  };
+  normalizedRole: ReturnType<typeof normalizeRole>;
   categoryTabs: Array<{ id: CategoryTab; label: string; count: number }>;
   selectedCategoryTab: CategoryTab;
   onSelectCategoryTab: (tab: CategoryTab) => void;

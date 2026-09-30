@@ -24,6 +24,7 @@ import { CardEditorModal } from './components/CardEditorModal';
 import { AuthModal } from './components/AuthModal';
 import { ProUpgradeModal } from './components/ProUpgradeModal';
 import { LandingPage } from './components/LandingPage';
+import { TermsPage, PrivacyPage, ContactPage } from './components/Legal';
 import { PublicProfilePage } from './app/[username]/page';
 import { AccountSettings, AccountSubTab } from './components/AccountSettings';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -74,8 +75,11 @@ function StudioApp() {
 
   const [routeTarget] = useState<string | null>(initialRouteTarget);
 
-  // Primary App View: 'landing' (Conversational Landing Page) | 'studio' (Sidebar + Preview) | 'preview_only' (Live interactive mobile view) | 'public' (Full public page)
-  const [appMode, setAppMode] = useState<'landing' | 'studio' | 'preview_only' | 'public'>(() => {
+  // Primary App View: 'landing' | 'studio' | 'preview_only' | 'public' | 'terms' | 'privacy' | 'contact'
+  const [appMode, setAppMode] = useState<'landing' | 'studio' | 'preview_only' | 'public' | 'terms' | 'privacy' | 'contact'>(() => {
+    if (initialRoute === 'terms') return 'terms';
+    if (initialRoute === 'privacy') return 'privacy';
+    if (initialRoute === 'contact') return 'contact';
     if (initialIsDirectPublic) return 'public';
     if (explicitStudio) return 'studio';
     return 'landing';
@@ -414,16 +418,8 @@ function StudioApp() {
     }
   };
 
-  const handleMoveCard = async (index: number, direction: 'up' | 'down') => {
-    const newCards = [...profile.cards];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newCards.length) return;
-
+  const handleReorderCards = async (newCards: ProfileCardData[]) => {
     const prevProfile = profile;
-    const temp = newCards[index];
-    newCards[index] = newCards[targetIndex];
-    newCards[targetIndex] = temp;
-
     setProfile((prev) => ({
       ...prev,
       cards: newCards,
@@ -442,13 +438,25 @@ function StudioApp() {
         console.error('Error reordering links:', err);
         setProfile(prevProfile);
         setSaveStatus('error');
-        const retry = () => handleMoveCard(index, direction);
+        const retry = () => handleReorderCards(newCards);
         setLastFailedAction(() => retry);
-        toast.error('Failed to reorder cards.', { label: 'Retry', onClick: retry });
+        toast.error('Failed to save card order.', { label: 'Retry', onClick: retry });
       } finally {
         setIsSyncing(false);
       }
     }
+  };
+
+  const handleMoveCard = async (index: number, direction: 'up' | 'down') => {
+    const newCards = [...profile.cards];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newCards.length) return;
+
+    const temp = newCards[index];
+    newCards[index] = newCards[targetIndex];
+    newCards[targetIndex] = temp;
+
+    await handleReorderCards(newCards);
   };
 
   const handleAddSection = async (title: string) => {
@@ -769,6 +777,9 @@ function StudioApp() {
           userProfile={profile}
           onSignOut={handleSignOut}
           onOpenAccountSettings={(tab) => handleOpenAccountSettings(tab || 'profile')}
+          onOpenTerms={() => setAppMode('terms')}
+          onOpenPrivacy={() => setAppMode('privacy')}
+          onOpenContact={() => setAppMode('contact')}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
@@ -793,6 +804,57 @@ function StudioApp() {
           lockedFeatureName={proLockedFeature}
         />
       </>
+    );
+  }
+
+  // Terms and Conditions standalone page view
+  if (appMode === 'terms') {
+    return (
+      <TermsPage
+        onBack={() => setAppMode('landing')}
+        onOpenPrivacy={() => setAppMode('privacy')}
+        onOpenContact={() => setAppMode('contact')}
+        onOpenStudio={() => {
+          if (!currentUser) setIsAuthModalOpen(true);
+          else setAppMode('studio');
+        }}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        currentUser={currentUser}
+      />
+    );
+  }
+
+  // Privacy Policy standalone page view
+  if (appMode === 'privacy') {
+    return (
+      <PrivacyPage
+        onBack={() => setAppMode('landing')}
+        onOpenTerms={() => setAppMode('terms')}
+        onOpenContact={() => setAppMode('contact')}
+        onOpenStudio={() => {
+          if (!currentUser) setIsAuthModalOpen(true);
+          else setAppMode('studio');
+        }}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        currentUser={currentUser}
+      />
+    );
+  }
+
+  // Contact & Support standalone page view
+  if (appMode === 'contact') {
+    return (
+      <ContactPage
+        onBack={() => setAppMode('landing')}
+        onOpenTerms={() => setAppMode('terms')}
+        onOpenPrivacy={() => setAppMode('privacy')}
+        onOpenStudio={() => {
+          if (!currentUser) setIsAuthModalOpen(true);
+          else setAppMode('studio');
+        }}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        currentUser={currentUser}
+      />
     );
   }
 
@@ -876,38 +938,6 @@ function StudioApp() {
               </div>
             </div>
           </button>
-
-          {/* Cloud Status Badge */}
-          <div className="flex items-center shrink-0">
-            {!currentUser ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 text-[11px] text-[#737882]">
-                <HugeiconsIcon icon={CloudIcon} size={14} className="text-[#737882]" />
-                <span className="truncate text-[#191A1E] font-medium">Local Draft</span>
-              </div>
-            ) : saveStatus === 'saving' || isSyncing ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-[11px] text-[#5E4BF7]">
-                <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin text-[#5E4BF7]" />
-                <span className="truncate font-semibold">Saving...</span>
-              </div>
-            ) : saveStatus === 'error' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (lastFailedAction) lastFailedAction();
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-[11px] text-red-700 hover:bg-red-100 transition-colors font-semibold cursor-pointer"
-                title="Save failed. Click to retry."
-              >
-                <HugeiconsIcon icon={AlertCircleIcon} size={14} className="text-red-600" />
-                <span className="truncate">Failed to save (Retry)</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="text-emerald-600" />
-                <span className="truncate font-medium">Saved</span>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* View Mode Switcher via Universal UI Kit SegmentedControl (No ' | ' separators!) */}
@@ -1012,6 +1042,7 @@ function StudioApp() {
             onEditCard={handleEditCard}
             onDeleteCard={handleDeleteCard}
             onMoveCard={handleMoveCard}
+            onReorderCards={handleReorderCards}
             onToggleCardActive={handleToggleCardActive}
             onOpenPublicView={() => {
               const url = profile.username ? `/?user=${encodeURIComponent(profile.username)}` : '/';
@@ -1048,104 +1079,96 @@ function StudioApp() {
       {/* Mobile Bottom Navigation Bar (Optimized for iPhone Home Indicator & Android Navigation Bar) */}
       <nav
         aria-label="Mobile Navigation"
-        className="lg:hidden bg-white/95 backdrop-blur-md border-t border-black/10 px-3 pt-1.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
+        className="lg:hidden bg-white/95 backdrop-blur-md border-t border-black/10 px-2 pt-1.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] grid grid-cols-5 items-center shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
       >
+        {/* 1. Links Tab */}
         <button
           type="button"
           onClick={() => {
             setAppMode('studio');
             setActiveSidebarTab('links');
           }}
-          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+          className={`flex flex-col items-center justify-center w-full min-h-[44px] py-1 px-1 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation cursor-pointer ${
             appMode === 'studio' && activeSidebarTab === 'links'
               ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
               : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
           <div className="relative">
-            <HugeiconsIcon icon={Link01Icon} size={18} />
+            <HugeiconsIcon icon={Link01Icon} size={19} />
             {profile.cards.length > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[13px] h-[13px] px-0.5 rounded-full bg-[#5E4BF7] text-white text-[8px] font-black flex items-center justify-center">
+              <span className="absolute -top-1 -right-2.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#5E4BF7] text-white text-[8px] font-black flex items-center justify-center shadow-xs">
                 {profile.cards.length}
               </span>
             )}
           </div>
-          <span className="mt-0.5 tracking-tight">Links</span>
+          <span className="mt-1 tracking-tight">Links</span>
         </button>
 
+        {/* 2. Theme / Appearance Tab */}
         <button
           type="button"
           onClick={() => {
             setAppMode('studio');
             setActiveSidebarTab('appearance');
           }}
-          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+          className={`flex flex-col items-center justify-center w-full min-h-[44px] py-1 px-1 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation cursor-pointer ${
             appMode === 'studio' && activeSidebarTab === 'appearance'
               ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
               : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={ColorsIcon} size={18} />
-          <span className="mt-0.5 tracking-tight">Theme</span>
+          <HugeiconsIcon icon={ColorsIcon} size={19} />
+          <span className="mt-1 tracking-tight">Theme</span>
         </button>
 
-        {/* Center Floating Action Button (+ Add Link) */}
-        <div className="flex flex-col items-center -mt-5">
+        {/* 3. Center Floating Action Button (+ Add Link) */}
+        <div className="flex flex-col items-center justify-center -mt-6">
           <button
             type="button"
-            onClick={handleAddCard}
-            className="w-12 h-12 rounded-full bg-[#1C1E22] hover:bg-black active:scale-90 text-white flex items-center justify-center shadow-lg shadow-black/20 ring-4 ring-white transition-transform touch-manipulation"
+            onClick={() => {
+              if (appMode === 'preview_only') setAppMode('studio');
+              setActiveSidebarTab('links');
+              handleAddCard();
+            }}
+            className="w-12 h-12 rounded-full bg-[#1C1E22] hover:bg-black active:scale-90 text-white flex items-center justify-center shadow-lg shadow-black/25 ring-4 ring-white transition-transform touch-manipulation cursor-pointer"
             title="Add Link Card"
             aria-label="Add new link card"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={22} strokeWidth={2.5} />
           </button>
-          <span className="text-[9px] font-extrabold text-[#1C1E22] mt-0.5 tracking-tight">Add</span>
+          <span className="text-[10px] font-extrabold text-[#1C1E22] mt-0.5 tracking-tight">Add</span>
         </div>
 
+        {/* 4. Leads / Inquiries Tab */}
         <button
           type="button"
           onClick={() => {
             setAppMode('studio');
             setActiveSidebarTab('leads');
           }}
-          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+          className={`flex flex-col items-center justify-center w-full min-h-[44px] py-1 px-1 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation cursor-pointer ${
             appMode === 'studio' && activeSidebarTab === 'leads'
               ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
               : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={Mail01Icon} size={18} />
-          <span className="mt-0.5 tracking-tight">Leads</span>
+          <HugeiconsIcon icon={Mail01Icon} size={19} />
+          <span className="mt-1 tracking-tight">Inquiries</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setAppMode('studio');
-            setActiveSidebarTab('profile');
-          }}
-          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
-            appMode === 'studio' && activeSidebarTab === 'profile'
-              ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
-              : 'text-[#737882] hover:text-[#1C1E22]'
-          }`}
-        >
-          <HugeiconsIcon icon={UserIcon} size={18} />
-          <span className="mt-0.5 tracking-tight">Profile</span>
-        </button>
-
+        {/* 5. Live Preview / Editor Toggle */}
         <button
           type="button"
           onClick={() => setAppMode(appMode === 'preview_only' ? 'studio' : 'preview_only')}
-          className={`flex flex-col items-center justify-center min-w-[54px] min-h-[44px] py-1 px-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation ${
+          className={`flex flex-col items-center justify-center w-full min-h-[44px] py-1 px-1 rounded-xl text-[10px] font-bold transition-all active:scale-95 touch-manipulation cursor-pointer ${
             appMode === 'preview_only'
               ? 'text-[#5E4BF7] bg-[#5E4BF7]/10'
               : 'text-[#737882] hover:text-[#1C1E22]'
           }`}
         >
-          <HugeiconsIcon icon={ViewIcon} size={18} />
-          <span className="mt-0.5 tracking-tight">{appMode === 'preview_only' ? 'Editor' : 'Preview'}</span>
+          <HugeiconsIcon icon={ViewIcon} size={19} />
+          <span className="mt-1 tracking-tight">{appMode === 'preview_only' ? 'Editor' : 'Preview'}</span>
         </button>
       </nav>
 

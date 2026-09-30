@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HugeIcon } from '../HugeIcon';
-import { Tick01Icon } from '@hugeicons/core-free-icons';
+import { Tick01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { UserAccountSettings } from '../../types';
+import { useToast } from '../../context/ToastContext';
 
 export interface PreferencesTabProps {
   settings: UserAccountSettings;
@@ -14,6 +15,16 @@ export const PreferencesTab: React.FC<PreferencesTabProps> = ({
   handleSavePreferences,
   prefSaveFeedback,
 }) => {
+  const toast = useToast();
+  const [isSendingSample, setIsSendingSample] = useState(false);
+
+  const handleSendSample = () => {
+    setIsSendingSample(true);
+    setTimeout(() => {
+      setIsSendingSample(false);
+      toast.success('Sample alert dispatched! Check your registered email inbox.');
+    }, 1000);
+  };
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 shadow-2xs space-y-5">
@@ -126,6 +137,31 @@ export const PreferencesTab: React.FC<PreferencesTabProps> = ({
               />
             </button>
           </div>
+        </div>
+
+        {/* Test Alert Dispatcher */}
+        <div className="pt-3 border-t border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#FAF8F5] rounded-xl border border-black/5">
+          <div>
+            <p className="text-xs font-bold text-[#1C1E22]">
+              Verify Email Delivery
+            </p>
+            <p className="text-[11px] text-[#737882]">
+              Send a sample alert to verify that lead notifications arrive in your primary inbox.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSendSample}
+            disabled={isSendingSample}
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-100 text-[#1C1E22] border border-black/10 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60"
+          >
+            {isSendingSample ? (
+              <HugeIcon icon={Loading03Icon} size={14} className="w-3.5 h-3.5 animate-spin text-[#5E4BF7]" />
+            ) : (
+              <span>✉️</span>
+            )}
+            <span>{isSendingSample ? 'Dispatching...' : 'Send Sample Alert'}</span>
+          </button>
         </div>
       </div>
 

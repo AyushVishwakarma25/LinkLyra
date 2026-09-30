@@ -21,17 +21,29 @@ import { UI_KIT } from '../../lib/ui-kit';
 
 export type CategoryTab =
   | 'for_you'
-  | 'creator'
+  | 'video'
+  | 'monetize'
+  | 'comedian'
+  | 'fashion'
+  | 'tech_finance'
+  | 'fitness'
   | 'musician'
   | 'podcast'
-  | 'real_estate'
-  | 'coach'
   | 'standard';
 
 export interface TemplateCardItem {
   id: CardTemplateType;
   title: string;
-  category: 'creator' | 'musician' | 'podcast' | 'real_estate' | 'coach' | 'standard';
+  category:
+    | 'video'
+    | 'monetize'
+    | 'comedian'
+    | 'fashion'
+    | 'tech_finance'
+    | 'fitness'
+    | 'musician'
+    | 'podcast'
+    | 'standard';
   categoryLabel: string;
   description: string;
   badge?: string;
@@ -40,15 +52,51 @@ export interface TemplateCardItem {
 }
 
 export function normalizeRole(rawRole?: string): {
-  category: 'creator' | 'musician' | 'podcast' | 'real_estate' | 'coach';
+  category:
+    | 'video'
+    | 'monetize'
+    | 'comedian'
+    | 'fashion'
+    | 'tech_finance'
+    | 'fitness'
+    | 'musician'
+    | 'podcast';
   roleName: string;
   roleHeadline: string;
 } {
   const r = (rawRole || '').toLowerCase();
-  if (r.includes('music') || r.includes('artist') || r.includes('band') || r.includes('singer')) {
+  if (r.includes('comed') || r.includes('standup') || r.includes('actor') || r.includes('entertain')) {
+    return {
+      category: 'comedian',
+      roleName: 'Comedian & Entertainer',
+      roleHeadline: 'Tour dates, stand-up video spotlights, ticket booking & corporate event inquiries',
+    };
+  }
+  if (r.includes('fashion') || r.includes('beauty') || r.includes('style') || r.includes('lifestyle') || r.includes('makeup')) {
+    return {
+      category: 'fashion',
+      roleName: 'Fashion & Lifestyle Creator',
+      roleHeadline: 'Shop my look, affiliate discount codes, brand PR requests & outfit reels',
+    };
+  }
+  if (r.includes('tech') || r.includes('finance') || r.includes('business') || r.includes('developer') || r.includes('money')) {
+    return {
+      category: 'tech_finance',
+      roleName: 'Tech, Finance & Business',
+      roleHeadline: 'Verified media kits, 1-on-1 strategy calls, gear recommendations & sponsorship decks',
+    };
+  }
+  if (r.includes('fit') || r.includes('gym') || r.includes('health') || r.includes('train') || r.includes('yoga') || r.includes('diet')) {
+    return {
+      category: 'fitness',
+      roleName: 'Fitness & Wellness Coach',
+      roleHeadline: 'Workout programs, personal training intake, supplement discounts & habit guides',
+    };
+  }
+  if (r.includes('music') || r.includes('artist') || r.includes('band') || r.includes('singer') || r.includes('dj')) {
     return {
       category: 'musician',
-      roleName: 'Musician & Artist',
+      roleName: 'Musician & Recording Artist',
       roleHeadline: 'Smart streaming hubs, audio snippet preview, gig booking & tour dates for artists',
     };
   }
@@ -59,98 +107,146 @@ export function normalizeRole(rawRole?: string): {
       roleHeadline: 'Sponsor media kit, latest episode player, streaming hubs & verified demographics',
     };
   }
-  if (r.includes('realt') || r.includes('estate') || r.includes('property') || r.includes('broker')) {
-    return {
-      category: 'real_estate',
-      roleName: 'Real Estate Professional',
-      roleHeadline: 'Property listings, VIP showing schedulers & automated home valuation CMA tools',
-    };
-  }
-  if (r.includes('coach') || r.includes('educat') || r.includes('teach') || r.includes('institute') || r.includes('mentor')) {
-    return {
-      category: 'coach',
-      roleName: 'Coach & Educator',
-      roleHeadline: 'Cohort batches, syllabus highlights, strategy sessions & student enrollment',
-    };
-  }
   return {
-    category: 'creator',
+    category: 'video',
     roleName: 'Content Creator',
-    roleHeadline: 'High-converting brand inquiries, UGC rate cards, media kits & audience reach stats',
+    roleHeadline: 'Auto-thumbnail video spotlights, brand inquiries, UGC rate cards & instant fan tips',
   };
 }
 
 export const ALL_TEMPLATES: TemplateCardItem[] = [
-  // Content Creator Suite
+  // 1. Video & Reel Showcase (Auto-Thumbnails)
+  {
+    id: 'video_spotlight',
+    title: 'Featured Video / Reel',
+    category: 'video',
+    categoryLabel: 'Auto-Thumbnail',
+    description: 'Paste any YouTube video, Short, or Instagram Reel to display HD cover & play button.',
+    badge: 'HIGH ENGAGEMENT',
+    icon: PlayIcon,
+    featured: true,
+  },
+  {
+    id: 'featured_work',
+    title: 'Brand Campaign Spotlight',
+    category: 'video',
+    categoryLabel: 'Past Work',
+    description: 'Showcase top-performing video reels, past brand campaigns, views & engagement.',
+    icon: Video01Icon,
+    featured: true,
+  },
+
+  // 2. Monetization & Tips Suite
+  {
+    id: 'tip_support',
+    title: 'Direct UPI & Fan Support',
+    category: 'monetize',
+    categoryLabel: 'Zero Fee',
+    description: 'Receive instant tips via Google Pay, PhonePe, Paytm with 0% platform fee.',
+    badge: 'POPULAR',
+    icon: DollarSquareIcon,
+    featured: true,
+  },
+  {
+    id: 'creator_packages',
+    title: 'Collaboration Rate Card',
+    category: 'monetize',
+    categoryLabel: 'Sponsorships',
+    description: 'Transparent rates and deliverables for UGC Videos, Instagram Reels, and Story combos.',
+    badge: 'HIGH CONVERTING',
+    icon: DollarSquareIcon,
+    featured: true,
+  },
   {
     id: 'brand_inquiry',
-    title: 'Brand Deal Inquiry',
-    category: 'creator',
+    title: 'Brand Sponsorship Inquiry',
+    category: 'monetize',
     categoryLabel: 'Lead Capture',
-    description: 'Direct campaign brief and sponsorship lead capture form for brands.',
-    badge: 'HIGH CONVERTING',
+    description: 'Capture brand campaign briefs, budget ranges, and timelines directly to your inbox.',
+    badge: 'LEAD MAGNET',
     icon: SentIcon,
     featured: true,
   },
   {
     id: 'work_with_me',
-    title: 'Work With Me',
-    category: 'creator',
+    title: 'Work With Me Pitch',
+    category: 'monetize',
     categoryLabel: 'Availability',
-    description: 'Availability status, UGC packages, and creative collaboration pitch.',
-    badge: 'POPULAR',
+    description: 'Availability status, creative specialties, and collaboration pitch for brands.',
     icon: UserCheck01Icon,
+  },
+
+  // 3. Comedians & Live Entertainment Suite
+  {
+    id: 'live_tour',
+    title: 'Live Tour Dates & Tickets',
+    category: 'comedian',
+    categoryLabel: 'Live Events',
+    description: 'List upcoming comedy shows, cities, venues, and direct ticketing links with sold out tags.',
+    badge: 'TOUR DATES',
+    icon: Calendar01Icon,
+    featured: true,
+  },
+
+  // 4. Fashion, Beauty & Lifestyle Suite
+  {
+    id: 'recommendation',
+    title: 'Shop My Look / Gear',
+    category: 'fashion',
+    categoryLabel: 'Affiliate Deal',
+    description: 'Product photo, price, direct buy link, and 1-tap coupon discount code copy.',
+    badge: 'SHOP LOOK',
+    icon: ShoppingBag01Icon,
+    featured: true,
+  },
+
+  // 5. Tech, Finance & Business Suite
+  {
+    id: 'creator_stats',
+    title: 'Audience Reach & Media Kit',
+    category: 'tech_finance',
+    categoryLabel: 'Social Proof',
+    description: 'Multi-platform verified follower count, monthly impressions, and engagement metrics.',
+    badge: 'VERIFIED',
+    icon: Analytics01Icon,
     featured: true,
   },
   {
-    id: 'creator_stats',
-    title: 'Creator Reach & Analytics',
-    category: 'creator',
-    categoryLabel: 'Social Proof',
-    description: 'Multi-platform verified follower count, impressions & engagement rate.',
-    badge: 'VERIFIED',
-    icon: Analytics01Icon,
-  },
-  {
-    id: 'featured_work',
-    title: 'Featured Work & Reel',
-    category: 'creator',
-    categoryLabel: 'Showcase',
-    description: 'Showcase top-performing video reels, past brand campaigns & metrics.',
-    icon: Video01Icon,
-  },
-  {
-    id: 'creator_packages',
-    title: 'Rate Card & Packages',
-    category: 'creator',
-    categoryLabel: 'Monetization',
-    description: 'Transparent pricing with turnaround time for UGC, Reels and stories.',
-    icon: DollarSquareIcon,
-  },
-  {
-    id: 'recommendation',
-    title: 'Affiliate Deal & Gear',
-    category: 'creator',
-    categoryLabel: 'Commerce',
-    description: 'Curated products and gear with exclusive community discount codes.',
-    icon: ShoppingBag01Icon,
-  },
-  {
     id: 'media_kit',
-    title: 'Media Kit (One-Sheet)',
-    category: 'creator',
-    categoryLabel: 'PR & Press',
-    description: 'One-page media kit with audience breakdown, demographics & past sponsors.',
+    title: 'Downloadable One-Sheet Media Kit',
+    category: 'tech_finance',
+    categoryLabel: 'Press Kit',
+    description: 'One-page media kit with audience demographics, past partners, and brand stats.',
     icon: File01Icon,
   },
+  {
+    id: 'client_reviews',
+    title: 'Brand / Client Testimonials',
+    category: 'tech_finance',
+    categoryLabel: 'Testimonials',
+    description: 'Verified reviews and praise from brand managers and sponsors you collaborated with.',
+    icon: StarIcon,
+  },
 
-  // Musician & Recording Artist Suite
+  // 6. Fitness & Wellness Suite
+  {
+    id: 'coaching_institute',
+    title: 'Masterclass / Cohort Program',
+    category: 'fitness',
+    categoryLabel: 'Programs',
+    description: 'Curriculum highlights, next batch schedule, pricing breakdown & WhatsApp enrollment.',
+    badge: 'ENROLLING',
+    icon: Mortarboard01Icon,
+    featured: true,
+  },
+
+  // 7. Musician & Recording Artist Suite
   {
     id: 'music_smart_card',
-    title: 'Smart Music Card',
+    title: 'Smart Streaming Hub',
     category: 'musician',
-    categoryLabel: 'Smart Link',
-    description: 'Multi-platform player linking Spotify, Apple Music, YouTube & Amazon.',
+    categoryLabel: 'Multi-Platform',
+    description: 'Multi-platform player linking Spotify, Apple Music, YouTube & Amazon in one card.',
     badge: 'SMART LINK',
     icon: MusicNote01Icon,
     featured: true,
@@ -159,45 +255,11 @@ export const ALL_TEMPLATES: TemplateCardItem[] = [
     id: 'music_latest_release',
     title: 'Latest Release Showcase',
     category: 'musician',
-    categoryLabel: 'New Music',
+    categoryLabel: 'New Single',
     description: 'Featured single or album artwork with instant audio snippet preview.',
     badge: 'OUT NOW',
     icon: PlayIcon,
     featured: true,
-  },
-  {
-    id: 'music_upcoming_shows',
-    title: 'Tour Dates & Tickets',
-    category: 'musician',
-    categoryLabel: 'Live Events',
-    description: 'List upcoming concerts with cities, venues, and direct ticket links.',
-    badge: 'LIVE DATES',
-    icon: Calendar01Icon,
-    featured: true,
-  },
-  {
-    id: 'music_book_me',
-    title: 'Book Me (Live Shows)',
-    category: 'musician',
-    categoryLabel: 'Gig Inquiries',
-    description: 'Gig booking inquiries, festival rates, and promoter technical rider.',
-    icon: Mic01Icon,
-  },
-  {
-    id: 'music_streaming_hub',
-    title: 'Streaming Hub',
-    category: 'musician',
-    categoryLabel: 'Music Routing',
-    description: 'Clean multi-platform selector for fans to stream anywhere.',
-    icon: PlayIcon,
-  },
-  {
-    id: 'music_player',
-    title: 'In-Card Audio Player',
-    category: 'musician',
-    categoryLabel: 'Audio Stream',
-    description: 'Plays audio preview directly inside your link page with volume controls.',
-    icon: MusicNote01Icon,
   },
   {
     id: 'music_merch',
@@ -208,30 +270,22 @@ export const ALL_TEMPLATES: TemplateCardItem[] = [
     icon: ShoppingBag01Icon,
   },
   {
-    id: 'music_press_kit',
-    title: 'Electronic Press Kit (EPK)',
+    id: 'music_book_me',
+    title: 'Book Live Performance',
     category: 'musician',
-    categoryLabel: 'Press & Media',
-    description: 'High-res press assets, promoter biography, and hospitality rider.',
-    icon: File01Icon,
-  },
-  {
-    id: 'music_booking_inquiry',
-    title: 'Concert Booking Form',
-    category: 'musician',
-    categoryLabel: 'Promoter Leads',
-    description: 'Dedicated form for promoters and venues to request a performance quote.',
-    icon: SentIcon,
+    categoryLabel: 'Gig Inquiries',
+    description: 'Gig booking inquiries, festival rates, and promoter technical rider.',
+    icon: Mic01Icon,
   },
 
-  // Podcasters & Show Creators Suite
+  // 8. Podcasters & Show Creators Suite
   {
     id: 'podcast_sponsor_me',
     title: 'Sponsor The Podcast',
     category: 'podcast',
     categoryLabel: 'Sponsorships',
     description: 'Audience size, verified downloads, listener demographics & CPM rates.',
-    badge: 'KILLER CARD',
+    badge: 'SPONSOR ME',
     icon: Mic01Icon,
     featured: true,
   },
@@ -253,100 +307,8 @@ export const ALL_TEMPLATES: TemplateCardItem[] = [
     description: 'One-click links to Apple Podcasts, Spotify, YouTube & Amazon.',
     icon: MusicNote01Icon,
   },
-  {
-    id: 'podcast_youtube',
-    title: 'Watch On YouTube',
-    category: 'podcast',
-    categoryLabel: 'Video Show',
-    description: 'Direct video podcast link with custom video player thumbnail.',
-    icon: Video01Icon,
-  },
-  {
-    id: 'podcast_archive',
-    title: 'Episode Archive',
-    category: 'podcast',
-    categoryLabel: 'Directory',
-    description: 'Organized library of past episodes, topics, and transcripts.',
-    icon: Book01Icon,
-  },
-  {
-    id: 'podcast_newsletter',
-    title: 'Show Notes & Newsletter',
-    category: 'podcast',
-    categoryLabel: 'Audience Capture',
-    description: 'Weekly deep dives, links, and reading lists delivered to listeners.',
-    icon: SentIcon,
-  },
-  {
-    id: 'podcast_stats',
-    title: 'Audience Demographics',
-    category: 'podcast',
-    categoryLabel: 'Verified Metrics',
-    description: 'Verified download numbers, top listener countries, and age profile.',
-    icon: Analytics01Icon,
-  },
-  {
-    id: 'podcast_sponsor_inquiry',
-    title: 'Sponsor Lead Form',
-    category: 'podcast',
-    categoryLabel: 'Direct Pitch',
-    description: 'Direct proposal submission for brands wanting to advertise on the show.',
-    icon: SentIcon,
-  },
 
-  // Real Estate Sales Engine Suite
-  {
-    id: 'real_estate',
-    title: 'Featured Property Listing',
-    category: 'real_estate',
-    categoryLabel: 'Listing Showcase',
-    description: 'High-res photos, bed/bath specs, asking price & tour scheduler.',
-    badge: 'HOT LISTING',
-    icon: Building01Icon,
-    featured: true,
-  },
-  {
-    id: 'showing_booking',
-    title: 'Schedule Private Showing',
-    category: 'real_estate',
-    categoryLabel: 'Tour Scheduler',
-    description: 'VIP property tour scheduler with preferred date and time capture.',
-    badge: 'BOOK SHOWING',
-    icon: Calendar01Icon,
-    featured: true,
-  },
-  {
-    id: 'home_valuation',
-    title: 'Home Valuation (CMA)',
-    category: 'real_estate',
-    categoryLabel: 'Seller Leads',
-    description: 'Automated comparative market report tool to generate seller leads.',
-    badge: 'SELLER MAGNET',
-    icon: Analytics01Icon,
-    featured: true,
-  },
-  {
-    id: 'client_reviews',
-    title: 'Client Sales Reviews',
-    category: 'real_estate',
-    categoryLabel: 'Verified Social Proof',
-    description: 'Verified testimonials from buyers and sellers with property details.',
-    icon: StarIcon,
-  },
-
-  // Coach & Educator Suite
-  {
-    id: 'coaching_institute',
-    title: 'Course Batch / Cohort',
-    category: 'coach',
-    categoryLabel: 'Course Admissions',
-    description: 'Curriculum syllabus, batch schedule, fee structure, and enrollment.',
-    badge: 'ENROLLING',
-    icon: Mortarboard01Icon,
-    featured: true,
-  },
-
-  // Standard Link
+  // 9. Standard Link
   {
     id: 'standard',
     title: 'Standard Custom Link',
@@ -359,11 +321,13 @@ export const ALL_TEMPLATES: TemplateCardItem[] = [
 
 export const AVAILABLE_COLORS = Object.values(UI_KIT.cardPalettes);
 
-export const PRESET_BADGES = ['FEATURED', 'HOT DEAL', 'AVAILABLE NOW', 'JUST LISTED', 'TOP RATED', 'LIMITED TIME'];
-
-export const REAL_ESTATE_SUGGESTIONS = {
-  propertyTypes: ['3 BHK Luxury Apartment', '4 BHK Villa with Pool', '2 BHK Modern Condo', 'Commercial Office Space', 'Gated Plot'],
-  locations: ['Austin, TX', 'Beverly Hills, CA', 'Bandra West, Mumbai', 'Whitefield, Bengaluru', 'Downtown Dubai'],
-  priceBrackets: ['$749,000', '$1,250,000', '₹1.5 Cr - 2.2 Cr', 'Rent: $3,200/mo', '$2,800,000'],
-  statusTags: ['just_listed', 'open_house', 'price_drop'] as const,
-};
+export const PRESET_BADGES = [
+  'FEATURED',
+  'NEW REEL',
+  'YOUTUBE',
+  'HOT DEAL',
+  'COLLAB',
+  'POPULAR',
+  'LIMITED TIME',
+  'LIVE TOUR',
+];

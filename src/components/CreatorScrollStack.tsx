@@ -13,6 +13,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { IPhoneMockup3D } from './IPhoneMockup3D';
 import { BRAND_LOGOS } from '../data';
+import { SpecularButton } from './ui/SpecularButton';
 
 export interface CreatorScrollStackProps {
   onOpenStudio: () => void;
@@ -233,13 +234,27 @@ export const CreatorScrollStack: React.FC<CreatorScrollStackProps> = ({
 
             {/* CTA Button */}
             <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
+              <SpecularButton
+                size="md"
+                radius={999}
+                tint="#111111"
+                tintOpacity={1}
+                textColor="#ffffff"
+                lineColor="#F8BA38"
+                baseColor="#27272a"
+                intensity={1.3}
+                shineSize={14}
+                shineFade={40}
+                thickness={1.4}
+                speed={0.35}
+                followMouse
+                proximity={250}
+                autoAnimate
                 onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
-                className="px-7 py-3.5 rounded-full bg-[#111111] hover:bg-black text-white text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                className="!font-bold shadow-sm"
               >
                 <span>Build a creator page →</span>
-              </button>
+              </SpecularButton>
               <span className="text-xs text-[#888888] font-mono">
                 Step {activeStep + 1} of {FEATURE_STEPS.length}
               </span>

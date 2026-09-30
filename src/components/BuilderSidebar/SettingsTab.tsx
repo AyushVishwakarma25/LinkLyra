@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   CheckmarkCircle01Icon,
@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { UserProfile, SocialLinks } from '../../types';
 import { isValidExternalUrl, createMailtoUrl, createWhatsAppUrl } from '../../lib/url';
+import { AiBioAssistantModal } from '../AiBioAssistantModal';
 
 export interface SettingsTabProps {
   profile: UserProfile;
@@ -36,6 +37,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   isSaving,
   justSaved,
 }) => {
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
   return (
     <div className="space-y-4 max-w-full">
 
@@ -139,9 +142,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
         <div>
-          <label className="text-xs font-bold text-[#1C1E22] block mb-1">
-            Bio / Headline
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-bold text-[#1C1E22] block">
+              Bio / Headline
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsAiModalOpen(true)}
+              className="px-2.5 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold flex items-center gap-1 border border-purple-200 transition-colors shadow-2xs cursor-pointer"
+            >
+              <span>✨</span>
+              <span>Write with AI</span>
+            </button>
+          </div>
           <input
             type="text"
             value={profile.headline}
@@ -150,6 +163,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             placeholder="Creator, Designer, Developer, Founder"
           />
         </div>
+
+        <AiBioAssistantModal
+          isOpen={isAiModalOpen}
+          onClose={() => setIsAiModalOpen(false)}
+          onSelectBio={(bio) => onUpdateProfile({ headline: bio })}
+          currentHeadline={profile.headline}
+          creatorName={profile.name}
+        />
 
         {/* WhatsApp Contact Box */}
         <div className="p-3.5 bg-[#1C1E22] text-white rounded-2xl border border-black/10 space-y-2.5 shadow-2xs">

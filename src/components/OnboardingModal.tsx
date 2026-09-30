@@ -51,9 +51,68 @@ interface PersonaOption {
 
 const PERSONAS: PersonaOption[] = [
   {
+    id: 'comedian',
+    title: 'Stand-Up Comedian & Entertainer',
+    badge: 'FEATURED',
+    icon: Mic01Icon,
+    headlinePlaceholder: 'Telling jokes on stage & screen • Live Tour Dates below 🎟️',
+    recommendedTheme: 'dark',
+    defaultCards: [
+      {
+        title: '🎤 Live Comedy Tour Dates 2026',
+        subtitle: 'Upcoming shows in Mumbai, Bengaluru & Delhi NCR',
+        templateType: 'live_tour',
+        badgeText: 'TOUR DATES',
+        color: 'stone',
+        linkUrl: 'https://bookmyshow.com',
+        meta: {
+          liveTour: {
+            tourTitle: '🎤 Live Comedy Tour Dates 2026',
+            dates: [
+              { id: '1', date: 'Sat, Nov 14', city: 'Mumbai', venue: 'NCPA Theatre', ticketUrl: 'https://insider.in' },
+              { id: '2', date: 'Fri, Nov 20', city: 'Bengaluru', venue: 'Good Shepherd Hall', ticketUrl: 'https://bookmyshow.com' },
+              { id: '3', date: 'Sun, Nov 29', city: 'Delhi NCR', venue: 'Siri Fort Auditorium', ticketUrl: 'https://bookmyshow.com', soldOut: true },
+            ],
+          },
+        },
+      },
+      {
+        title: 'Watch Latest Comedy Special & Crowdwork',
+        subtitle: 'Over 1M+ views on YouTube • 4K Full Set',
+        templateType: 'video_spotlight',
+        badgeText: 'FEATURED VIDEO',
+        color: 'stone',
+        linkUrl: 'https://youtube.com',
+        meta: {
+          videoMedia: {
+            platform: 'youtube',
+            videoUrl: 'https://youtube.com',
+            thumbnailUrl: 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=800',
+          },
+        },
+      },
+      {
+        title: '☕ Support My Comedy (UPI / GPay)',
+        subtitle: 'Fuel my next special with an instant tip directly via UPI',
+        templateType: 'tip_support',
+        badgeText: 'TIP JAR',
+        color: 'stone',
+        linkUrl: 'https://',
+        meta: {
+          tipSupport: {
+            upiId: 'comedy@upi',
+            creatorName: 'Stand-Up Creator',
+            thankYouMessage: 'Thanks for supporting independent comedy! ☕',
+            presetAmounts: [100, 250, 500, 1000],
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'musician',
     title: 'Musician / Recording Artist',
-    badge: 'NEW PREMIUM',
+    badge: 'POPULAR',
     icon: MusicNote01Icon,
     headlinePlaceholder: 'Singer, Songwriter & Producer • New Single "Neon Mirage" Out Now',
     recommendedTheme: 'dark',
@@ -376,6 +435,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       if (user?.uid) {
         // Map persona to primary role
         const roleMap: Record<string, OnboardingPrimaryRole> = {
+          comedian: 'creator',
           musician: 'creator',
           podcaster: 'creator',
           creator: 'creator',
@@ -428,6 +488,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               is_premium: true,
               ...(card.meta?.music ? { music: card.meta.music } : {}),
               ...(card.meta?.podcast ? { podcast: card.meta.podcast } : {}),
+              ...(card.meta?.tipSupport ? { tipSupport: card.meta.tipSupport } : {}),
+              ...(card.meta?.liveTour ? { liveTour: card.meta.liveTour } : {}),
+              ...(card.meta?.videoMedia ? { videoMedia: card.meta.videoMedia } : {}),
             });
             createdCards.push(newLink);
           }
@@ -464,6 +527,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               isPremium: true,
               ...(card.meta?.music ? { music: card.meta.music } : {}),
               ...(card.meta?.podcast ? { podcast: card.meta.podcast } : {}),
+              ...(card.meta?.tipSupport ? { tipSupport: card.meta.tipSupport } : {}),
+              ...(card.meta?.liveTour ? { liveTour: card.meta.liveTour } : {}),
+              ...(card.meta?.videoMedia ? { videoMedia: card.meta.videoMedia } : {}),
             });
           }
         }

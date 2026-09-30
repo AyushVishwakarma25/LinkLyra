@@ -32,12 +32,16 @@ import {
   CoachingMetadata,
   MusicMetadata,
   PodcastMetadata,
+  TipSupportMetadata,
+  VideoSpotlightMetadata,
+  LiveTourMetadata,
   ProfileCardData,
   CollaborationPackageItem,
 } from '../types';
 import { UI_KIT } from '../lib/ui-kit';
 import { generateWhatsAppIntentUrl } from '../lib/whatsapp';
 import { safeOpenUrl } from '../lib/url';
+import { detectVideoMedia } from '../lib/video';
 import { useToast } from '../context/ToastContext';
 import {
   SmartMusicCard,
@@ -60,6 +64,11 @@ import {
   PodcastStatsCard,
   PodcastSponsorInquiryCard,
 } from './cards/PodcasterCards';
+import {
+  VideoSpotlightCard,
+  TipSupportCard,
+  LiveTourCard,
+} from './cards/CreatorSpecializedCards';
 
 export interface ProfileCardProps {
   id?: string;
@@ -87,6 +96,9 @@ export interface ProfileCardProps {
   coaching?: CoachingMetadata;
   music?: MusicMetadata;
   podcast?: PodcastMetadata;
+  tipSupport?: TipSupportMetadata;
+  videoMedia?: VideoSpotlightMetadata;
+  liveTour?: LiveTourMetadata;
   isPremium?: boolean;
   businessPhone?: string;
   customWhatsappPhone?: string;
@@ -183,6 +195,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   coaching,
   music,
   podcast,
+  tipSupport,
+  videoMedia,
+  liveTour,
   isPremium,
   businessPhone,
   customWhatsappPhone,
@@ -239,6 +254,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     coaching,
     music,
     podcast,
+    tipSupport,
+    videoMedia,
+    liveTour,
     isPremium,
     customWhatsappPhone,
   };
@@ -988,7 +1006,55 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   }
 
   // -------------------------------------------------------------
-  // 11. EXPANDED / FEATURED CARD
+  // 11. CREATOR VIDEO SPOTLIGHT (YouTube Videos, Shorts, Instagram Reels)
+  // -------------------------------------------------------------
+  const detectedVideo = detectVideoMedia(linkUrl || videoMedia?.videoUrl);
+  if (
+    templateType === 'video_spotlight' ||
+    templateType === 'youtube' ||
+    templateType === 'instagram' ||
+    (detectedVideo.isVideo && templateType === 'standard' && !isWhatsAppLink)
+  ) {
+    return (
+      <VideoSpotlightCard
+        card={cardData}
+        interactive={interactive}
+        onLinkClick={onLinkClick}
+        radiusClass={radiusClass}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 12. DIRECT CREATOR TIP & SUPPORT JAR (UPI / GPay / PhonePe)
+  // -------------------------------------------------------------
+  if (templateType === 'tip_support') {
+    return (
+      <TipSupportCard
+        card={cardData}
+        interactive={interactive}
+        onLinkClick={onLinkClick}
+        radiusClass={radiusClass}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 13. COMEDY & ARTIST LIVE TOUR DATES
+  // -------------------------------------------------------------
+  if (templateType === 'live_tour') {
+    return (
+      <LiveTourCard
+        card={cardData}
+        interactive={interactive}
+        onLinkClick={onLinkClick}
+        radiusClass={radiusClass}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 14. EXPANDED / FEATURED CARD
   // -------------------------------------------------------------
   if (expanded) {
     const isCoaching = templateType === 'coaching_institute' && coaching;
@@ -1200,8 +1266,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="text-xs sm:text-sm font-bold tracking-tight truncate leading-tight">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="text-xs sm:text-sm font-bold tracking-tight truncate leading-tight min-w-0 flex-1">
               {title}
             </h3>
           </div>

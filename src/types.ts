@@ -22,6 +22,9 @@ export type CardTemplateType =
   | 'product'
   | 'email'
   | 'phone'
+  | 'tip_support'
+  | 'video_spotlight'
+  | 'live_tour'
   // Musicians & Artists Premium Templates
   | 'music_latest_release'
   | 'music_streaming_hub'
@@ -164,6 +167,41 @@ export interface MediaKitMetadata {
   description?: string;
   oneSheetPdfUrl?: string;
   lastUpdated?: string;
+}
+
+// -------------------------------------------------------------
+// Direct Creator Tip & Support Metadata
+// -------------------------------------------------------------
+export interface TipSupportMetadata {
+  upiId?: string; // e.g. "creator@okhdfcbank"
+  creatorName?: string; // e.g. "Ayush"
+  presetAmounts?: number[]; // e.g. [100, 250, 500, 1000]
+  defaultAmount?: number; // e.g. 250
+  thankYouMessage?: string; // e.g. "Thanks for fueling my creative journey! ☕"
+  buttonText?: string; // e.g. "Support on UPI / GPay"
+  paymentLink?: string; // Optional fallback (e.g. Topmate, BuyMeACoffee)
+}
+
+// -------------------------------------------------------------
+// Creator Video Spotlight Metadata (YouTube & Reels)
+// -------------------------------------------------------------
+export interface VideoSpotlightMetadata {
+  videoUrl: string;
+  platform?: 'youtube' | 'instagram' | 'tiktok' | 'vimeo' | 'other';
+  thumbnailUrl?: string;
+  duration?: string; // e.g. "12:45"
+  viewCount?: string; // e.g. "340K views"
+  videoId?: string;
+  isShortOrReel?: boolean;
+  aspectRatio?: '16:9' | '9:16';
+}
+
+// -------------------------------------------------------------
+// Comedian & Artist Live Tour Date Metadata
+// -------------------------------------------------------------
+export interface LiveTourMetadata {
+  tourTitle?: string; // e.g. "Late Night Laughs India Tour 2026"
+  dates?: TourDateItem[];
 }
 
 // -------------------------------------------------------------
@@ -315,8 +353,13 @@ export interface ProfileCardData {
   coaching?: CoachingMetadata;
   music?: MusicMetadata;
   podcast?: PodcastMetadata;
+  tipSupport?: TipSupportMetadata;
+  videoMedia?: VideoSpotlightMetadata;
+  liveTour?: LiveTourMetadata;
   isPremium?: boolean;
   customWhatsappPhone?: string; // Optional card-level WhatsApp phone override
+  cardBgColor?: string;
+  cardTextColor?: string;
 }
 
 export type CanvasTheme =
@@ -492,6 +535,7 @@ export interface SpecializedAnalyticsSummary {
   deviceCounts?: Record<string, number>;
   browserCounts?: Record<string, number>;
   referrerCounts?: Record<string, number>;
+  locationCounts?: Record<string, number>;
   linkClickCounts?: Record<string, number>;
   topLinks?: { linkId: string; title?: string; clicks: number; url?: string; color?: string }[];
   dailyStats?: { date: string; views: number; clicks: number }[];

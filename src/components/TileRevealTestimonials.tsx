@@ -416,19 +416,19 @@ export const TileRevealTestimonials: React.FC<TileRevealTestimonialsProps> = ({
 
           {/* Revealed Headline */}
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-[#1C1E22] tracking-tight text-center leading-tight">
-            Why Creators Are Switching to LinkLyra
+            Loved by Creators Worldwide
           </h2>
           <p className="mt-1.5 text-xs sm:text-base text-[#555962] text-center max-w-xl mx-auto">
-            From YouTubers and specialty roasteries to luxury brokers and indie founders — see how real creators convert bio traffic.
+            See how comedians, YouTubers, stylists, podcasters, and artists turn their bio link into their favorite creative space.
           </p>
 
           {/* Category Filter Pills (No Dots) */}
           <div className="mt-3 sm:mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
             {[
               { id: 'all', label: 'All Reviews' },
-              { id: 'creators', label: 'Video & Media' },
-              { id: 'business', label: 'Coaches & Services' },
-              { id: 'tech', label: 'Founders & Devs' },
+              { id: 'creators', label: 'Video & Film' },
+              { id: 'business', label: 'Coaching & Community' },
+              { id: 'tech', label: 'Tech & Design' },
             ].map((tab) => (
               <button
                 key={tab.id}

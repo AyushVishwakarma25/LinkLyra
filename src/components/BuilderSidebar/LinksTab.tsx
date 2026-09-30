@@ -25,6 +25,7 @@ export interface LinksTabProps {
   onEditCard: (card: ProfileCardData) => void;
   onDeleteCard: (id: string) => void;
   onMoveCard: (index: number, direction: 'up' | 'down') => void;
+  onReorderCards?: (newCards: ProfileCardData[]) => void;
   onToggleCardActive: (id: string) => void;
   onDeleteSection?: (sectionId: string) => void;
   setTab: (tab: SidebarTabKey) => void;
@@ -44,6 +45,7 @@ export const LinksTab: React.FC<LinksTabProps> = ({
   onEditCard,
   onDeleteCard,
   onMoveCard,
+  onReorderCards,
   onToggleCardActive,
   onDeleteSection,
   setTab,
@@ -56,6 +58,76 @@ export const LinksTab: React.FC<LinksTabProps> = ({
   activeCardMenuId,
   setActiveCardMenuId,
 }) => {
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = React.useState<number | null>(null);
+  const [dropPosition, setDropPosition] = React.useState<'above' | 'below' | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+      e.preventDefault();
+      return;
+    }
+    setActiveCardMenuId(null);
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? 'above' : 'below';
+
+    if (dragOverIndex !== index || dropPosition !== position) {
+      setDragOverIndex(index);
+      setDropPosition(position);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (dragOverIndex === index) {
+        setDragOverIndex(null);
+        setDropPosition(null);
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const isAbove = e.clientY < midY;
+
+    let toIndex = isAbove ? index : index + 1;
+    if (draggedIndex < toIndex) {
+      toIndex -= 1;
+    }
+
+    if (draggedIndex !== toIndex && toIndex >= 0 && toIndex < profile.cards.length) {
+      const updated = [...profile.cards];
+      const [removed] = updated.splice(draggedIndex, 1);
+      updated.splice(toIndex, 0, removed);
+      onReorderCards?.(updated);
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
   return (
     <div className="space-y-4 max-w-full">
       {/* Minimalist Profile Hero Header (Matching Reference Design) */}
@@ -220,6 +292,22 @@ export const LinksTab: React.FC<LinksTabProps> = ({
 
       {/* Link Cards List (Minimalist Clean Cards matching Image) */}
       <div className="space-y-3 max-w-full">
+        {profile.cards.length > 1 && (
+          <div className="flex items-center justify-between px-1 text-xs text-stone-500 font-medium">
+            <span>Your Links ({profile.cards.length})</span>
+            <span className="text-[11px] text-stone-400 flex items-center gap-1 font-normal">
+              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                <circle cx="8.5" cy="5" r="1.6" />
+                <circle cx="15.5" cy="5" r="1.6" />
+                <circle cx="8.5" cy="12" r="1.6" />
+                <circle cx="15.5" cy="12" r="1.6" />
+                <circle cx="8.5" cy="19" r="1.6" />
+                <circle cx="15.5" cy="19" r="1.6" />
+              </svg>
+              Drag cards to reorder
+            </span>
+          </div>
+        )}
         {profile.cards.length === 0 ? (
           <div className="text-center py-10 px-4 bg-stone-50 rounded-3xl border border-dashed border-stone-200">
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mx-auto mb-2.5 shadow-xs border border-stone-200 text-[#1C1E22]">
@@ -243,37 +331,84 @@ export const LinksTab: React.FC<LinksTabProps> = ({
             const isFirst = index === 0;
             const isLast = index === profile.cards.length - 1;
             const isMenuOpen = activeCardMenuId === card.id;
+            const isBeingDragged = draggedIndex === index;
+            const isTargetAbove = dragOverIndex === index && dropPosition === 'above' && draggedIndex !== index;
+            const isTargetBelow = dragOverIndex === index && dropPosition === 'below' && draggedIndex !== index;
+            const displayUrl = card.linkUrl
+              ? card.linkUrl.replace(/^https?:\/\//, '').replace(/\/$/, '').trim()
+              : '';
+            const hasDisplayUrl = Boolean(displayUrl && displayUrl !== '#');
 
             return (
               <div
                 key={card.id}
-                className={`group relative p-3.5 sm:p-4 rounded-[22px] sm:rounded-[24px] border transition-all max-w-full ${
-                  card.isActive !== false
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={(e) => handleDragLeave(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`group relative p-3.5 sm:p-4 rounded-[22px] sm:rounded-[24px] border transition-all max-w-full select-none ${
+                  isBeingDragged
+                    ? 'opacity-35 scale-[0.98] border-dashed border-indigo-400 bg-indigo-50/40 shadow-none'
+                    : card.isActive !== false
                     ? 'bg-white border-stone-200/90 shadow-2xs hover:border-stone-300'
                     : 'bg-stone-50/60 border-dashed border-stone-200 opacity-60'
                 }`}
               >
-                <div className="flex items-center justify-between gap-3 min-w-0">
+                {/* Drop Indicator Bar: Above */}
+                {isTargetAbove && (
+                  <div className="absolute -top-2 left-2 right-2 h-1 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 rounded-full shadow-md z-30 pointer-events-none flex items-center animate-pulse">
+                    <div className="w-3 h-3 rounded-full bg-violet-600 -ml-1 border-2 border-white shadow" />
+                    <div className="w-3 h-3 rounded-full bg-purple-600 -mr-1 ml-auto border-2 border-white shadow" />
+                  </div>
+                )}
+
+                {/* Drop Indicator Bar: Below */}
+                {isTargetBelow && (
+                  <div className="absolute -bottom-2 left-2 right-2 h-1 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 rounded-full shadow-md z-30 pointer-events-none flex items-center animate-pulse">
+                    <div className="w-3 h-3 rounded-full bg-violet-600 -ml-1 border-2 border-white shadow" />
+                    <div className="w-3 h-3 rounded-full bg-purple-600 -mr-1 ml-auto border-2 border-white shadow" />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2.5 sm:gap-3 min-w-0">
+                  {/* Drag Grip Handle */}
+                  <div
+                    className="shrink-0 cursor-grab active:cursor-grabbing text-stone-300 hover:text-stone-600 active:text-stone-900 p-1 -ml-1 rounded-lg hover:bg-stone-100 transition-colors flex items-center justify-center"
+                    title="Drag to rearrange"
+                    aria-label="Drag to rearrange"
+                  >
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                      <circle cx="8.5" cy="5" r="1.6" />
+                      <circle cx="15.5" cy="5" r="1.6" />
+                      <circle cx="8.5" cy="12" r="1.6" />
+                      <circle cx="15.5" cy="12" r="1.6" />
+                      <circle cx="8.5" cy="19" r="1.6" />
+                      <circle cx="15.5" cy="19" r="1.6" />
+                    </svg>
+                  </div>
+
                   {/* Left: Soft Rounded Icon Box with Gallery fallback */}
                   <CardThumbnailBadge card={card} cardTheme={cardTheme} />
 
                   {/* Middle: Title & Subtitle (Clicks / URL) */}
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onEditCard(card)}>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-sm sm:text-base font-bold text-[#1C1E22] truncate leading-tight">
-                        {card.title}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h4 className="text-sm sm:text-base font-bold text-[#1C1E22] truncate leading-tight min-w-0 flex-1">
+                        {card.title || 'Untitled Card'}
                       </h4>
                       {card.badgeText && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-stone-100 text-[#1C1E22] font-semibold text-[9px] truncate max-w-[80px]">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-stone-100 text-[#1C1E22] font-semibold text-[9px] truncate max-w-[80px]">
                           {card.badgeText}
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-[#737882] truncate font-normal mt-0.5">
-                      {card.clicks || 0} clicks
-                      {card.linkUrl && (
+                      <span>{card.clicks || 0} clicks</span>
+                      {hasDisplayUrl && (
                         <span className="ml-1 text-stone-400">
-                          • {card.linkUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                          • {displayUrl}
                         </span>
                       )}
                     </p>

@@ -61,6 +61,22 @@ export const linksService = {
           client_review: data.clientReview || (data as Record<string, any>).client_review,
           music: data.music,
           podcast: data.podcast,
+          media_kit: data.mediaKit || (data as Record<string, any>).media_kit,
+          mediaKit: data.mediaKit || (data as Record<string, any>).media_kit,
+          showing_booking: data.showingBooking || (data as Record<string, any>).showing_booking,
+          showingBooking: data.showingBooking || (data as Record<string, any>).showing_booking,
+          home_valuation: data.homeValuation || (data as Record<string, any>).home_valuation,
+          homeValuation: data.homeValuation || (data as Record<string, any>).home_valuation,
+          tip_support: data.tipSupport || (data as Record<string, any>).tip_support,
+          tipSupport: data.tipSupport || (data as Record<string, any>).tip_support,
+          live_tour: data.liveTour || (data as Record<string, any>).live_tour,
+          liveTour: data.liveTour || (data as Record<string, any>).live_tour,
+          video_media: data.videoMedia || (data as Record<string, any>).video_media,
+          videoMedia: data.videoMedia || (data as Record<string, any>).video_media,
+          card_bg_color: data.cardBgColor || (data as Record<string, any>).card_bg_color,
+          cardBgColor: data.cardBgColor || (data as Record<string, any>).card_bg_color,
+          card_text_color: data.cardTextColor || (data as Record<string, any>).card_text_color,
+          cardTextColor: data.cardTextColor || (data as Record<string, any>).card_text_color,
           is_premium: data.isPremium || (data as Record<string, any>).is_premium,
           custom_whatsapp_phone: data.customWhatsappPhone || (data as Record<string, any>).custom_whatsapp_phone,
           created_at: data.createdAt ? String(data.createdAt) : undefined,
@@ -152,6 +168,38 @@ export const linksService = {
     }
     if (linkData.music) docPayload.music = linkData.music;
     if (linkData.podcast) docPayload.podcast = linkData.podcast;
+    if (linkData.mediaKit || linkData.media_kit) {
+      docPayload.mediaKit = linkData.mediaKit || linkData.media_kit;
+      docPayload.media_kit = linkData.mediaKit || linkData.media_kit;
+    }
+    if (linkData.showingBooking || linkData.showing_booking) {
+      docPayload.showingBooking = linkData.showingBooking || linkData.showing_booking;
+      docPayload.showing_booking = linkData.showingBooking || linkData.showing_booking;
+    }
+    if (linkData.homeValuation || linkData.home_valuation) {
+      docPayload.homeValuation = linkData.homeValuation || linkData.home_valuation;
+      docPayload.home_valuation = linkData.homeValuation || linkData.home_valuation;
+    }
+    if (linkData.tipSupport || linkData.tip_support) {
+      docPayload.tipSupport = linkData.tipSupport || linkData.tip_support;
+      docPayload.tip_support = linkData.tipSupport || linkData.tip_support;
+    }
+    if (linkData.liveTour || linkData.live_tour) {
+      docPayload.liveTour = linkData.liveTour || linkData.live_tour;
+      docPayload.live_tour = linkData.liveTour || linkData.live_tour;
+    }
+    if (linkData.videoMedia || linkData.video_media) {
+      docPayload.videoMedia = linkData.videoMedia || linkData.video_media;
+      docPayload.video_media = linkData.videoMedia || linkData.video_media;
+    }
+    if (linkData.cardBgColor || linkData.card_bg_color) {
+      docPayload.cardBgColor = linkData.cardBgColor || linkData.card_bg_color;
+      docPayload.card_bg_color = linkData.cardBgColor || linkData.card_bg_color;
+    }
+    if (linkData.cardTextColor || linkData.card_text_color) {
+      docPayload.cardTextColor = linkData.cardTextColor || linkData.card_text_color;
+      docPayload.card_text_color = linkData.cardTextColor || linkData.card_text_color;
+    }
     if (linkData.isPremium !== undefined || linkData.is_premium !== undefined) {
       docPayload.isPremium = linkData.isPremium || linkData.is_premium;
       docPayload.is_premium = linkData.isPremium || linkData.is_premium;
@@ -187,6 +235,22 @@ export const linksService = {
       client_review: docPayload.client_review,
       music: docPayload.music,
       podcast: docPayload.podcast,
+      media_kit: docPayload.media_kit,
+      mediaKit: docPayload.mediaKit,
+      showing_booking: docPayload.showing_booking,
+      showingBooking: docPayload.showingBooking,
+      home_valuation: docPayload.home_valuation,
+      homeValuation: docPayload.homeValuation,
+      tip_support: docPayload.tip_support,
+      tipSupport: docPayload.tipSupport,
+      live_tour: docPayload.live_tour,
+      liveTour: docPayload.liveTour,
+      video_media: docPayload.video_media,
+      videoMedia: docPayload.videoMedia,
+      card_bg_color: docPayload.card_bg_color,
+      cardBgColor: docPayload.cardBgColor,
+      card_text_color: docPayload.card_text_color,
+      cardTextColor: docPayload.cardTextColor,
       is_premium: docPayload.is_premium,
       custom_whatsapp_phone: docPayload.custom_whatsapp_phone,
       created_at: new Date().toISOString(),
@@ -296,6 +360,44 @@ export const linksService = {
     if (rawUpdates.customWhatsappPhone !== undefined || rawUpdates.custom_whatsapp_phone !== undefined) {
       updates.customWhatsappPhone = rawUpdates.customWhatsappPhone ?? rawUpdates.custom_whatsapp_phone;
       updates.custom_whatsapp_phone = rawUpdates.customWhatsappPhone ?? rawUpdates.custom_whatsapp_phone;
+    }
+    if (rawUpdates.templateType !== undefined || rawUpdates.template_type !== undefined || rawUpdates.linkType !== undefined) {
+      const t = rawUpdates.templateType ?? rawUpdates.template_type ?? rawUpdates.linkType;
+      updates.templateType = t;
+      updates.template_type = t;
+      updates.linkType = t;
+    }
+    if (rawUpdates.mediaKit !== undefined || rawUpdates.media_kit !== undefined) {
+      updates.mediaKit = rawUpdates.mediaKit ?? rawUpdates.media_kit;
+      updates.media_kit = rawUpdates.mediaKit ?? rawUpdates.media_kit;
+    }
+    if (rawUpdates.showingBooking !== undefined || rawUpdates.showing_booking !== undefined) {
+      updates.showingBooking = rawUpdates.showingBooking ?? rawUpdates.showing_booking;
+      updates.showing_booking = rawUpdates.showingBooking ?? rawUpdates.showing_booking;
+    }
+    if (rawUpdates.homeValuation !== undefined || rawUpdates.home_valuation !== undefined) {
+      updates.homeValuation = rawUpdates.homeValuation ?? rawUpdates.home_valuation;
+      updates.home_valuation = rawUpdates.homeValuation ?? rawUpdates.home_valuation;
+    }
+    if (rawUpdates.tipSupport !== undefined || rawUpdates.tip_support !== undefined) {
+      updates.tipSupport = rawUpdates.tipSupport ?? rawUpdates.tip_support;
+      updates.tip_support = rawUpdates.tipSupport ?? rawUpdates.tip_support;
+    }
+    if (rawUpdates.liveTour !== undefined || rawUpdates.live_tour !== undefined) {
+      updates.liveTour = rawUpdates.liveTour ?? rawUpdates.live_tour;
+      updates.live_tour = rawUpdates.liveTour ?? rawUpdates.live_tour;
+    }
+    if (rawUpdates.videoMedia !== undefined || rawUpdates.video_media !== undefined) {
+      updates.videoMedia = rawUpdates.videoMedia ?? rawUpdates.video_media;
+      updates.video_media = rawUpdates.videoMedia ?? rawUpdates.video_media;
+    }
+    if (rawUpdates.cardBgColor !== undefined || rawUpdates.card_bg_color !== undefined) {
+      updates.cardBgColor = rawUpdates.cardBgColor ?? rawUpdates.card_bg_color;
+      updates.card_bg_color = rawUpdates.cardBgColor ?? rawUpdates.card_bg_color;
+    }
+    if (rawUpdates.cardTextColor !== undefined || rawUpdates.card_text_color !== undefined) {
+      updates.cardTextColor = rawUpdates.cardTextColor ?? rawUpdates.card_text_color;
+      updates.card_text_color = rawUpdates.cardTextColor ?? rawUpdates.card_text_color;
     }
 
     try {

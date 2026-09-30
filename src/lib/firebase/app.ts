@@ -24,10 +24,16 @@ import {
   FeaturedWorkItem,
   CreatorPackagesMetadata,
   BrandInquiryMetadata,
+  MediaKitMetadata,
+  ShowingBookingMetadata,
+  HomeValuationMetadata,
   AffiliateRecommendationMetadata,
   ClientReviewMetadata,
   MusicMetadata,
   PodcastMetadata,
+  TipSupportMetadata,
+  LiveTourMetadata,
+  VideoSpotlightMetadata,
   UserAccountSettings,
 } from '../../types';
 
@@ -217,6 +223,14 @@ export interface FirestoreLink {
   clientReview?: ClientReviewMetadata;
   music?: MusicMetadata;
   podcast?: PodcastMetadata;
+  mediaKit?: MediaKitMetadata;
+  showingBooking?: ShowingBookingMetadata;
+  homeValuation?: HomeValuationMetadata;
+  tipSupport?: TipSupportMetadata;
+  liveTour?: LiveTourMetadata;
+  videoMedia?: VideoSpotlightMetadata;
+  cardBgColor?: string;
+  cardTextColor?: string;
   isPremium?: boolean;
   customWhatsappPhone?: string;
   createdAt?: unknown;
@@ -319,6 +333,22 @@ export interface DbLink {
   client_review?: ClientReviewMetadata;
   music?: MusicMetadata;
   podcast?: PodcastMetadata;
+  media_kit?: MediaKitMetadata;
+  mediaKit?: MediaKitMetadata;
+  showing_booking?: ShowingBookingMetadata;
+  showingBooking?: ShowingBookingMetadata;
+  home_valuation?: HomeValuationMetadata;
+  homeValuation?: HomeValuationMetadata;
+  tip_support?: TipSupportMetadata;
+  tipSupport?: TipSupportMetadata;
+  live_tour?: LiveTourMetadata;
+  liveTour?: LiveTourMetadata;
+  video_media?: VideoSpotlightMetadata;
+  videoMedia?: VideoSpotlightMetadata;
+  card_bg_color?: string;
+  cardBgColor?: string;
+  card_text_color?: string;
+  cardTextColor?: string;
   is_premium?: boolean;
   custom_whatsapp_phone?: string;
   created_at?: string;

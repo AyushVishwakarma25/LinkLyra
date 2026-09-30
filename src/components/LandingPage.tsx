@@ -11,22 +11,32 @@ import {
   Settings01Icon,
   Logout01Icon,
   UserIcon,
+  Mic01Icon,
+  ShoppingBag01Icon,
+  ShieldIcon,
+  File01Icon,
+  Mail01Icon,
 } from '@hugeicons/core-free-icons';
 import { ProfileCard } from './ProfileCard';
 import { ProfileCardData, CanvasTheme, UserProfile } from '../types';
 import { BRAND_LOGOS } from '../data';
 import { User as FirebaseUser } from 'firebase/auth';
 import { TileRevealTestimonials } from './TileRevealTestimonials';
+import { PricingSection } from './PricingSection';
 import { IPhoneMockup3D } from './IPhoneMockup3D';
 import { CreatorScrollStack } from './CreatorScrollStack';
 import { ScrollVelocity } from './ScrollVelocity';
 import { AccountSubTab } from './AccountSettings';
+import { SpecularButton } from './ui/SpecularButton';
 
 export interface LandingPageProps {
   onOpenStudio: (claimedHandle?: string) => void;
   onOpenAuth: () => void;
   onOpenVisitorDemo: () => void;
   onOpenProModal?: (featureName?: string) => void;
+  onOpenTerms?: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenContact?: () => void;
   currentUser?: FirebaseUser | null;
   userProfile?: UserProfile | null;
   onSignOut?: () => void;
@@ -36,7 +46,7 @@ export interface LandingPageProps {
 interface CreatorArchetype {
   id: string;
   name: string;
-  category: 'creator' | 'designer' | 'realtor' | 'business';
+  category: 'creator' | 'designer' | 'comedian' | 'fashion' | 'realtor' | 'business';
   label: string;
   icon: any;
   creatorName: string;
@@ -52,80 +62,106 @@ interface CreatorArchetype {
 const ARCHETYPES: CreatorArchetype[] = [
   {
     id: 'designer',
-    name: 'Designer / Founder',
+    name: 'Tech & Design',
     category: 'designer',
-    label: 'Founder Profile',
+    label: 'Tech Creator Profile',
     icon: Edit01Icon,
     creatorName: 'Ayush Vishwakarma',
-    creatorRole: 'Designer / Founder',
-    bio: 'Crafting tactile software, high-craft brand systems, and living digital identities.',
+    creatorRole: 'Tech Creator & Design Engineer',
+    bio: 'Crafting tactile software, documenting creative engineering, and teaching 80K+ builders.',
     handle: '@ayushvishwakarma',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    socials: ['Instagram', 'Twitter/X', 'GitHub', 'LinkedIn'],
+    socials: ['YouTube (84K)', 'Twitter/X', 'GitHub', 'LinkedIn'],
     theme: 'warm',
     cards: [
       {
-        id: 'card-instagram',
-        title: 'Instagram',
-        subtitle: 'Behind the scenes, design systems, and daily stories',
-        linkUrl: 'https://instagram.com',
+        id: 'card-video',
+        title: 'Building LinkLyra in 7 Days: Architecture & Tactile UI',
+        subtitle: 'Full 14-min deep dive on YouTube into our modern creator stack',
+        linkUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
         color: 'purple',
-        logoSrc: BRAND_LOGOS.instagram,
-        badgeText: 'SOCIAL',
-        expanded: false,
+        logoSrc: BRAND_LOGOS.youtube,
+        badgeText: 'FEATURED VIDEO',
+        expanded: true,
+        templateType: 'video_spotlight',
+        videoMedia: {
+          videoUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+          platform: 'youtube',
+          videoId: 'dQw4w9WgXcQ',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80',
+          duration: '14:22',
+          aspectRatio: '16:9',
+        },
+      },
+      {
+        id: 'card-tip',
+        title: 'Support Independent Creator Software',
+        subtitle: 'Send a direct 1-tap tip via UPI — 100% lands directly in my account',
+        linkUrl: 'upi://pay?pa=ayush@upi&pn=Ayush%20Vishwakarma&cu=INR',
+        color: 'green',
+        badgeText: '0% FEE TIP',
+        expanded: true,
+        templateType: 'tip_support',
+        tipSupport: {
+          upiId: 'ayush@upi',
+          creatorName: 'Ayush Vishwakarma',
+          presetAmounts: [100, 250, 500, 1000],
+          defaultAmount: 250,
+          thankYouMessage: 'Thank you for supporting independent developer tools! 🙏',
+        },
       },
       {
         id: 'card-portfolio',
-        title: 'My Portfolio',
+        title: 'Tactile UI Engineering Portfolio',
         subtitle: 'Selected case studies in software architecture and visual design',
         linkUrl: 'https://behance.net',
         color: 'dark',
         badgeText: 'PORTFOLIO',
-        expanded: true,
-      },
-      {
-        id: 'card-work-with-me',
-        title: 'Work With Me',
-        subtitle: 'Consulting, design sprints, and brand partnerships',
-        linkUrl: 'https://calendly.com',
-        color: 'orange',
-        badgeText: 'CONTACT',
         expanded: false,
       },
       {
-        id: 'card-latest-project',
-        title: 'Latest Project',
-        subtitle: 'Tactile software components & minimal design foundations',
-        linkUrl: 'https://github.com',
-        color: 'green',
-        badgeText: 'FEATURED',
+        id: 'card-work-with-me',
+        title: 'Sponsor Video / Advisory Sprints',
+        subtitle: 'Direct booking for brand integrations and design consulting',
+        linkUrl: 'https://calendly.com',
+        color: 'orange',
+        badgeText: 'PARTNERSHIP',
         expanded: false,
       },
     ],
   },
   {
     id: 'creator',
-    name: 'Creators',
+    name: 'Filmmakers',
     category: 'creator',
-    label: 'Creator Profile',
+    label: 'Filmmaker Profile',
     icon: Video01Icon,
     creatorName: 'Maya Lin',
     creatorRole: 'Visual Filmmaker & 3D Artist',
     bio: 'Visual essays on technology, cinematic spaces, and tactile computing.',
     handle: '@mayalin',
     avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
-    socials: ['YouTube', 'Instagram', 'TikTok'],
+    socials: ['YouTube (220K)', 'Instagram', 'Discord'],
     theme: 'warm',
     cards: [
       {
         id: 'creator-reel',
         title: 'Featured Reel: Building My Studio 2026',
         subtitle: 'Complete breakdown of tactile lighting, custom audio, and minimal cable management',
-        linkUrl: 'https://youtube.com',
+        linkUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
         color: 'purple',
         logoSrc: BRAND_LOGOS.youtube,
-        badgeText: 'FEATURED REEL',
+        badgeText: '4K CINEMATIC',
         expanded: true,
+        templateType: 'video_spotlight',
+        videoMedia: {
+          videoUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+          platform: 'youtube',
+          videoId: 'dQw4w9WgXcQ',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=600&auto=format&fit=crop&q=80',
+          duration: '08:45',
+          aspectRatio: '16:9',
+        },
       },
       {
         id: 'creator-shop',
@@ -133,7 +169,7 @@ const ARCHETYPES: CreatorArchetype[] = [
         subtitle: 'The exact color science profiles and Blender lighting setups used across my channel',
         linkUrl: 'https://gumroad.com',
         color: 'orange',
-        badgeText: '$29 SHOP',
+        badgeText: '₹1,999 SHOP',
         expanded: false,
       },
       {
@@ -158,105 +194,165 @@ const ARCHETYPES: CreatorArchetype[] = [
     ],
   },
   {
-    id: 'business',
-    name: 'Businesses',
-    category: 'business',
-    label: 'Business Profile',
-    icon: GlobeIcon,
-    creatorName: 'Komorebi Roasters',
-    creatorRole: 'Specialty Micro-Roastery & Slow Bar',
-    bio: 'Direct-trade single-origin coffees, Japanese pour-overs, and daily sourdough bakery.',
-    handle: '@komorebiroasters',
-    avatarUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=200&auto=format&fit=crop&q=80',
-    socials: ['Daily 7:30 AM–8 PM', 'Arts District', 'WhatsApp'],
-    theme: 'cream',
+    id: 'comedian',
+    name: 'Comedians',
+    category: 'comedian',
+    label: 'Live Performer Profile',
+    icon: Mic01Icon,
+    creatorName: 'Kabir Sharma',
+    creatorRole: 'Stand-Up Comedian & Storyteller',
+    bio: 'Selling out rooms across India. New comedy hour "Overthinking & Chai" touring now! 🎙️',
+    handle: '@kabirsharma',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+    socials: ['YouTube (420K)', 'Instagram', 'BookMyShow'],
+    theme: 'warm',
     cards: [
       {
-        id: 'business-order',
-        title: "Order Today's Fresh Roast Online",
-        subtitle: 'Single-origin Ethiopian Yirgacheffe & Colombian Geisha roasted in-house daily',
-        linkUrl: 'https://komorebi.coffee',
+        id: 'comedian-tour',
+        title: 'Overthinking & Chai — India Tour 2026',
+        subtitle: 'Grab tickets for upcoming live shows in your city',
+        linkUrl: 'https://in.bookmyshow.com',
         color: 'orange',
-        badgeText: 'ORDER ONLINE',
+        badgeText: 'TICKETS LIVE',
         expanded: true,
+        templateType: 'live_tour',
+        liveTour: {
+          tourTitle: 'Overthinking & Chai Tour',
+          dates: [
+            {
+              id: 'ev-1',
+              date: 'Sat, Oct 12',
+              city: 'Mumbai',
+              venue: 'Bal Gandharva Hall',
+              ticketUrl: 'https://in.bookmyshow.com',
+            },
+            {
+              id: 'ev-2',
+              date: 'Fri, Oct 18',
+              city: 'Bengaluru',
+              venue: 'Good Shepherd Auditorium',
+              ticketUrl: 'https://in.bookmyshow.com',
+            },
+            {
+              id: 'ev-3',
+              date: 'Sat, Oct 26',
+              city: 'Delhi NCR',
+              venue: 'Kamani Auditorium',
+              ticketUrl: 'https://in.bookmyshow.com',
+            },
+            {
+              id: 'ev-4',
+              date: 'Sat, Nov 02',
+              city: 'Pune',
+              venue: 'Nehru Memorial Hall',
+              ticketUrl: 'https://in.bookmyshow.com',
+              soldOut: true,
+            },
+          ],
+        },
       },
       {
-        id: 'business-whatsapp',
-        title: 'WhatsApp Tasting Table Booking',
-        subtitle: '1-tap instant reservation for pour-over flights and origin cupping sessions',
-        linkUrl: 'https://wa.me/14155552671',
+        id: 'comedian-video',
+        title: 'Crowd Work: Why Engineers Love Bangalore',
+        subtitle: 'Live from That Comedy Club (3.2M views on YouTube)',
+        linkUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+        color: 'purple',
+        badgeText: 'VIRAL CLIP',
+        expanded: true,
+        templateType: 'video_spotlight',
+        videoMedia: {
+          videoUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+          platform: 'youtube',
+          videoId: 'dQw4w9WgXcQ',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=600&auto=format&fit=crop&q=80',
+          duration: '11:40',
+          aspectRatio: '16:9',
+        },
+      },
+      {
+        id: 'comedian-tip',
+        title: 'Buy Kabir a Cutting Chai / Tip the Show',
+        subtitle: 'Direct 1-tap UPI support with zero platform commission',
+        linkUrl: 'upi://pay?pa=kabir@upi&pn=Kabir%20Sharma&cu=INR',
         color: 'green',
-        badgeText: '1-TAP WHATSAPP',
-        expanded: false,
+        badgeText: '0% FEE TIP',
+        expanded: true,
+        templateType: 'tip_support',
+        tipSupport: {
+          upiId: 'kabir@upi',
+          creatorName: 'Kabir Sharma',
+          presetAmounts: [100, 250, 500, 1000],
+          defaultAmount: 250,
+          thankYouMessage: 'Thank you for supporting live Indian comedy! See you at the show. 🙏',
+        },
       },
       {
-        id: 'business-menu',
-        title: 'Seasonal Slow Bar & Bakery Menu',
-        subtitle: 'Ceremonial grade matcha, nitro cold brews, and freshly baked cardamom buns',
-        linkUrl: 'https://komorebi.coffee/menu',
-        color: 'yellow',
-        badgeText: 'MENU',
-        expanded: false,
-      },
-      {
-        id: 'business-location',
-        title: 'Roastery Hours & Arts District Location',
-        subtitle: 'Open daily 7:30 AM–8 PM at 410 S Santa Fe Ave, Arts District',
-        linkUrl: 'https://maps.google.com',
+        id: 'comedian-booking',
+        title: 'Book for College & Corporate Shows',
+        subtitle: 'Direct WhatsApp chat with management for dates and pricing',
+        linkUrl: 'https://wa.me/919876543210',
         color: 'dark',
-        badgeText: 'VISIT US',
+        badgeText: 'BOOKINGS',
         expanded: false,
       },
     ],
   },
   {
-    id: 'realtor',
-    name: 'Professionals',
-    category: 'realtor',
-    label: 'Professional Profile',
-    icon: Briefcase01Icon,
-    creatorName: 'David Sterling',
-    creatorRole: 'Luxury Architectural Estates',
-    bio: 'Specializing in mid-century modern and trophy residential sanctuaries across coastal California.',
-    handle: '@sterlingestates',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
-    socials: ['WhatsApp', 'LinkedIn', 'Direct Call'],
-    theme: 'clay',
+    id: 'fashion',
+    name: 'Fashion & Style',
+    category: 'fashion',
+    label: 'Fashion Creator Profile',
+    icon: ShoppingBag01Icon,
+    creatorName: 'Tara Sen',
+    creatorRole: 'Fashion Stylist & Aesthetic Curator',
+    bio: 'Minimalist styling, everyday luxury lookbooks, and sustainable thrift edits. ✨',
+    handle: '@tarasen',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+    socials: ['Instagram (310K)', 'YouTube', 'Pinterest'],
+    theme: 'cream',
     cards: [
       {
-        id: 'realtor-property',
-        title: 'The Glass Pavilion — Oceanfront Penthouse',
-        subtitle: '6,400 sq.ft private rooftop terrace, infinity plunge pool, and panoramic sunset views ($2,850,000)',
-        linkUrl: 'https://sterlingestates.com',
-        color: 'orange',
-        badgeText: 'JUST LISTED',
+        id: 'fashion-reel',
+        title: 'Monsoon Capsule Wardrobe: 10 Pieces, 30 Outfits',
+        subtitle: 'Watch my viral styling breakdown on Instagram Reels',
+        linkUrl: 'https://instagram.com/reel/C8qL9x_vT2Z/',
+        color: 'purple',
+        badgeText: 'VIRAL REEL',
         expanded: true,
+        templateType: 'video_spotlight',
+        videoMedia: {
+          videoUrl: 'https://instagram.com/reel/C8qL9x_vT2Z/',
+          platform: 'instagram',
+          videoId: 'C8qL9x_vT2Z',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&auto=format&fit=crop&q=80',
+          aspectRatio: '9:16',
+        },
       },
       {
-        id: 'realtor-showing',
-        title: 'Request Private Showing',
-        subtitle: 'Book a confidential walkthrough with David Sterling and our private estate team',
+        id: 'fashion-shop',
+        title: 'Shop My Daily Outfits & Beauty Routine',
+        subtitle: 'Direct links to linen shirts, vintage denim, and skin tints',
+        linkUrl: 'https://amazon.in',
+        color: 'orange',
+        badgeText: 'LOOKBOOK',
+        expanded: false,
+      },
+      {
+        id: 'fashion-collab',
+        title: 'Brand Partnerships & Sponsored Reels',
+        subtitle: 'Download media kit with demographics (82% female, 18-34)',
         linkUrl: 'https://calendly.com',
         color: 'dark',
-        badgeText: 'SHOWINGS',
+        badgeText: 'MEDIA KIT',
         expanded: false,
       },
       {
-        id: 'realtor-valuation',
-        title: 'Instant Home Valuation',
-        subtitle: 'Receive a detailed comparative market analysis and private valuation for your property',
-        linkUrl: 'https://sterlingestates.com/valuation',
-        color: 'purple',
-        badgeText: 'VALUATION',
-        expanded: false,
-      },
-      {
-        id: 'realtor-listings',
-        title: '14 Off-Market Architectural Listings',
-        subtitle: 'Download confidential portfolio with floor plans, high-res renders, and pricing disclosures',
-        linkUrl: 'https://sterlingestates.com/listings',
+        id: 'fashion-consult',
+        title: '1-on-1 Personal Styling Consultation',
+        subtitle: 'Instant WhatsApp chat to book a private wardrobe audit',
+        linkUrl: 'https://wa.me/919876543210',
         color: 'green',
-        badgeText: 'PORTFOLIO',
+        badgeText: 'WHATSAPP',
         expanded: false,
       },
     ],
@@ -269,6 +365,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenStudio,
   onOpenAuth,
   onOpenVisitorDemo,
+  onOpenProModal,
+  onOpenTerms,
+  onOpenPrivacy,
+  onOpenContact,
   currentUser,
   userProfile,
   onSignOut,
@@ -278,7 +378,63 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clickedCardId, setClickedCardId] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [showAuthToast, setShowAuthToast] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Bottom-left toast notification for signed-in user (lasts for 5 seconds only)
+  React.useEffect(() => {
+    if (currentUser) {
+      setShowAuthToast(true);
+      const timer = setTimeout(() => {
+        setShowAuthToast(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowAuthToast(false);
+    }
+  }, [currentUser]);
+
+  const handleNavigateTerms = () => {
+    if (onOpenTerms) {
+      onOpenTerms();
+    } else {
+      window.location.href = '?view=terms';
+    }
+  };
+
+  const handleNavigatePrivacy = () => {
+    if (onOpenPrivacy) {
+      onOpenPrivacy();
+    } else {
+      window.location.href = '?view=privacy';
+    }
+  };
+
+  const handleNavigateContact = () => {
+    if (onOpenContact) {
+      onOpenContact();
+    } else {
+      window.location.href = '?view=contact';
+    }
+  };
+
+  const handleSelectPlan = (planName: string) => {
+    if (planName === 'Free Forever') {
+      if (currentUser) {
+        onOpenStudio();
+      } else {
+        onOpenAuth();
+      }
+    } else {
+      if (onOpenProModal) {
+        onOpenProModal(planName);
+      } else if (currentUser) {
+        onOpenStudio();
+      } else {
+        onOpenAuth();
+      }
+    }
+  };
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -380,6 +536,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 logoSrc={card.logoSrc}
                 badgeText={card.badgeText}
                 expanded={card.expanded}
+                templateType={card.templateType}
+                tipSupport={card.tipSupport}
+                videoMedia={card.videoMedia}
+                liveTour={card.liveTour}
                 interactive={true}
                 onClick={() => handleCardClick(card)}
               />
@@ -407,20 +567,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] text-[#111111] flex flex-col font-sans selection:bg-[#4F46E5] selection:text-white relative">
-      {/* Top Banner if signed in */}
-      {currentUser && (
-        <div className="bg-[#111111] text-white px-4 py-2 text-center text-xs flex items-center justify-center gap-2 font-medium z-50">
-          <span>Signed in as <strong>{currentUser.email}</strong></span>
-          <span>•</span>
-          <button
-            type="button"
-            onClick={() => onOpenStudio()}
-            className="text-[#F8BA38] font-bold hover:underline cursor-pointer flex items-center gap-1"
-          >
-            <span>Launch Creator Studio</span>
-            <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-          </button>
-        </div>
+      {/* Bottom-left toast notification for signed-in user (lasts for 5 seconds only) */}
+      {showAuthToast && currentUser && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 left-5 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 pointer-events-auto"
+        >
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#18181B] text-white shadow-2xl border border-white/15 text-xs font-medium backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="truncate max-w-[190px] sm:max-w-[260px]">
+              Signed in as <strong className="text-white">{currentUser.email}</strong>
+            </span>
+            <span className="text-white/40">•</span>
+            <button
+              type="button"
+              onClick={() => onOpenStudio()}
+              className="text-[#F8BA38] font-bold hover:underline cursor-pointer flex items-center gap-1 shrink-0"
+            >
+              <span>Launch Creator Studio</span>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAuthToast(false)}
+              className="ml-1 text-zinc-400 hover:text-white cursor-pointer leading-none text-base px-1"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Header — Brand Foundation + Minimal Nav */}
@@ -441,15 +618,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </button>
 
           {/* Center: Primary navigation */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-zinc-300">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-zinc-300">
             <a href="#product" className="hover:text-white transition-colors cursor-pointer">
-              Product
+              Features
+            </a>
+            <a href="#templates" className="hover:text-white transition-colors cursor-pointer">
+              Templates
             </a>
             <a href="#creators" className="hover:text-white transition-colors cursor-pointer">
               Creators
             </a>
-            <a href="#businesses" className="hover:text-white transition-colors cursor-pointer">
-              Businesses
+            <a href="#pricing" className="hover:text-white transition-colors cursor-pointer">
+              Pricing
             </a>
           </nav>
 
@@ -534,6 +714,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         <HugeiconsIcon icon={GlobeIcon} size={14} className="text-zinc-400" />
                         <span>View Public Profile</span>
                       </button>
+
+                      <div className="my-1 border-t border-white/10" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          handleNavigateTerms();
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <HugeiconsIcon icon={File01Icon} size={14} className="text-zinc-400" />
+                        <span>Terms of Service</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          handleNavigatePrivacy();
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <HugeiconsIcon icon={ShieldIcon} size={14} className="text-zinc-400" />
+                        <span>Privacy Policy</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          handleNavigateContact();
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <HugeiconsIcon icon={Mail01Icon} size={14} className="text-zinc-400" />
+                        <span>Contact &amp; Support</span>
+                      </button>
                     </div>
 
                     {/* Sign out */}
@@ -564,13 +782,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 >
                   Log in
                 </button>
-                <button
-                  type="button"
+                <SpecularButton
+                  size="sm"
+                  radius={999}
+                  tint="#ffffff"
+                  tintOpacity={1}
+                  textColor="#111111"
+                  lineColor="#F8BA38"
+                  baseColor="#E8E8E8"
+                  intensity={1.2}
+                  shineSize={12}
+                  shineFade={35}
+                  thickness={1.4}
+                  speed={0.4}
+                  followMouse
+                  autoAnimate
                   onClick={onOpenAuth}
-                  className="px-4 py-2 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all active:scale-95 shadow-xs cursor-pointer flex items-center gap-1.5"
+                  className="!font-bold text-xs shadow-xs"
                 >
                   <span>Create your LinkLyra →</span>
-                </button>
+                </SpecularButton>
               </>
             )}
           </div>
@@ -593,24 +824,69 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <a
                 href="#product"
                 onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-white transition-colors py-1 cursor-pointer"
+                className="hover:text-white transition-colors py-1 cursor-pointer flex items-center justify-between"
               >
-                Product
+                <span>Features</span>
+                <span className="text-[11px] text-zinc-400 font-mono">How it works</span>
+              </a>
+              <a
+                href="#templates"
+                onClick={() => setMobileMenuOpen(false)}
+                className="hover:text-white transition-colors py-1 cursor-pointer flex items-center justify-between"
+              >
+                <span>Templates</span>
+                <span className="text-[11px] text-zinc-400 font-mono">Presets</span>
               </a>
               <a
                 href="#creators"
                 onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-white transition-colors py-1 cursor-pointer"
+                className="hover:text-white transition-colors py-1 cursor-pointer flex items-center justify-between"
               >
-                Creators
+                <span>Creators</span>
+                <span className="text-[11px] text-zinc-400 font-mono">Niches</span>
               </a>
               <a
-                href="#businesses"
+                href="#pricing"
                 onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-white transition-colors py-1 cursor-pointer"
+                className="hover:text-white transition-colors py-1 cursor-pointer flex items-center justify-between"
               >
-                Businesses
+                <span>Pricing</span>
+                <span className="text-[11px] text-zinc-400 font-mono">0% Fee &amp; Pro</span>
               </a>
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-zinc-400">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleNavigateTerms();
+                  }}
+                  className="hover:text-white transition-colors py-1 cursor-pointer"
+                >
+                  Terms
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleNavigatePrivacy();
+                  }}
+                  className="hover:text-white transition-colors py-1 cursor-pointer"
+                >
+                  Privacy
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleNavigateContact();
+                  }}
+                  className="hover:text-white transition-colors py-1 cursor-pointer"
+                >
+                  Contact
+                </button>
+              </div>
             </nav>
 
             <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
@@ -624,16 +900,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       {currentUser.email}
                     </p>
                   </div>
-                  <button
-                    type="button"
+                  <SpecularButton
+                    size="md"
+                    radius={999}
+                    tint="#ffffff"
+                    tintOpacity={1}
+                    textColor="#111111"
+                    lineColor="#F8BA38"
+                    baseColor="#E8E8E8"
+                    intensity={1.2}
+                    shineSize={14}
+                    thickness={1.4}
+                    autoAnimate
                     onClick={() => {
                       setMobileMenuOpen(false);
                       onOpenStudio();
                     }}
-                    className="w-full py-2.5 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full !font-bold text-xs shadow-xs"
                   >
                     <span>Launch Studio Dashboard →</span>
-                  </button>
+                  </SpecularButton>
 
                   <button
                     type="button"
@@ -689,16 +975,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   >
                     Log in
                   </button>
-                  <button
-                    type="button"
+                  <SpecularButton
+                    size="md"
+                    radius={999}
+                    tint="#ffffff"
+                    tintOpacity={1}
+                    textColor="#111111"
+                    lineColor="#F8BA38"
+                    baseColor="#E8E8E8"
+                    intensity={1.2}
+                    shineSize={14}
+                    thickness={1.4}
+                    autoAnimate
                     onClick={() => {
                       setMobileMenuOpen(false);
                       onOpenAuth();
                     }}
-                    className="w-full py-3 rounded-full text-xs font-bold bg-white text-[#111111] hover:bg-zinc-100 transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full !font-bold text-xs shadow-xs"
                   >
                     <span>Create your LinkLyra →</span>
-                  </button>
+                  </SpecularButton>
                 </>
               )}
             </div>
@@ -733,19 +1029,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* CTAs */}
             <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-              <button
-                type="button"
+              <SpecularButton
+                size="lg"
+                radius={999}
+                tint="#111111"
+                tintOpacity={1}
+                textColor="#ffffff"
+                lineColor="#F8BA38"
+                baseColor="#27272a"
+                intensity={1.4}
+                shineSize={16}
+                shineFade={45}
+                thickness={1.5}
+                speed={0.4}
+                followMouse
+                proximity={300}
+                autoAnimate
                 onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
-                className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-[#111111] hover:bg-black text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto !font-bold shadow-lg"
               >
                 <span>Create your LinkLyra →</span>
-              </button>
-              <a
-                href="#creators"
-                className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-white hover:bg-stone-50 text-[#111111] text-xs sm:text-sm font-bold border border-[#E8E8E8] shadow-2xs hover:border-black/20 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+              </SpecularButton>
+              <SpecularButton
+                size="lg"
+                radius={999}
+                tint="#ffffff"
+                tintOpacity={1}
+                textColor="#111111"
+                lineColor="#6366F1"
+                baseColor="#E8E8E8"
+                intensity={1.0}
+                shineSize={12}
+                shineFade={35}
+                thickness={1.2}
+                speed={0.35}
+                followMouse
+                proximity={250}
+                onClick={() => {
+                  document.getElementById('creators')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="w-full sm:w-auto !font-bold border border-[#E8E8E8] shadow-2xs hover:border-black/20"
               >
                 <span>Explore creators</span>
-              </a>
+              </SpecularButton>
             </div>
 
             {/* Handle claim bar */}
@@ -766,12 +1092,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     placeholder="ayushvishwakarma"
                     className="w-full bg-transparent px-1.5 py-1 text-xs font-semibold text-[#111111] focus:outline-none placeholder:text-[#999999]"
                   />
-                  <button
+                  <SpecularButton
                     type="submit"
-                    className="px-3.5 py-1.5 rounded-full bg-[#111111] hover:bg-black text-white text-[11px] font-bold whitespace-nowrap active:scale-95 transition-all cursor-pointer shrink-0"
+                    size="sm"
+                    radius={999}
+                    tint="#111111"
+                    tintOpacity={1}
+                    textColor="#ffffff"
+                    lineColor="#F8BA38"
+                    baseColor="#27272a"
+                    intensity={1.3}
+                    shineSize={12}
+                    shineFade={35}
+                    thickness={1.2}
+                    speed={0.4}
+                    autoAnimate
+                    className="!px-3.5 !py-1.5 !font-bold text-[11px] whitespace-nowrap shrink-0"
                   >
-                    Claim
-                  </button>
+                    <span>Claim</span>
+                  </SpecularButton>
                 </form>
               </div>
             )}
@@ -791,8 +1130,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/40 via-transparent to-transparent pointer-events-none" />
         <ScrollVelocity
           texts={[
-            'Content Creator ✦ Visual Designer ✦ Podcast Host ✦ Studio Founder ✦ Digital Artist ✦ Live Streamer ✦ Real Estate Pro ✦ Musician & Producer ✦ Indie Builder ✦',
-            'Bio Link Reimagined ⚡ 1-Tap Bookings ⚡ Custom Portfolios ⚡ Digital Media Kits ⚡ Instant Product Sales ⚡ Tactile UI Canvas ⚡ Monetize Audience ⚡'
+            'Comedians & Performers ✦ YouTubers & Filmmakers ✦ Fashion & Stylists ✦ Tech & Finance Creators ✦ Podcast Hosts ✦ Musicians & Bands ✦ Gaming & Streamers ✦ Fitness & Wellness ✦ Visual Artists ✦',
+            '0% Fee Fan Tips ⚡ Video & Reel Previews ⚡ Live Tour Dates ⚡ Digital Asset Sales ⚡ Verified Rate Cards ⚡ Custom Bio Links ⚡ 1-Tap Bookings ⚡'
           ]}
           velocity={70}
           className="text-[#FAFAF7] font-black tracking-tight drop-shadow-md hover:text-[#F8BA38] transition-colors"
@@ -810,34 +1149,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* SECTION 3: PROFESSIONALS — Real Profile (David Sterling) -> Label -> Copy */}
+      {/* SECTION 3: LIVE PERFORMERS & COMEDIANS                                    */}
       {/* ========================================================================= */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full border-t border-[#E8E8E8]">
+      <section id="creators" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full border-t border-[#E8E8E8]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-          {/* Left: Real Profile (David Sterling) */}
+          {/* Left: Real Profile (Kabir Sharma - Stand-up Comedian) */}
           <div className="lg:col-span-6 order-2 lg:order-1 flex justify-center">
-            {renderLiveProfile(ARCHETYPES[3])}
+            {renderLiveProfile(ARCHETYPES[2])}
           </div>
 
           {/* Right: Tiny Label + One Sentence */}
           <div className="lg:col-span-6 order-1 lg:order-2 text-center lg:text-left space-y-4">
             <span className="text-[11px] sm:text-xs font-bold tracking-[0.2em] text-[#666666] uppercase font-mono">
-              BUILT FOR HIGH-TICKET CLIENTS
+              BUILT FOR STAND-UP & LIVE TOURS
             </span>
             <h2 className="text-3xl sm:text-5xl font-black text-[#111111] tracking-tight leading-[1.1]">
-              Show your work before you start the conversation.
+              Pack your live rooms and get tipped directly.
             </h2>
             <p className="text-sm sm:text-base text-[#666666] max-w-lg leading-relaxed">
-              Showcase trophy estates, book confidential private showings, calculate valuations, and share private off-market disclosures seamlessly.
+              Publish upcoming tour dates with 1-tap ticket links, spotlight your latest viral specials, and collect instant fan tips via UPI with zero platform cuts.
             </p>
             <div className="pt-2">
-              <button
-                type="button"
+              <SpecularButton
+                size="md"
+                radius={999}
+                tint="#111111"
+                tintOpacity={1}
+                textColor="#ffffff"
+                lineColor="#F8BA38"
+                baseColor="#27272a"
+                intensity={1.3}
+                shineSize={14}
+                shineFade={40}
+                thickness={1.4}
+                speed={0.35}
+                followMouse
+                proximity={250}
+                autoAnimate
                 onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#111111] hover:bg-black text-white text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                className="!font-bold shadow-md"
               >
-                <span>Build your page →</span>
-              </button>
+                <span>Create your creator page →</span>
+              </SpecularButton>
             </div>
           </div>
         </div>
@@ -849,6 +1202,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* SECTION 6: SOCIAL PROOF / TESTIMONIALS                                   */}
       {/* ========================================================================= */}
       <TileRevealTestimonials onOpenStudio={onOpenStudio} />
+
+      {/* ========================================================================= */}
+      {/* SECTION 7: TRANSPARENT PRICING — Clean, Simple Creator Tiers              */}
+      {/* ========================================================================= */}
+      <PricingSection onSelectPlan={handleSelectPlan} />
 
       {/* ========================================================================= */}
       {/* SECTION 7: FINAL CTA                                                     */}
@@ -867,13 +1225,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Build your LinkLyra profile in minutes. Free to start, forever tactile.
             </p>
             <div className="pt-4">
-              <button
-                type="button"
+              <SpecularButton
+                size="lg"
+                radius={999}
+                tint="#ffffff"
+                tintOpacity={1}
+                textColor="#111111"
+                lineColor="#F8BA38"
+                baseColor="#ffffff"
+                intensity={1.5}
+                shineSize={18}
+                shineFade={45}
+                thickness={1.8}
+                speed={0.4}
+                followMouse
+                proximity={350}
+                autoAnimate
                 onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
-                className="px-8 py-4 rounded-full bg-white hover:bg-zinc-100 text-[#111111] text-sm sm:text-base font-bold shadow-xl active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+                className="!px-8 !py-4 !font-black text-sm sm:text-base shadow-2xl hover:scale-105"
               >
                 <span>Create your LinkLyra →</span>
-              </button>
+              </SpecularButton>
             </div>
             <p className="pt-2 text-xs text-zinc-400 font-medium tracking-wide">
               No credit card required · Free forever tier
@@ -889,19 +1261,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-10 lg:gap-12 pb-12 border-b border-[#E8E8E8] text-left">
             {/* Brand Block */}
-            <div className="md:col-span-2 space-y-3">
+            <div className="md:col-span-2 space-y-3.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-xl bg-[#111111] text-white flex items-center justify-center font-black text-xs">
+                <div className="w-7 h-7 rounded-xl bg-[#111111] text-white flex items-center justify-center font-black text-xs shadow-xs">
                   LL
                 </div>
                 <span className="font-black text-base tracking-tight text-[#111111]">
                   LINKLYRA
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-[#666666] font-normal leading-relaxed">
-                Your digital home, in one link.
+              <p className="text-xs sm:text-sm text-[#666666] font-normal leading-relaxed max-w-sm">
+                The tactile, high-speed bio link crafted for content creators. Showcase videos, sell digital work, and receive 0% fee direct tips.
               </p>
+
               <div className="pt-2 flex items-center gap-4 text-xs font-semibold text-[#666666]">
+                <a
+                  href="https://youtube.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#111111] transition-colors"
+                >
+                  YouTube
+                </a>
+                <span className="text-[#CCCCCC]">·</span>
                 <a
                   href="https://instagram.com"
                   target="_blank"
@@ -912,21 +1294,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </a>
                 <span className="text-[#CCCCCC]">·</span>
                 <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-[#111111] transition-colors"
-                >
-                  LinkedIn
-                </a>
-                <span className="text-[#CCCCCC]">·</span>
-                <a
                   href="https://x.com"
                   target="_blank"
                   rel="noreferrer"
                   className="hover:text-[#111111] transition-colors"
                 >
                   X
+                </a>
+                <span className="text-[#CCCCCC]">·</span>
+                <a
+                  href="https://linkedin.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#111111] transition-colors"
+                >
+                  LinkedIn
                 </a>
               </div>
             </div>
@@ -936,15 +1318,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <h4 className="text-xs font-bold font-mono tracking-wider uppercase text-[#111111]">
                 Product
               </h4>
-              <ul className="space-y-2 text-xs text-[#666666]">
+              <ul className="space-y-2.5 text-xs text-[#666666]">
                 <li>
-                  <button
-                    type="button"
-                    onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
-                    className="hover:text-[#111111] transition-colors cursor-pointer"
-                  >
-                    Create your page
-                  </button>
+                  <a href="#product" className="hover:text-[#111111] transition-colors">
+                    Features
+                  </a>
                 </li>
                 <li>
                   <a href="#templates" className="hover:text-[#111111] transition-colors">
@@ -952,63 +1330,152 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </a>
                 </li>
                 <li>
-                  <a href="#product" className="hover:text-[#111111] transition-colors">
-                    Features
+                  <a href="#pricing" className="hover:text-[#111111] transition-colors">
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => (currentUser ? onOpenStudio() : onOpenAuth())}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Launch Studio
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={onOpenVisitorDemo}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Live Creator Demo
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 2: Creators */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold font-mono tracking-wider uppercase text-[#111111]">
+                Creators
+              </h4>
+              <ul className="space-y-2.5 text-xs text-[#666666]">
+                <li>
+                  <a href="#creators" className="hover:text-[#111111] transition-colors">
+                    Video &amp; Film
+                  </a>
+                </li>
+                <li>
+                  <a href="#creators" className="hover:text-[#111111] transition-colors">
+                    Comedy &amp; Stand-up
+                  </a>
+                </li>
+                <li>
+                  <a href="#creators" className="hover:text-[#111111] transition-colors">
+                    Fashion &amp; Style
+                  </a>
+                </li>
+                <li>
+                  <a href="#creators" className="hover:text-[#111111] transition-colors">
+                    Music &amp; Audio
+                  </a>
+                </li>
+                <li>
+                  <a href="#creators" className="hover:text-[#111111] transition-colors">
+                    Tech &amp; Podcasters
                   </a>
                 </li>
               </ul>
             </div>
 
-            {/* Column 2: Explore */}
+            {/* Column 3: Trust & Legal */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold font-mono tracking-wider uppercase text-[#111111]">
-                Explore
+                Trust &amp; Legal
               </h4>
-              <ul className="space-y-2 text-xs text-[#666666]">
+              <ul className="space-y-2.5 text-xs text-[#666666]">
                 <li>
-                  <a href="#creators" className="hover:text-[#111111] transition-colors">
-                    Creators
-                  </a>
+                  <button
+                    type="button"
+                    onClick={handleNavigateTerms}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Terms and Conditions
+                  </button>
                 </li>
                 <li>
-                  <a href="#businesses" className="hover:text-[#111111] transition-colors">
-                    Businesses
-                  </a>
+                  <button
+                    type="button"
+                    onClick={handleNavigatePrivacy}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Privacy Policy
+                  </button>
                 </li>
                 <li>
-                  <a href="#creators" className="hover:text-[#111111] transition-colors">
-                    Professionals
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 3: Company */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold font-mono tracking-wider uppercase text-[#111111]">
-                Company
-              </h4>
-              <ul className="space-y-2 text-xs text-[#666666]">
-                <li>
-                  <a href="#privacy" className="hover:text-[#111111] transition-colors">
-                    Privacy
-                  </a>
+                  <button
+                    type="button"
+                    onClick={handleNavigateContact}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Contact &amp; Support
+                  </button>
                 </li>
                 <li>
-                  <a href="#terms" className="hover:text-[#111111] transition-colors">
-                    Terms
-                  </a>
+                  <button
+                    type="button"
+                    onClick={handleNavigateTerms}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    0% Commission Policy
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={handleNavigatePrivacy}
+                    className="hover:text-[#111111] transition-colors cursor-pointer text-left"
+                  >
+                    Data Protection &amp; Security
+                  </button>
                 </li>
               </ul>
             </div>
           </div>
 
-          {/* Bottom Copyright */}
+          {/* Bottom Copyright & Disclaimer */}
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#888888]">
-            <p>© 2026 LinkLyra</p>
-            <p className="font-medium text-[#666666]">
-              Made for people with something to share.
-            </p>
+            <p>© 2026 LinkLyra • A product of Zeper AI</p>
+            <div className="flex items-center gap-4 text-[#666666]">
+              <button
+                type="button"
+                onClick={handleNavigateTerms}
+                className="hover:text-[#111111] transition-colors cursor-pointer"
+              >
+                Terms
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={handleNavigatePrivacy}
+                className="hover:text-[#111111] transition-colors cursor-pointer"
+              >
+                Privacy
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={handleNavigateContact}
+                className="hover:text-[#111111] transition-colors cursor-pointer"
+              >
+                Contact
+              </button>
+              <span>·</span>
+              <span className="font-medium">
+                Made for people with something to share.
+              </span>
+            </div>
           </div>
         </div>
       </footer>

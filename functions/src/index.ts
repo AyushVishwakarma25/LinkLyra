@@ -1622,10 +1622,135 @@ export const setWhiteLabel = onCall(async (request) => {
 });
 
 // -------------------------------------------------------------
+// 10b. Callable Function: changeUsername (ACID Slug Registry Service)
+// Alternate Architecture:
+// - Server-authoritative ACID Firestore transaction for unique slug claiming.
+// - Slug Aliasing & 301 Redirect History: Preserves creator backlinks by setting
+//   previous slugs to 'redirect' status pointing to the new slug with a 90-day cooldown.
+// - Invalidation of in-memory edge metadata cache.
+// -------------------------------------------------------------
+export const changeUsername = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated to change username.');
+  }
+
+  const uid = request.auth.uid;
+  const { newUsername } = (request.data || {}) as { newUsername?: string };
+
+  if (!newUsername || typeof newUsername !== 'string') {
+    throw new HttpsError('invalid-argument', 'Missing or invalid newUsername.');
+  }
+
+  const cleanNew = newUsername.toLowerCase().trim().replace(/^@/, '');
+
+  // 1. Format validation
+  const USERNAME_REGEX = /^[a-z0-9_]{3,30}$/;
+  if (!USERNAME_REGEX.test(cleanNew)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Username must be between 3 and 30 characters and contain only lowercase letters, numbers, and underscores.'
+    );
+  }
+
+  // 2. Reserved system names
+  const reservedUsernames = new Set([
+    'admin', 'administrator', 'api', 'app', 'login', 'signin', 'signup',
+    'register', 'studio', 'dashboard', 'pricing', 'terms', 'privacy',
+    'settings', 'billing', 'explore', 'landing', 'help', 'support',
+    'assets', 'static', 'index', 'index.html', 'creator', 'creators',
+    'www', 'root', 'auth', 'oauth', 'profile', 'profiles', 'page', 'pages',
+    'user', 'users', 'linklyra', 'zeperai', 'domain', 'domains', 'about',
+    'contact', 'legal', 'docs', 'documentation', 'blog', 'status', 'mail',
+    'email', 'null', 'undefined', 'true', 'false',
+  ]);
+
+  if (reservedUsernames.has(cleanNew)) {
+    throw new HttpsError('invalid-argument', `@${cleanNew} is a reserved system address.`);
+  }
+
+  // 3. Strict ACID Firestore Transaction
+  let previousSlug: string | null = null;
+
+  await db.runTransaction(async (tx) => {
+    const newDocRef = db.doc(`usernames/${cleanNew}`);
+    const newDocSnap = await tx.get(newDocRef);
+
+    if (newDocSnap.exists) {
+      const existingData = newDocSnap.data();
+      if (existingData?.userId && existingData.userId !== uid) {
+        throw new HttpsError('already-exists', `Username @${cleanNew} is already taken.`);
+      }
+    }
+
+    // Read current user profile/page
+    const pageRef = db.doc(`pages/${uid}`);
+    const pageSnap = await tx.get(pageRef);
+    if (pageSnap.exists) {
+      const currentHandle = pageSnap.data()?.username;
+      if (currentHandle && typeof currentHandle === 'string') {
+        const cleanOld = currentHandle.toLowerCase().trim().replace(/^@/, '');
+        if (cleanOld !== cleanNew) {
+          previousSlug = cleanOld;
+          const oldDocRef = db.doc(`usernames/${cleanOld}`);
+          const oldDocSnap = await tx.get(oldDocRef);
+          if (oldDocSnap.exists && oldDocSnap.data()?.userId === uid) {
+            // Set 301 alias redirect with 90-day cooldown
+            tx.set(
+              oldDocRef,
+              {
+                status: 'redirect',
+                redirectToSlug: cleanNew,
+                userId: uid,
+                pageId: uid,
+                redirectUntil: admin.firestore.Timestamp.fromMillis(Date.now() + 90 * 24 * 3600 * 1000),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+        }
+      }
+    }
+
+    // Set new active slug
+    tx.set(
+      newDocRef,
+      {
+        status: 'active',
+        userId: uid,
+        pageId: uid,
+        username: cleanNew,
+        redirectToSlug: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Update canonical page and user documents
+    tx.set(pageRef, { username: cleanNew, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    tx.set(db.doc(`users/${uid}`), { username: cleanNew, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  });
+
+  // Clear server in-memory cache for both slugs
+  metaCache.delete(`meta_${cleanNew}`);
+  if (previousSlug) {
+    metaCache.delete(`meta_${previousSlug}`);
+  }
+
+  return {
+    success: true,
+    username: cleanNew,
+    previousUsername: previousSlug,
+  };
+});
+
+// -------------------------------------------------------------
 // 11. HTTP Function: renderProfileMeta (Social Bot Crawlers & Fast SSR Ingress)
 // Alternate Architecture:
 // - Edge/Crawler classification with instant redirect for human visitors.
 // - In-memory LRU cache + Stale-While-Revalidate CDN headers to eliminate cold-start timeouts.
+// - Automatic 301 Moved Permanently redirects for aliased / renamed profile slugs.
 // - Rich OpenGraph, Twitter Large Image, and Schema.org JSON-LD microdata.
 // -------------------------------------------------------------
 
@@ -1666,7 +1791,7 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     } else {
       const segments = urlPath.split('/').filter(Boolean);
       if (segments.length > 0) {
-        if (segments[0] === 'app' && segments[1]) {
+        if ((segments[0] === 'app' || segments[0] === 'p' || segments[0] === 'u') && segments[1]) {
           usernameOrDomain = segments[1].toLowerCase().trim().replace(/^@/, '');
         } else {
           usernameOrDomain = segments[0].toLowerCase().trim().replace(/^@/, '');
@@ -1683,7 +1808,27 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
 
   const targetIdentifier = usernameOrDomain.toLowerCase().trim().replace(/^@/, '');
 
-  // 1. If human visitor (not a social crawler bot), redirect cleanly to SPA URL
+  // 1. Check for 301 Permanent Redirect on renamed or aliased handles
+  if (targetIdentifier && !reserved.has(targetIdentifier) && !targetIdentifier.includes('.')) {
+    try {
+      const slugSnap = await db.doc(`usernames/${targetIdentifier}`).get();
+      if (slugSnap.exists) {
+        const slugData = slugSnap.data();
+        if (slugData?.status === 'redirect' && slugData.redirectToSlug) {
+          const canonicalTarget = slugData.redirectToSlug.toLowerCase().trim().replace(/^@/, '');
+          const redirectUrl = `/@${canonicalTarget}`;
+          res.set('Location', redirectUrl);
+          res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
+          res.status(301).send(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${redirectUrl}"><script>window.location.replace('${redirectUrl}');</script></head><body>301 Moved Permanently: Redirecting to <a href="${redirectUrl}">${redirectUrl}</a></body></html>`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[renderProfileMeta] Error checking slug alias redirect:', e);
+    }
+  }
+
+  // 2. If human visitor (not a social crawler bot), redirect cleanly to SPA URL
   if (!isSocialCrawler) {
     const redirectUrl = targetIdentifier ? `/${targetIdentifier}` : '/';
     res.set('Location', redirectUrl);
@@ -1691,7 +1836,7 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     return;
   }
 
-  // 2. Check In-Memory Cache (Sub-5ms response time for warm instances)
+  // 3. Check In-Memory Cache (Sub-5ms response time for warm instances)
   const cacheKey = `meta_${targetIdentifier || 'default'}`;
   const now = Date.now();
   const cached = metaCache.get(cacheKey);
@@ -1703,7 +1848,7 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     return;
   }
 
-  // 3. Resolve Creator Data
+  // 4. Resolve Creator Data
   let title = 'LinkLyra - The Link-in-Bio for Modern Creators';
   let description = 'Create a high-converting, dynamic bio page with direct lead capture, multi-platform media routing, and real-time analytics.';
   let image = 'https://linklyra.web.app/og-preview.png';

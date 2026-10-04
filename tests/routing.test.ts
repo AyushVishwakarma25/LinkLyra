@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveRoute, getRouteTarget, isPlatformHost } from '../src/lib/routing';
+import { resolveRoute, getRouteTarget, isPlatformHost, getCanonicalProfileUrl } from '../src/lib/routing';
 
 describe('Unified Routing Engine (routing.ts)', () => {
   describe('isPlatformHost', () => {
@@ -86,6 +86,26 @@ describe('Unified Routing Engine (routing.ts)', () => {
       expect(getRouteTarget('linklyra.web.app', '/', '?u=sarah')).toBe('sarah');
       expect(resolveRoute('linklyra.web.app', '/', '?domain=bio.sarah.com')).toBe('domain');
       expect(getRouteTarget('linklyra.web.app', '/', '?domain=bio.sarah.com')).toBe('bio.sarah.com');
+    });
+
+    // 7. Alternate Profile Slug Routes: /p/:slug, /u/:slug, and /@:slug
+    it('resolves /p/:slug, /u/:slug, and /@:slug correctly', () => {
+      expect(resolveRoute('linklyra.com', '/p/alex', '')).toBe('profile');
+      expect(getRouteTarget('linklyra.com', '/p/alex', '')).toBe('alex');
+
+      expect(resolveRoute('linklyra.com', '/u/sarah_tech', '')).toBe('profile');
+      expect(getRouteTarget('linklyra.com', '/u/sarah_tech', '')).toBe('sarah_tech');
+
+      expect(resolveRoute('linklyra.com', '/@johndoe', '')).toBe('profile');
+      expect(getRouteTarget('linklyra.com', '/@johndoe', '')).toBe('johndoe');
+    });
+
+    // 8. Canonical profile URL builder
+    it('constructs correct canonical URLs for handles and custom domains', () => {
+      expect(getCanonicalProfileUrl('alex')).toBe('https://linklyra.com/@alex');
+      expect(getCanonicalProfileUrl('@alex')).toBe('https://linklyra.com/@alex');
+      expect(getCanonicalProfileUrl('bio.alex.com')).toBe('https://bio.alex.com');
+      expect(getCanonicalProfileUrl('sarah', 'custom.app')).toBe('https://custom.app/@sarah');
     });
   });
 });

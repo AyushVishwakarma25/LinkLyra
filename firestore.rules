@@ -123,8 +123,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && username.matches('^[a-z0-9_]{3,30}$');
 
-      // No client updates
-      allow update: if false;
+      // Update allowed only by owner (e.g. for setting redirect aliases)
+      allow update: if signedIn() && resource.data.userId == request.auth.uid;
 
       // Delete only by owner
       allow delete: if signedIn() && resource.data.userId == request.auth.uid;

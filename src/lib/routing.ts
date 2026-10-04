@@ -242,9 +242,10 @@ export function resolveRoute(
     return 'landing';
   }
 
-  // /app/studio or /app/:username
-  if (segments[0].toLowerCase() === 'app') {
-    if (segments[1] && segments[1].toLowerCase() === 'studio') {
+  // /app/studio or /app/:username or /p/:username or /u/:username
+  const firstSegment = segments[0]?.toLowerCase() || '';
+  if (firstSegment === 'app' || firstSegment === 'p' || firstSegment === 'u') {
+    if (firstSegment === 'app' && segments[1] && segments[1].toLowerCase() === 'studio') {
       return 'studio';
     }
     if (segments[1]) {
@@ -316,7 +317,8 @@ export function getRouteTarget(
     }
 
     const segments = pathname.split('/').filter(Boolean);
-    if (segments[0]?.toLowerCase() === 'app' && segments[1]) {
+    const firstSegment = segments[0]?.toLowerCase() || '';
+    if ((firstSegment === 'app' || firstSegment === 'p' || firstSegment === 'u') && segments[1]) {
       return segments[1].toLowerCase().replace(/^@/, '');
     }
     if (segments[0]) {
@@ -328,4 +330,21 @@ export function getRouteTarget(
   }
 
   return null;
+}
+
+/**
+ * Generates the canonical profile URL for a creator handle or custom domain.
+ */
+export function getCanonicalProfileUrl(
+  usernameOrDomain: string,
+  appHost?: string
+): string {
+  if (!usernameOrDomain) return '';
+  const clean = usernameOrDomain.trim().toLowerCase();
+  if (clean.includes('.')) {
+    return `https://${clean}`;
+  }
+  const handle = clean.replace(/^@/, '');
+  const host = (appHost || DEFAULT_APP_HOST).toLowerCase().trim();
+  return `https://${host}/@${handle}`;
 }

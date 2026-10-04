@@ -1,5 +1,5 @@
 import { transliterate } from 'transliteration';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
 export const RESERVED_USERNAMES = new Set<string>([
@@ -211,4 +211,128 @@ export async function suggestAvailableUsername(
   // Fallback with random hex
   const randomSuffix = `_${Math.random().toString(36).substring(2, 6)}`;
   return `${cleanBase.slice(0, 30 - randomSuffix.length)}${randomSuffix}`;
+}
+
+export interface SlugResolution {
+  originalSlug: string;
+  canonicalSlug: string;
+  pageId: string | null;
+  userId: string | null;
+  status: 'active' | 'redirect' | 'reserved' | 'not_found';
+  isRedirect: boolean;
+  redirectTo?: string | null;
+}
+
+const slugCache = new Map<string, { data: SlugResolution; timestamp: number }>();
+const SLUG_CACHE_TTL_MS = 60_000; // 60 seconds
+
+export function clearSlugCache(): void {
+  slugCache.clear();
+}
+
+/**
+ * Resolves a profile slug with support for 301/302 aliases, redirect chains (max 3 hops),
+ * and in-memory TTL caching.
+ */
+export async function resolveProfileSlug(rawSlug: string): Promise<SlugResolution> {
+  const clean = (rawSlug || '').toLowerCase().trim().replace(/^@/, '');
+  if (!clean) {
+    return {
+      originalSlug: '',
+      canonicalSlug: '',
+      pageId: null,
+      userId: null,
+      status: 'not_found',
+      isRedirect: false,
+    };
+  }
+
+  // Reserved slug check
+  if (RESERVED_USERNAMES.has(clean)) {
+    return {
+      originalSlug: clean,
+      canonicalSlug: clean,
+      pageId: null,
+      userId: null,
+      status: 'reserved',
+      isRedirect: false,
+    };
+  }
+
+  // Check in-memory cache
+  const cached = slugCache.get(clean);
+  if (cached && Date.now() - cached.timestamp < SLUG_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  try {
+    let currentSlug = clean;
+    let hops = 0;
+    let isRedirect = false;
+
+    while (hops < 3) {
+      const snap = await getDoc(doc(db, 'usernames', currentSlug));
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.status === 'redirect' && data.redirectToSlug) {
+          isRedirect = true;
+          currentSlug = data.redirectToSlug.toLowerCase().trim().replace(/^@/, '');
+          hops++;
+          continue;
+        }
+
+        const res: SlugResolution = {
+          originalSlug: clean,
+          canonicalSlug: currentSlug,
+          pageId: data?.pageId || data?.userId || data?.uid || null,
+          userId: data?.userId || data?.uid || null,
+          status: isRedirect ? 'redirect' : (data?.status || 'active'),
+          isRedirect,
+          redirectTo: isRedirect ? currentSlug : null,
+        };
+        slugCache.set(clean, { data: res, timestamp: Date.now() });
+        return res;
+      }
+      break;
+    }
+
+    // Direct pages collection lookup fallback
+    const q = query(collection(db, 'pages'), where('username', '==', clean), limit(1));
+    const pageSnap = await getDocs(q);
+    if (!pageSnap.empty) {
+      const pageDoc = pageSnap.docs[0];
+      const pageData = pageDoc.data();
+      const res: SlugResolution = {
+        originalSlug: clean,
+        canonicalSlug: clean,
+        pageId: pageDoc.id,
+        userId: pageData.userId || pageDoc.id,
+        status: 'active',
+        isRedirect: false,
+      };
+      slugCache.set(clean, { data: res, timestamp: Date.now() });
+      return res;
+    }
+
+    const notFoundRes: SlugResolution = {
+      originalSlug: clean,
+      canonicalSlug: clean,
+      pageId: null,
+      userId: null,
+      status: 'not_found',
+      isRedirect: false,
+    };
+    slugCache.set(clean, { data: notFoundRes, timestamp: Date.now() });
+    return notFoundRes;
+  } catch (err) {
+    console.warn(`[resolveProfileSlug] Error resolving slug @${clean}:`, err);
+    return {
+      originalSlug: clean,
+      canonicalSlug: clean,
+      pageId: null,
+      userId: null,
+      status: 'not_found',
+      isRedirect: false,
+    };
+  }
 }

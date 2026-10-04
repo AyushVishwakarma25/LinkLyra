@@ -8,6 +8,7 @@ import {
   getDocs,
   limit,
   serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
@@ -25,6 +26,7 @@ import {
 import { pageToProfile } from '../mappers';
 import { linksService } from './links';
 import { UserAccountSettings } from '../../types';
+import { resolveProfileSlug, clearSlugCache, validateUsername } from '../username';
 
 export const pagesService = {
   // Canonical Page / Profile retrieval: pages/{userId} and users/{userId}
@@ -64,28 +66,49 @@ export const pagesService = {
     return null;
   },
 
-  // Public lookup by username
+  // Public lookup by username with alias resolution & canonical URL sync
   async getProfileByUsername(
     username: string
-  ): Promise<{ profile: DbProfile; links: DbLink[] } | null> {
+  ): Promise<{ profile: DbProfile; links: DbLink[]; isRedirect?: boolean; canonicalSlug?: string } | null> {
     if (!username) return null;
     const cleanUsername = username.toLowerCase().trim().replace(/^@/, '');
 
     try {
-      // 1. Check usernames index collection
-      const userLookupSnap = await getDoc(doc(db, 'usernames', cleanUsername));
-      if (userLookupSnap.exists()) {
-        const pageId = userLookupSnap.data()?.pageId || userLookupSnap.data()?.userId || userLookupSnap.data()?.uid;
-        if (pageId) {
-          const profile = await this.getProfile(pageId);
-          if (profile) {
-            const links = await linksService.getLinks(pageId);
-            return { profile, links };
+      // 1. Resolve slug via Slug Service (supports 301/302 redirects, aliases, in-memory caching)
+      const resolution = await resolveProfileSlug(cleanUsername);
+      if (resolution.status === 'not_found' || resolution.status === 'reserved') {
+        return null;
+      }
+
+      const targetPageId = resolution.pageId;
+      if (targetPageId) {
+        const profile = await this.getProfile(targetPageId);
+        if (profile) {
+          const links = await linksService.getLinks(targetPageId);
+
+          // If this was an alias/redirect, update browser URL smoothly to canonical handle
+          if (resolution.isRedirect && resolution.canonicalSlug && typeof window !== 'undefined') {
+            try {
+              const currentPath = window.location.pathname;
+              if (currentPath.includes(cleanUsername)) {
+                const newPath = currentPath.replace(cleanUsername, resolution.canonicalSlug);
+                window.history.replaceState(null, '', newPath);
+              }
+            } catch {
+              // Ignore history error in non-standard window environments
+            }
           }
+
+          return {
+            profile,
+            links,
+            isRedirect: resolution.isRedirect,
+            canonicalSlug: resolution.canonicalSlug,
+          };
         }
       }
 
-      // 2. Query canonical pages collection where username == cleanUsername
+      // 2. Query canonical pages collection fallback where username == cleanUsername
       const qPages = query(collection(db, 'pages'), where('username', '==', cleanUsername), limit(1));
       const qPageSnap = await getDocs(qPages);
       if (!qPageSnap.empty) {
@@ -116,6 +139,87 @@ export const pagesService = {
     }
 
     return null;
+  },
+
+  /**
+   * Atomically claims or transfers a profile slug with 301 alias preservation.
+   * If a previous handle existed, it is placed in a 90-day redirect state pointing to the new slug.
+   */
+  async claimOrTransferSlug(
+    userId: string,
+    pageId: string,
+    newUsername: string,
+    previousUsername?: string
+  ): Promise<{ success: boolean; username: string }> {
+    const cleanNew = newUsername.toLowerCase().trim().replace(/^@/, '');
+    const cleanOld = previousUsername ? previousUsername.toLowerCase().trim().replace(/^@/, '') : undefined;
+
+    // Validate format and reservation
+    const val = validateUsername(cleanNew);
+    if (!val.valid) {
+      throw new Error(val.reason || 'Invalid username.');
+    }
+
+    // Try server-authoritative callable first if available
+    try {
+      const changeSlugFn = httpsCallable<{ newUsername: string }, { success: boolean; username: string }>(
+        functions,
+        'changeUsername'
+      );
+      const res = await changeSlugFn({ newUsername: cleanNew });
+      if (res.data?.success) {
+        clearSlugCache();
+        return { success: true, username: res.data.username };
+      }
+    } catch (callErr: any) {
+      // If function not deployed or offline, fall back to transactional client update
+      console.warn('changeUsername callable unavailable, falling back to client transaction:', callErr?.message);
+    }
+
+    // Strict client-side Firestore Transaction
+    await runTransaction(db, async (tx) => {
+      const newSlugRef = doc(db, 'usernames', cleanNew);
+      const newSlugSnap = await tx.get(newSlugRef);
+
+      if (newSlugSnap.exists()) {
+        const existingData = newSlugSnap.data();
+        if (existingData?.userId && existingData.userId !== userId) {
+          throw new Error(`Username @${cleanNew} is already taken by another creator.`);
+        }
+      }
+
+      // If transferring from an old slug, create redirect alias
+      if (cleanOld && cleanOld !== cleanNew) {
+        const oldSlugRef = doc(db, 'usernames', cleanOld);
+        const oldSlugSnap = await tx.get(oldSlugRef);
+        if (oldSlugSnap.exists() && oldSlugSnap.data()?.userId === userId) {
+          tx.set(oldSlugRef, {
+            status: 'redirect',
+            redirectToSlug: cleanNew,
+            userId,
+            pageId,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+
+      // Set new active slug
+      tx.set(newSlugRef, {
+        userId,
+        pageId,
+        username: cleanNew,
+        status: 'active',
+        redirectToSlug: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // Sync canonical page and user documents
+      tx.set(doc(db, 'pages', pageId), { username: cleanNew, updatedAt: serverTimestamp() }, { merge: true });
+      tx.set(doc(db, 'users', userId), { username: cleanNew, updatedAt: serverTimestamp() }, { merge: true });
+    });
+
+    clearSlugCache();
+    return { success: true, username: cleanNew };
   },
 
   // Public lookup by custom domain

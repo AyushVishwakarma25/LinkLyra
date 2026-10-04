@@ -4,6 +4,8 @@ import {
   validateUsername,
   suggestAvailableUsername,
   RESERVED_USERNAMES,
+  resolveProfileSlug,
+  clearSlugCache,
 } from '../src/lib/username';
 
 describe('username normalization and validation', () => {
@@ -107,6 +109,28 @@ describe('username normalization and validation', () => {
       const suggestion = await suggestAvailableUsername(longBase, isAvail);
       expect(suggestion.length).toBeLessThanOrEqual(30);
       expect(suggestion.endsWith('_1')).toBe(true);
+    });
+  });
+
+  describe('resolveProfileSlug & cache', () => {
+    it('returns not_found for empty slug', async () => {
+      const res = await resolveProfileSlug('');
+      expect(res.status).toBe('not_found');
+      expect(res.isRedirect).toBe(false);
+    });
+
+    it('returns reserved for reserved system usernames', async () => {
+      const res = await resolveProfileSlug('studio');
+      expect(res.status).toBe('reserved');
+      expect(res.isRedirect).toBe(false);
+
+      const adminRes = await resolveProfileSlug('@admin');
+      expect(adminRes.status).toBe('reserved');
+      expect(adminRes.originalSlug).toBe('admin');
+    });
+
+    it('clears in-memory slug cache without error', () => {
+      expect(() => clearSlugCache()).not.toThrow();
     });
   });
 });

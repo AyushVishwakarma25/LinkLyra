@@ -172,3 +172,159 @@ export function shouldRecordPageView(pageId: string): boolean {
     return true;
   }
 }
+
+// -------------------------------------------------------------
+// High-Throughput Analytics Stream Buffer (Alternate Architecture)
+// -------------------------------------------------------------
+
+export interface TelemetryEvent {
+  type: string;
+  pageId: string;
+  linkId?: string | null;
+  visitorId: string;
+  device: 'mobile' | 'tablet' | 'desktop';
+  browser: string;
+  os?: string;
+  referrer?: string;
+  country?: string;
+  timestamp: number;
+}
+
+export const COUNTRY_NAMES: Record<string, { name: string; flag: string }> = {
+  IN: { name: 'India', flag: '🇮🇳' },
+  US: { name: 'United States', flag: '🇺🇸' },
+  GB: { name: 'United Kingdom', flag: '🇬🇧' },
+  AE: { name: 'UAE (Dubai)', flag: '🇦🇪' },
+  CA: { name: 'Canada', flag: '🇨🇦' },
+  AU: { name: 'Australia', flag: '🇦🇺' },
+  DE: { name: 'Germany', flag: '🇩🇪' },
+  FR: { name: 'France', flag: '🇫🇷' },
+  SG: { name: 'Singapore', flag: '🇸🇬' },
+  JP: { name: 'Japan', flag: '🇯🇵' },
+  NL: { name: 'Netherlands', flag: '🇳🇱' },
+  BR: { name: 'Brazil', flag: '🇧🇷' },
+  GLOBAL: { name: 'Global Direct', flag: '🌍' },
+};
+
+export function formatCountryLabel(countryCode: string): { label: string; flag: string } {
+  const code = (countryCode || '').toUpperCase().trim();
+  if (COUNTRY_NAMES[code]) {
+    return { label: COUNTRY_NAMES[code].name, flag: COUNTRY_NAMES[code].flag };
+  }
+  return { label: code.length === 2 ? `Country (${code})` : (code || 'Global'), flag: '🌍' };
+}
+
+const OFFLINE_QUEUE_KEY = 'linklyra_analytics_offline_queue';
+const CLICK_DEBOUNCE_WINDOW_MS = 800;
+const lastClickTimestamps = new Map<string, number>();
+
+class AnalyticsStreamEngine {
+  private queue: TelemetryEvent[] = [];
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private isFlushing = false;
+  private customDispatcher: ((events: TelemetryEvent[]) => Promise<void>) | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      this.restorePendingQueue();
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          this.flush(true);
+        }
+      });
+
+      window.addEventListener('pagehide', () => {
+        this.flush(true);
+      });
+
+      window.addEventListener('online', () => {
+        this.restorePendingQueue();
+        this.flush(false);
+      });
+    }
+  }
+
+  public setDispatcher(dispatcher: (events: TelemetryEvent[]) => Promise<void>) {
+    this.customDispatcher = dispatcher;
+  }
+
+  public enqueue(event: TelemetryEvent): void {
+    if (event.type === 'link_click' && event.linkId) {
+      const clickKey = `${event.pageId}::${event.linkId}`;
+      const last = lastClickTimestamps.get(clickKey) || 0;
+      const now = Date.now();
+      if (now - last < CLICK_DEBOUNCE_WINDOW_MS) {
+        return;
+      }
+      lastClickTimestamps.set(clickKey, now);
+    }
+
+    this.queue.push(event);
+    this.persistQueue();
+
+    if (this.queue.length >= 5) {
+      this.flush(false);
+    } else if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => {
+        this.flushTimer = null;
+        this.flush(false);
+      }, 1500);
+    }
+  }
+
+  public async flush(_isUnloading = false): Promise<void> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+
+    if (this.queue.length === 0 || this.isFlushing) {
+      return;
+    }
+
+    const batch = [...this.queue];
+    this.queue = [];
+    this.persistQueue();
+
+    if (this.customDispatcher) {
+      this.isFlushing = true;
+      try {
+        await this.customDispatcher(batch);
+      } catch (err) {
+        console.warn('[AnalyticsStream] Dispatch notice (re-queuing for retry):', err);
+        this.queue.unshift(...batch);
+        this.persistQueue();
+      } finally {
+        this.isFlushing = false;
+      }
+    }
+  }
+
+  private persistQueue(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      if (this.queue.length === 0) {
+        localStorage.removeItem(OFFLINE_QUEUE_KEY);
+      } else {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(this.queue.slice(-50)));
+      }
+    } catch {}
+  }
+
+  private restorePendingQueue(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.queue.push(...parsed);
+          localStorage.removeItem(OFFLINE_QUEUE_KEY);
+        }
+      }
+    } catch {}
+  }
+}
+
+export const analyticsStreamEngine = new AnalyticsStreamEngine();

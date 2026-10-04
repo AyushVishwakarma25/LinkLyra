@@ -263,28 +263,36 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               </span>
             </div>
             {(() => {
-              const rawLocations = analyticsData.locationCounts || {
-                'India (Mumbai, Bengaluru, Delhi)': Math.max(12, Math.round(analyticsData.totalViews * 0.68)),
-                'United States (New York, SF)': Math.max(3, Math.round(analyticsData.totalViews * 0.18)),
-                'United Kingdom (London)': Math.max(1, Math.round(analyticsData.totalViews * 0.08)),
-                'UAE (Dubai)': Math.max(1, Math.round(analyticsData.totalViews * 0.06)),
-              };
-              const totalLoc = Object.values(rawLocations).reduce((a, b) => a + b, 0) || 1;
+              const hasRealLocs = analyticsData.locationCounts && Object.keys(analyticsData.locationCounts).length > 0;
+              const rawLocations = hasRealLocs ? analyticsData.locationCounts! : (
+                analyticsData.totalViews > 0
+                  ? {
+                      '🇮🇳 India': Math.max(1, Math.round(analyticsData.totalViews * 0.68)),
+                      '🇺🇸 United States': Math.max(1, Math.round(analyticsData.totalViews * 0.18)),
+                      '🇬🇧 United Kingdom': Math.max(1, Math.round(analyticsData.totalViews * 0.08)),
+                      '🇦🇪 UAE (Dubai)': Math.max(1, Math.round(analyticsData.totalViews * 0.06)),
+                    }
+                  : { '🌍 Global Direct': 0 }
+              );
+              const totalLoc = Object.values(rawLocations).reduce((a, b) => a + Number(b), 0) || 1;
 
               return (
                 <div className="space-y-1.5">
                   {Object.entries(rawLocations)
                     .sort((a, b) => Number(b[1]) - Number(a[1]))
-                    .slice(0, 4)
+                    .slice(0, 5)
                     .map(([loc, count]) => {
                       const pct = Math.round((Number(count) / totalLoc) * 100);
-                      const flag = loc.includes('India') ? '🇮🇳' : loc.includes('United States') ? '🇺🇸' : loc.includes('United Kingdom') ? '🇬🇧' : loc.includes('UAE') ? '🇦🇪' : '🌍';
+                      const startsWithEmoji = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/.test(loc);
+                      const flag = startsWithEmoji ? loc.split(' ')[0] : (loc.includes('India') ? '🇮🇳' : loc.includes('United States') ? '🇺🇸' : loc.includes('United Kingdom') ? '🇬🇧' : loc.includes('UAE') ? '🇦🇪' : '🌍');
+                      const label = startsWithEmoji ? loc.substring(flag.length).trim() : loc;
+
                       return (
                         <div key={loc} className="p-2 bg-[#FAF8F5] rounded-xl border border-black/5 text-xs space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-[#1C1E22] truncate flex items-center gap-1.5">
                               <span>{flag}</span>
-                              <span className="truncate">{loc}</span>
+                              <span className="truncate">{label}</span>
                             </span>
                             <span className="font-bold text-[#5E4BF7] text-[11px] shrink-0">
                               {pct}% ({count})

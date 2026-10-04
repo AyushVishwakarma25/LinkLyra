@@ -30,7 +30,8 @@
     "ogl": "^1.0.11",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "transliteration": "^2.6.1"
+    "transliteration": "^2.6.1",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

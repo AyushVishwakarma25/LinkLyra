@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { HugeIcon } from '../HugeIcon';
-import { CrownIcon, Tick01Icon, ArrowUpRight01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
+import { CrownIcon, Tick01Icon, ArrowUpRight01Icon, Loading03Icon, AlertCircleIcon } from '@hugeicons/core-free-icons';
 import { UserAccountSettings } from '../../types';
+import { profileService } from '../../lib/firebase';
 
 export interface PrivacyTabProps {
   settings: UserAccountSettings;
@@ -23,20 +24,38 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({
   onOpenProModal,
 }) => {
   const [isTestingDns, setIsTestingDns] = useState(false);
-  const [dnsTestResult, setDnsTestResult] = useState<{ checked: boolean; valid: boolean; message: string } | null>(null);
+  const [dnsTestResult, setDnsTestResult] = useState<{
+    checked: boolean;
+    valid: boolean;
+    message: string;
+    strategy?: 'cname' | 'apex_a' | 'txt_challenge' | null;
+    challengeToken?: string;
+    challengeRecordName?: string;
+  } | null>(null);
 
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     if (!settings.privacy.customDomain) return;
     setIsTestingDns(true);
     setDnsTestResult(null);
-    setTimeout(() => {
+    try {
+      const probe = await profileService.checkCustomDomainStatus(settings.privacy.customDomain);
       setIsTestingDns(false);
       setDnsTestResult({
         checked: true,
-        valid: true,
-        message: 'DNS CNAME verified & SSL Edge certificate active!',
+        valid: probe.isConfigured,
+        message: probe.message,
+        strategy: probe.strategy,
+        challengeToken: probe.challengeToken,
+        challengeRecordName: probe.challengeRecordName,
       });
-    }, 1200);
+    } catch (err: any) {
+      setIsTestingDns(false);
+      setDnsTestResult({
+        checked: true,
+        valid: false,
+        message: err?.message || 'DNS verification probe failed.',
+      });
+    }
   };
   return (
     <div className="space-y-6">
@@ -224,16 +243,45 @@ export const PrivacyTab: React.FC<PrivacyTabProps> = ({
             </div>
 
             {dnsTestResult && (
-              <div className="p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 flex items-center justify-between gap-2 text-xs animate-fadeIn">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="font-semibold text-purple-950 text-xs">
-                    {dnsTestResult.message}
+              <div
+                className={`p-3.5 rounded-xl border flex flex-col gap-2 text-xs animate-fadeIn ${
+                  dnsTestResult.valid
+                    ? 'bg-emerald-50/80 border-emerald-200/80 text-emerald-950'
+                    : 'bg-amber-50/80 border-amber-200/80 text-amber-950'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        dnsTestResult.valid ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    <span className="font-semibold text-xs">{dnsTestResult.message}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${
+                      dnsTestResult.valid
+                        ? 'text-emerald-700 bg-emerald-100'
+                        : 'text-amber-800 bg-amber-100'
+                    }`}
+                  >
+                    {dnsTestResult.valid
+                      ? dnsTestResult.strategy === 'cname'
+                        ? 'CNAME ACTIVE'
+                        : dnsTestResult.strategy === 'apex_a'
+                        ? 'APEX A-RECORD ACTIVE'
+                        : 'TXT CHALLENGE ACTIVE'
+                      : 'PENDING PROPAGATION'}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded shrink-0">
-                  HEALTHY
-                </span>
+                {!dnsTestResult.valid && dnsTestResult.challengeToken && (
+                  <div className="pt-2 border-t border-amber-200/60 font-mono text-[11px] text-amber-900 space-y-1">
+                    <p className="font-sans font-semibold">Zero-downtime TXT challenge record:</p>
+                    <p>Host / Name: <strong className="text-black">{dnsTestResult.challengeRecordName}</strong></p>
+                    <p>Value: <strong className="text-black">linklyra-verification={dnsTestResult.challengeToken}</strong></p>
+                  </div>
+                )}
               </div>
             )}
 

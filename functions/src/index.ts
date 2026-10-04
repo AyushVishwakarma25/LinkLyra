@@ -13,6 +13,10 @@ import {
   ConsumeCreditsRequest,
   ClaimDomainRequest,
   ReleaseDomainRequest,
+  CheckDomainStatusRequest,
+  CheckDomainStatusResponse,
+  IngestAnalyticsBatchRequest,
+  IngestionBatchEvent,
 } from './types';
 
 admin.initializeApp();
@@ -239,10 +243,26 @@ export const verifyPayment = onCall(
       });
     });
 
+    // 5. Alternate Architecture: Set Cryptographic Firebase Custom User Claims (JWT)
+    // Enables zero-database-read entitlement verification in client and firestore rules
+    const expiresAtSeconds = Math.floor(new Date(currentPeriodEnd).getTime() / 1000);
+    try {
+      await admin.auth().setCustomUserClaims(uid, {
+        plan,
+        pro: true,
+        business: (plan as string) === 'business' || (plan as string) === 'agency',
+        agency: (plan as string) === 'agency',
+        expiresAt: expiresAtSeconds,
+      });
+    } catch (claimErr) {
+      console.warn(`[verifyPayment] Notice setting custom claims for uid ${uid}:`, claimErr);
+    }
+
     return {
       success: true,
       plan,
       invoiceNumber: generatedInvoiceNumber,
+      expiresAt: expiresAtSeconds,
     };
   }
 );
@@ -369,6 +389,21 @@ export const razorpayWebhook = onRequest(
 
             tx.set(userRef, { plan, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
           });
+
+          // Set Custom Claims on Webhook capture
+          const endIso = new Date(now.getTime() + (cycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString();
+          const expiresAtSeconds = Math.floor(new Date(endIso).getTime() / 1000);
+          try {
+            await admin.auth().setCustomUserClaims(uid, {
+              plan,
+              pro: true,
+              business: (plan as string) === 'business' || (plan as string) === 'agency',
+              agency: (plan as string) === 'agency',
+              expiresAt: expiresAtSeconds,
+            });
+          } catch (claimsErr) {
+            console.warn(`[razorpayWebhook] Notice setting claims for ${uid}:`, claimsErr);
+          }
         }
       } else if (event.event === 'payment.failed') {
         const paymentId = paymentEntity.id;
@@ -392,6 +427,14 @@ export const razorpayWebhook = onRequest(
           { status: 'refunded', updatedAt: new Date().toISOString() },
           { merge: true }
         );
+        // Revoke Pro Custom Claims on refund
+        admin.auth().setCustomUserClaims(uid, {
+          plan: 'free',
+          pro: false,
+          business: false,
+          agency: false,
+          expiresAt: 0,
+        }).catch(() => {});
       }
 
       res.status(200).json({ status: 'ok' });
@@ -441,6 +484,14 @@ export const dailySubscriptionExpiry = onSchedule('every 24 hours', async () => 
           },
           { merge: true }
         );
+        // Revoke Pro Custom Claims on scheduled expiry
+        admin.auth().setCustomUserClaims(userId, {
+          plan: 'free',
+          pro: false,
+          business: false,
+          agency: false,
+          expiresAt: 0,
+        }).catch(() => {});
       }
     });
 
@@ -449,6 +500,66 @@ export const dailySubscriptionExpiry = onSchedule('every 24 hours', async () => 
   } catch (err) {
     console.error('Error during daily subscription expiry sweep:', err);
   }
+});
+
+// -------------------------------------------------------------
+// 4B. Callable: syncUserEntitlements (Alternate Architecture)
+// Re-synchronizes cryptographic JWT custom claims directly from server ledger.
+// -------------------------------------------------------------
+export const syncUserEntitlements = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated to sync entitlements.');
+  }
+
+  const uid = request.auth.uid;
+  const userDoc = await db.doc(`users/${uid}`).get();
+  const userData = userDoc.data();
+  const subSnap = await db.doc(`users/${uid}/subscriptions/current`).get();
+  const subData = subSnap.data();
+
+  const nowMs = Date.now();
+  let resolvedPlan: 'free' | 'pro' | 'business' | 'agency' = 'free';
+  let expiresAtSec = 0;
+
+  if (subData && subData.status === 'active' && subData.currentPeriodEnd) {
+    const endMs = new Date(subData.currentPeriodEnd).getTime();
+    if (endMs > nowMs) {
+      resolvedPlan = subData.plan || userData?.plan || 'pro';
+      expiresAtSec = Math.floor(endMs / 1000);
+    } else {
+      // Period has elapsed: downgrade atomically
+      await db.doc(`users/${uid}`).set(
+        { plan: 'free', updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      await db.doc(`users/${uid}/subscriptions/current`).set(
+        { status: 'expired', updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    }
+  } else if (userData?.plan && userData.plan !== 'free') {
+    resolvedPlan = userData.plan;
+  }
+
+  const isPro = resolvedPlan === 'pro' || resolvedPlan === 'business' || resolvedPlan === 'agency';
+  const claims = {
+    plan: resolvedPlan,
+    pro: isPro,
+    business: resolvedPlan === 'business' || resolvedPlan === 'agency',
+    agency: resolvedPlan === 'agency',
+    expiresAt: expiresAtSec,
+  };
+
+  try {
+    await admin.auth().setCustomUserClaims(uid, claims);
+  } catch (cErr) {
+    console.warn(`[syncUserEntitlements] Notice setting claims for ${uid}:`, cErr);
+  }
+
+  return {
+    success: true,
+    entitlements: claims,
+  };
 });
 
 // -------------------------------------------------------------
@@ -629,35 +740,85 @@ export const claimCustomDomain = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Platform domains cannot be claimed as custom domains.');
   }
 
-  // 1. Verify user's subscription / plan
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.data() || {};
-  const plan = userData.plan || 'free';
+  // 1. Verify user's subscription / plan (Zero-database token claim check first)
+  const tokenPlan = (request.auth.token?.plan as string) || '';
+  const isTokenPro = Boolean(request.auth.token?.pro || ['pro', 'business', 'agency'].includes(tokenPlan));
+  let plan = tokenPlan;
+
+  if (!isTokenPro) {
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.data() || {};
+    plan = userData.plan || 'free';
+  }
 
   if (plan !== 'pro' && plan !== 'business' && plan !== 'agency') {
     throw new HttpsError('permission-denied', 'Custom domains are available on Pro, Business, or Agency plans.');
   }
 
-  // 2. Verify DNS CNAME record
-  const cnameTarget = (process.env.CUSTOM_DOMAIN_CNAME_TARGET || 'cname.linklyra.app')
-    .toLowerCase()
-    .replace(/\.$/, '');
+  // 2. Multi-Strategy DNS Verification (CNAME, Apex A Record, or TXT Challenge)
+  const ACCEPTED_CNAME_TARGETS = [
+    (process.env.CUSTOM_DOMAIN_CNAME_TARGET || 'cname.linklyra.app').toLowerCase().replace(/\.$/, ''),
+    'linklyra.app',
+    'linklyra.com',
+    'cname.linklyra.com',
+  ];
+
+  const PLATFORM_A_RECORDS = [
+    '76.76.21.21',
+    '199.36.158.100',
+    '151.101.1.195',
+    '151.101.65.195',
+  ];
+
+  let verifiedStrategy: 'cname' | 'apex_a' | 'txt_challenge' = 'cname';
 
   if (process.env.NODE_ENV !== 'test' && process.env.SKIP_DNS_CHECK !== 'true') {
+    let isCnameMatch = false;
+    let cnameRecords: string[] = [];
     try {
-      const records = await dns.promises.resolveCname(cleanDomain);
-      const isConfigured = records.some((r) => r.toLowerCase().replace(/\.$/, '') === cnameTarget);
-      if (!isConfigured) {
-        throw new HttpsError(
-          'failed-precondition',
-          `CNAME record for ${cleanDomain} does not point to ${cnameTarget}. Found: ${records.join(', ')}`
-        );
-      }
-    } catch (dnsErr: any) {
-      if (dnsErr instanceof HttpsError) throw dnsErr;
+      const rawCnames = await dns.promises.resolveCname(cleanDomain);
+      cnameRecords = rawCnames.map((r) => r.toLowerCase().replace(/\.$/, ''));
+      isCnameMatch = cnameRecords.some((r) => ACCEPTED_CNAME_TARGETS.includes(r));
+    } catch (_) {}
+
+    let isApexMatch = false;
+    let aRecords: string[] = [];
+    try {
+      aRecords = await dns.promises.resolve4(cleanDomain);
+      isApexMatch = aRecords.some((ip) => PLATFORM_A_RECORDS.includes(ip));
+    } catch (_) {}
+
+    const challengeToken = crypto
+      .createHash('sha256')
+      .update(`${uid}:${cleanDomain}:linklyra_domain_salt`)
+      .digest('hex')
+      .slice(0, 32);
+
+    const challengeRecordName = `_linklyra-challenge.${cleanDomain}`;
+    let isTxtMatch = false;
+    let txtRecords: string[] = [];
+    try {
+      const rawTxt = await dns.promises.resolveTxt(challengeRecordName);
+      txtRecords = rawTxt.flat();
+      isTxtMatch = txtRecords.some(
+        (txt) => txt === `linklyra-verification=${challengeToken}` || txt === challengeToken
+      );
+    } catch (_) {}
+
+    if (isCnameMatch) {
+      verifiedStrategy = 'cname';
+    } else if (isApexMatch) {
+      verifiedStrategy = 'apex_a';
+    } else if (isTxtMatch) {
+      verifiedStrategy = 'txt_challenge';
+    } else {
       throw new HttpsError(
         'failed-precondition',
-        `DNS CNAME verification failed. Please ensure a CNAME record pointing to ${cnameTarget} is set up.`
+        `DNS verification failed for ${cleanDomain}. ` +
+          `No matching DNS records found. Options: ` +
+          `1) CNAME pointing to ${ACCEPTED_CNAME_TARGETS[0]} (found: ${cnameRecords.join(', ') || 'none'}). ` +
+          `2) A Record pointing to ${PLATFORM_A_RECORDS[0]} (found: ${aRecords.join(', ') || 'none'}). ` +
+          `3) TXT Record at ${challengeRecordName} with value "linklyra-verification=${challengeToken}".`
       );
     }
   }
@@ -672,21 +833,124 @@ export const claimCustomDomain = onCall(async (request) => {
     }
   }
 
-  // 4. Batch commit
+  // 4. Batch commit with verified strategy
   const batch = db.batch();
   batch.set(domainRef, {
     domain: cleanDomain,
     uid,
     status: 'verified',
+    strategy: verifiedStrategy,
     createdAt: domainSnap.exists ? domainSnap.data()?.createdAt || new Date().toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    lastVerifiedAt: new Date().toISOString(),
   });
   batch.set(db.doc(`pages/${uid}`), { customDomain: cleanDomain }, { merge: true });
   batch.set(db.doc(`profiles/${uid}`), { custom_domain: cleanDomain }, { merge: true });
 
   await batch.commit();
 
-  return { success: true, domain: cleanDomain };
+  return { success: true, domain: cleanDomain, strategy: verifiedStrategy };
+});
+
+// -------------------------------------------------------------
+// 8b. Callable: checkCustomDomainStatus
+// -------------------------------------------------------------
+export const checkCustomDomainStatus = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be signed in to check domain status.');
+  }
+
+  const uid = request.auth.uid;
+  const { domain: rawDomain } = (request.data || {}) as CheckDomainStatusRequest;
+
+  if (!rawDomain || typeof rawDomain !== 'string') {
+    throw new HttpsError('invalid-argument', 'A valid domain name is required.');
+  }
+
+  const cleanDomain = rawDomain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '');
+
+  const ACCEPTED_CNAME_TARGETS = [
+    (process.env.CUSTOM_DOMAIN_CNAME_TARGET || 'cname.linklyra.app').toLowerCase().replace(/\.$/, ''),
+    'linklyra.app',
+    'linklyra.com',
+    'cname.linklyra.com',
+  ];
+
+  const PLATFORM_A_RECORDS = [
+    '76.76.21.21',
+    '199.36.158.100',
+    '151.101.1.195',
+    '151.101.65.195',
+  ];
+
+  let isCnameMatch = false;
+  let cnameRecords: string[] = [];
+  try {
+    const rawCnames = await dns.promises.resolveCname(cleanDomain);
+    cnameRecords = rawCnames.map((r) => r.toLowerCase().replace(/\.$/, ''));
+    isCnameMatch = cnameRecords.some((r) => ACCEPTED_CNAME_TARGETS.includes(r));
+  } catch (_) {}
+
+  let isApexMatch = false;
+  let aRecords: string[] = [];
+  try {
+    aRecords = await dns.promises.resolve4(cleanDomain);
+    isApexMatch = aRecords.some((ip) => PLATFORM_A_RECORDS.includes(ip));
+  } catch (_) {}
+
+  const challengeToken = crypto
+    .createHash('sha256')
+    .update(`${uid}:${cleanDomain}:linklyra_domain_salt`)
+    .digest('hex')
+    .slice(0, 32);
+
+  const challengeRecordName = `_linklyra-challenge.${cleanDomain}`;
+  let isTxtMatch = false;
+  let txtRecords: string[] = [];
+  try {
+    const rawTxt = await dns.promises.resolveTxt(challengeRecordName);
+    txtRecords = rawTxt.flat();
+    isTxtMatch = txtRecords.some(
+      (txt) => txt === `linklyra-verification=${challengeToken}` || txt === challengeToken
+    );
+  } catch (_) {}
+
+  let strategy: 'cname' | 'apex_a' | 'txt_challenge' | null = null;
+  if (isCnameMatch) strategy = 'cname';
+  else if (isApexMatch) strategy = 'apex_a';
+  else if (isTxtMatch) strategy = 'txt_challenge';
+
+  const isConfigured = Boolean(strategy);
+
+  let message = 'DNS records not yet detected. Please allow a few minutes for DNS propagation.';
+  if (strategy === 'cname') {
+    message = `CNAME record correctly pointing to ${cnameRecords.join(', ')}. Domain is ready!`;
+  } else if (strategy === 'apex_a') {
+    message = `Apex A record pointing to platform IP (${aRecords.join(', ')}). Domain is ready!`;
+  } else if (strategy === 'txt_challenge') {
+    message = 'TXT ownership challenge verified. Domain is ready!';
+  }
+
+  const response: CheckDomainStatusResponse = {
+    domain: cleanDomain,
+    isConfigured,
+    strategy,
+    detectedCnames: cnameRecords,
+    detectedIps: aRecords,
+    detectedTxt: txtRecords,
+    expectedCname: ACCEPTED_CNAME_TARGETS[0],
+    expectedIps: PLATFORM_A_RECORDS,
+    challengeToken,
+    challengeRecordName,
+    message,
+  };
+
+  return response;
 });
 
 // -------------------------------------------------------------
@@ -1064,6 +1328,251 @@ export const aggregateAnalyticsEvent = onDocumentCreated(
 );
 
 // -------------------------------------------------------------
+// 9B. High-Throughput Analytics Stream Ingestion Endpoint (Alternate Architecture)
+// Batches multiple visitor interactions, pre-aggregates in-memory, resolves geo-IP,
+// and issues batched multi-counter increments without document write contention.
+// -------------------------------------------------------------
+export const ingestAnalyticsBatch = onRequest({ cors: true }, async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    return;
+  }
+
+  // 1. Bot & Crawler Suppression
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  const isBotUA = /bot|crawler|spider|crawling|googlebot|bingbot|yahoo|duckduckbot|baiduspider|yandexbot|facebookexternalhit|whatsapp|telegrambot|twitterbot|slackbot|discordbot|headlesschrome|puppeteer/i.test(ua);
+  if (isBotUA) {
+    res.status(200).json({ success: true, filtered: 'bot' });
+    return;
+  }
+
+  // 2. Parse payload
+  let events: IngestionBatchEvent[] = [];
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    events = Array.isArray(body?.events) ? body.events : (Array.isArray(body) ? body : (body?.event ? [body.event] : []));
+  } catch {
+    res.status(400).json({ error: 'Invalid JSON payload.' });
+    return;
+  }
+
+  if (!events || events.length === 0) {
+    res.status(200).json({ success: true, processed: 0 });
+    return;
+  }
+
+  // Limit max batch size to 100 per request
+  events = events.slice(0, 100);
+
+  // 3. Resolve Geographic Origin from Edge / Cloud Headers
+  const rawCountry = (
+    req.headers['cf-ipcountry'] ||
+    req.headers['x-appengine-country'] ||
+    req.headers['x-country-code'] ||
+    req.headers['fastly-client-ip-country'] ||
+    req.headers['x-client-geo-country'] ||
+    ''
+  ) as string;
+
+  const headerCountry = typeof rawCountry === 'string' && rawCountry.trim().length >= 2
+    ? rawCountry.trim().toUpperCase().slice(0, 10)
+    : null;
+
+  // 4. In-Memory Pre-Aggregation
+  interface PageDailyAggregation {
+    pageId: string;
+    dateKey: string;
+    views: number;
+    clicks: number;
+    conversions: number;
+    devices: Record<string, number>;
+    browsers: Record<string, number>;
+    referrers: Record<string, number>;
+    countries: Record<string, number>;
+    linkClicks: Record<string, number>;
+    eventTypes: Record<string, number>;
+  }
+
+  const rollupsByPageDate = new Map<string, PageDailyAggregation>();
+  const linkClicksMap = new Map<string, { pageId: string; linkId: string; count: number }>();
+
+  for (const ev of events) {
+    if (!ev || !ev.pageId || typeof ev.pageId !== 'string') continue;
+    const pageId = ev.pageId.trim();
+    if (!pageId) continue;
+
+    let dateKey: string;
+    try {
+      const ts = ev.timestamp ? new Date(ev.timestamp) : new Date();
+      dateKey = isNaN(ts.getTime()) ? new Date().toISOString().split('T')[0] : ts.toISOString().split('T')[0];
+    } catch {
+      dateKey = new Date().toISOString().split('T')[0];
+    }
+
+    const key = `${pageId}::${dateKey}`;
+    let rollup = rollupsByPageDate.get(key);
+    if (!rollup) {
+      rollup = {
+        pageId,
+        dateKey,
+        views: 0,
+        clicks: 0,
+        conversions: 0,
+        devices: {},
+        browsers: {},
+        referrers: {},
+        countries: {},
+        linkClicks: {},
+        eventTypes: {},
+      };
+      rollupsByPageDate.set(key, rollup);
+    }
+
+    const eventType = String(ev.type || 'page_view');
+    if (eventType === 'page_view') {
+      rollup.views += 1;
+    } else if (eventType === 'link_click') {
+      rollup.clicks += 1;
+      if (ev.linkId && typeof ev.linkId === 'string') {
+        const cleanLinkId = ev.linkId.replace(/[\.\/\[\]]/g, '_').slice(0, 100);
+        rollup.linkClicks[cleanLinkId] = (rollup.linkClicks[cleanLinkId] || 0) + 1;
+
+        const lKey = `${pageId}::${cleanLinkId}`;
+        const existingLink = linkClicksMap.get(lKey);
+        if (existingLink) {
+          existingLink.count += 1;
+        } else {
+          linkClicksMap.set(lKey, { pageId, linkId: cleanLinkId, count: 1 });
+        }
+      }
+    } else {
+      rollup.conversions += 1;
+      const cleanType = eventType.replace(/[\.\/\[\]]/g, '_').slice(0, 50);
+      rollup.eventTypes[cleanType] = (rollup.eventTypes[cleanType] || 0) + 1;
+    }
+
+    const dev = ev.device && ['mobile', 'desktop', 'tablet'].includes(ev.device.toLowerCase())
+      ? ev.device.toLowerCase()
+      : 'mobile';
+    rollup.devices[dev] = (rollup.devices[dev] || 0) + 1;
+
+    if (ev.browser && typeof ev.browser === 'string') {
+      const cleanBrowser = ev.browser.replace(/[\.\/\[\]]/g, '_').slice(0, 40);
+      rollup.browsers[cleanBrowser] = (rollup.browsers[cleanBrowser] || 0) + 1;
+    }
+
+    if (ev.referrer && typeof ev.referrer === 'string') {
+      let ref = ev.referrer;
+      try {
+        if (ref.startsWith('http')) {
+          ref = new URL(ref).hostname.replace(/^www\./, '');
+        }
+      } catch {}
+      const cleanRef = ref.replace(/[\.\/\[\]]/g, '_').slice(0, 60) || 'direct';
+      rollup.referrers[cleanRef] = (rollup.referrers[cleanRef] || 0) + 1;
+    }
+
+    const country = headerCountry || (ev.country && typeof ev.country === 'string' ? ev.country.trim().toUpperCase().slice(0, 10) : 'GLOBAL');
+    const cleanCountry = country.replace(/[\.\/\[\]]/g, '_');
+    rollup.countries[cleanCountry] = (rollup.countries[cleanCountry] || 0) + 1;
+  }
+
+  // 5. Atomic Batch Commit
+  try {
+    const batch = db.batch();
+
+    for (const rollup of rollupsByPageDate.values()) {
+      const statsRef = db.doc(`pages/${rollup.pageId}/stats/${rollup.dateKey}`);
+      const updates: Record<string, any> = {
+        date: rollup.dateKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (rollup.views > 0) updates.views = admin.firestore.FieldValue.increment(rollup.views);
+      if (rollup.clicks > 0) updates.clicks = admin.firestore.FieldValue.increment(rollup.clicks);
+      if (rollup.conversions > 0) updates.conversions = admin.firestore.FieldValue.increment(rollup.conversions);
+
+      for (const [dev, count] of Object.entries(rollup.devices)) {
+        updates[`devices.${dev}`] = admin.firestore.FieldValue.increment(count);
+      }
+      for (const [br, count] of Object.entries(rollup.browsers)) {
+        updates[`browsers.${br}`] = admin.firestore.FieldValue.increment(count);
+      }
+      for (const [ref, count] of Object.entries(rollup.referrers)) {
+        updates[`referrers.${ref}`] = admin.firestore.FieldValue.increment(count);
+      }
+      for (const [c, count] of Object.entries(rollup.countries)) {
+        updates[`countries.${c}`] = admin.firestore.FieldValue.increment(count);
+      }
+      for (const [lId, count] of Object.entries(rollup.linkClicks)) {
+        updates[`linkClicks.${lId}`] = admin.firestore.FieldValue.increment(count);
+      }
+      for (const [evT, count] of Object.entries(rollup.eventTypes)) {
+        updates[`eventTypes.${evT}`] = admin.firestore.FieldValue.increment(count);
+      }
+
+      batch.set(statsRef, updates, { merge: true });
+    }
+
+    for (const linkEntry of linkClicksMap.values()) {
+      const linkRef = db.doc(`pages/${linkEntry.pageId}/links/${linkEntry.linkId}`);
+      batch.set(
+        linkRef,
+        {
+          clickCount: admin.firestore.FieldValue.increment(linkEntry.count),
+        },
+        { merge: true }
+      );
+    }
+
+    await batch.commit();
+    res.status(200).json({ success: true, processed: events.length });
+  } catch (err: any) {
+    console.error('[ingestAnalyticsBatch] Error processing analytics batch:', err);
+    res.status(500).json({ error: 'Failed to process analytics batch.' });
+  }
+});
+
+export const ingestAnalyticsBatchCallable = onCall(async (request) => {
+  const reqData = (request.data || {}) as IngestAnalyticsBatchRequest;
+  const events = (reqData.events || []) as IngestionBatchEvent[];
+  if (!events || events.length === 0) {
+    return { success: true, processed: 0 };
+  }
+
+  const batch = db.batch();
+  for (const ev of events.slice(0, 100)) {
+    if (!ev || !ev.pageId) continue;
+    const ts = ev.timestamp ? new Date(ev.timestamp) : new Date();
+    const dateKey = isNaN(ts.getTime()) ? new Date().toISOString().split('T')[0] : ts.toISOString().split('T')[0];
+    const statsRef = db.doc(`pages/${ev.pageId}/stats/${dateKey}`);
+    const updates: Record<string, any> = {
+      date: dateKey,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (ev.type === 'page_view') {
+      updates.views = admin.firestore.FieldValue.increment(1);
+    } else if (ev.type === 'link_click') {
+      updates.clicks = admin.firestore.FieldValue.increment(1);
+      if (ev.linkId) {
+        const cleanLinkId = ev.linkId.replace(/[\.\/\[\]]/g, '_').slice(0, 100);
+        updates[`linkClicks.${cleanLinkId}`] = admin.firestore.FieldValue.increment(1);
+        const linkRef = db.doc(`pages/${ev.pageId}/links/${cleanLinkId}`);
+        batch.set(linkRef, { clickCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+      }
+    }
+    batch.set(statsRef, updates, { merge: true });
+  }
+  await batch.commit();
+  return { success: true, processed: events.length };
+});
+
+// -------------------------------------------------------------
 // 10. Callable: setWhiteLabel
 // -------------------------------------------------------------
 export const setWhiteLabel = onCall(async (request) => {
@@ -1074,10 +1583,16 @@ export const setWhiteLabel = onCall(async (request) => {
   const uid = request.auth.uid;
   const enabled = Boolean(request.data?.enabled);
 
-  // Verify user's actual subscription plan in Firestore
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.data();
-  const plan = userData?.plan || 'free';
+  // Verify user's actual subscription plan (Zero-database token claim check first)
+  const tokenPlan = (request.auth.token?.plan as string) || '';
+  const isTokenPro = Boolean(request.auth.token?.pro || ['pro', 'business', 'agency'].includes(tokenPlan));
+  let plan = tokenPlan;
+
+  if (enabled && !isTokenPro) {
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.data();
+    plan = userData?.plan || 'free';
+  }
 
   if (enabled && plan !== 'pro' && plan !== 'business' && plan !== 'agency') {
     throw new HttpsError(
@@ -1107,16 +1622,30 @@ export const setWhiteLabel = onCall(async (request) => {
 });
 
 // -------------------------------------------------------------
-// 11. HTTP Function: renderProfileMeta (SEO & Social Crawlers)
+// 11. HTTP Function: renderProfileMeta (Social Bot Crawlers & Fast SSR Ingress)
+// Alternate Architecture:
+// - Edge/Crawler classification with instant redirect for human visitors.
+// - In-memory LRU cache + Stale-While-Revalidate CDN headers to eliminate cold-start timeouts.
+// - Rich OpenGraph, Twitter Large Image, and Schema.org JSON-LD microdata.
 // -------------------------------------------------------------
+
+interface MetaCacheEntry {
+  html: string;
+  expiresAt: number;
+}
+const metaCache = new Map<string, MetaCacheEntry>();
+
 export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => {
   const urlPath = req.path.replace(/^\/+/, '').replace(/\/+$/, '');
 
-  // Guard against static assets if accidentally routed
-  if (/\.(js|css|png|jpg|jpeg|svg|ico|json|woff2?|map|webp)$/i.test(urlPath)) {
+  // Guard against static assets
+  if (/\.(js|css|png|jpg|jpeg|svg|ico|json|woff2?|map|webp|txt)$/i.test(urlPath)) {
     res.status(404).send('Not found');
     return;
   }
+
+  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
+  const isSocialCrawler = /facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|discordbot|slackbot|linkedinbot|pinterest|skypeuripreview|google-structured-data-testing-tool|vkshare|w3c_validator|bingbot|googlebot/i.test(userAgent);
 
   const hostname = (req.hostname || '').toLowerCase();
   const isPlatform =
@@ -1131,7 +1660,6 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
   if (!isPlatform && hostname) {
     usernameOrDomain = hostname;
   } else {
-    // Check query params ?user= or ?u= or path segment
     const qUser = (req.query.user || req.query.u || req.query.domain || req.query.d) as string | undefined;
     if (qUser && typeof qUser === 'string') {
       usernameOrDomain = qUser.toLowerCase().trim().replace(/^@/, '');
@@ -1153,18 +1681,42 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     'landing', 'help', 'support', 'assets', 'static', 'index.html', 'creator'
   ]);
 
+  const targetIdentifier = usernameOrDomain.toLowerCase().trim().replace(/^@/, '');
+
+  // 1. If human visitor (not a social crawler bot), redirect cleanly to SPA URL
+  if (!isSocialCrawler) {
+    const redirectUrl = targetIdentifier ? `/${targetIdentifier}` : '/';
+    res.set('Location', redirectUrl);
+    res.status(302).send(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${redirectUrl}"><script>window.location.replace('${redirectUrl}');</script></head><body>Redirecting to LinkLyra...</body></html>`);
+    return;
+  }
+
+  // 2. Check In-Memory Cache (Sub-5ms response time for warm instances)
+  const cacheKey = `meta_${targetIdentifier || 'default'}`;
+  const now = Date.now();
+  const cached = metaCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+    res.set('X-Cache-Status', 'HIT');
+    res.status(200).send(cached.html);
+    return;
+  }
+
+  // 3. Resolve Creator Data
   let title = 'LinkLyra - The Link-in-Bio for Modern Creators';
   let description = 'Create a high-converting, dynamic bio page with direct lead capture, multi-platform media routing, and real-time analytics.';
   let image = 'https://linklyra.web.app/og-preview.png';
-  let canonicalUrl = `https://linklyra.web.app/${usernameOrDomain}`;
+  let canonicalUrl = `https://linklyra.web.app/${targetIdentifier}`;
+  let creatorName = 'LinkLyra Creator';
 
-  if (usernameOrDomain && !reserved.has(usernameOrDomain)) {
+  if (targetIdentifier && !reserved.has(targetIdentifier)) {
     try {
       let pageData: any = null;
 
-      // Check if domain
-      if (usernameOrDomain.includes('.')) {
-        const domainSnap = await db.doc(`domains/${usernameOrDomain}`).get();
+      // Check if custom domain
+      if (targetIdentifier.includes('.')) {
+        const domainSnap = await db.doc(`domains/${targetIdentifier}`).get();
         if (domainSnap.exists) {
           const uid = domainSnap.data()?.userId || domainSnap.data()?.pageId;
           if (uid) {
@@ -1176,7 +1728,7 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
 
       // Check username lookup
       if (!pageData) {
-        const usernameSnap = await db.doc(`usernames/${usernameOrDomain}`).get();
+        const usernameSnap = await db.doc(`usernames/${targetIdentifier}`).get();
         if (usernameSnap.exists) {
           const uid = usernameSnap.data()?.userId || usernameSnap.data()?.pageId;
           if (uid) {
@@ -1188,26 +1740,26 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
 
       // Query pages collection fallback
       if (!pageData) {
-        const pageQuery = await db.collection('pages').where('username', '==', usernameOrDomain).limit(1).get();
+        const pageQuery = await db.collection('pages').where('username', '==', targetIdentifier).limit(1).get();
         if (!pageQuery.empty) {
           pageData = pageQuery.docs[0].data();
         }
       }
 
       if (pageData) {
-        const name = pageData.title || pageData.name || usernameOrDomain;
-        title = `${name} (@${usernameOrDomain}) | LinkLyra`;
-        description = pageData.bio || `Check out @${usernameOrDomain}'s official links, projects, and updates on LinkLyra.`;
-        if (pageData.avatarUrl) {
+        creatorName = pageData.title || pageData.name || pageData.full_name || targetIdentifier;
+        title = `${creatorName} (@${targetIdentifier}) | LinkLyra`;
+        description = pageData.bio || pageData.headline || `Explore @${targetIdentifier}'s official links, portfolios, and booking channels on LinkLyra.`;
+        if (pageData.avatarUrl && typeof pageData.avatarUrl === 'string' && pageData.avatarUrl.startsWith('http')) {
           image = pageData.avatarUrl;
         }
-        canonicalUrl = `https://linklyra.web.app/${usernameOrDomain}`;
+        canonicalUrl = `https://linklyra.web.app/${targetIdentifier}`;
       } else {
-        title = `Profile Not Found (@${usernameOrDomain}) | LinkLyra`;
-        description = `The page @${usernameOrDomain} does not exist yet. Claim your custom username on LinkLyra.`;
+        title = `Profile Not Found (@${targetIdentifier}) | LinkLyra`;
+        description = `The page @${targetIdentifier} has not been claimed yet. Create your verified link showroom today.`;
       }
     } catch (e) {
-      console.error('[renderProfileMeta] Error fetching page:', e);
+      console.error('[renderProfileMeta] Error fetching page metadata:', e);
     }
   }
 
@@ -1224,9 +1776,27 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
   const safeDesc = escapeHtml(description);
   const safeImage = escapeHtml(image);
   const safeCanonical = escapeHtml(canonicalUrl);
+  const safeName = escapeHtml(creatorName);
+
+  // Schema.org JSON-LD structured data for Google Search & Social bots
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    name: safeTitle,
+    url: safeCanonical,
+    description: safeDesc,
+    mainEntity: {
+      '@type': 'Person',
+      name: safeName,
+      alternateName: `@${targetIdentifier}`,
+      image: safeImage,
+      url: safeCanonical,
+      description: safeDesc,
+    },
+  };
 
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -1234,35 +1804,45 @@ export const renderProfileMeta = onRequest({ cors: false }, async (req, res) => 
     <meta name="description" content="${safeDesc}" />
     <link rel="canonical" href="${safeCanonical}" />
 
-    <!-- Open Graph / Facebook / WhatsApp -->
+    <!-- Open Graph Protocol (WhatsApp, Facebook, LinkedIn, Discord) -->
     <meta property="og:type" content="profile" />
     <meta property="og:site_name" content="LinkLyra" />
     <meta property="og:url" content="${safeCanonical}" />
     <meta property="og:title" content="${safeTitle}" />
     <meta property="og:description" content="${safeDesc}" />
     <meta property="og:image" content="${safeImage}" />
+    <meta property="og:image:secure_url" content="${safeImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${safeName}'s Profile on LinkLyra" />
+    <meta property="profile:username" content="${targetIdentifier}" />
 
-    <!-- Twitter / X -->
+    <!-- Twitter / X Summary Large Image Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="${safeCanonical}" />
     <meta name="twitter:title" content="${safeTitle}" />
     <meta name="twitter:description" content="${safeDesc}" />
     <meta name="twitter:image" content="${safeImage}" />
+    <meta name="twitter:image:alt" content="${safeName}'s Profile" />
 
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index.css">
+    <!-- Schema.org JSON-LD Microdata -->
+    <script type="application/ld+json">
+      ${JSON.stringify(jsonLd)}
+    </script>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="font-family: system-ui, -apple-system, sans-serif; background: #faf8f5; color: #1c1e22; padding: 2rem; text-align: center;">
+    <h1>${safeName}</h1>
+    <p>${safeDesc}</p>
+    <a href="${safeCanonical}" style="color: #5e4bf7; font-weight: 600;">Open on LinkLyra &rarr;</a>
   </body>
 </html>`;
 
+  // Cache in-memory for 10 minutes (prevents duplicate Firestore queries during rapid social scrapes)
+  metaCache.set(cacheKey, { html, expiresAt: now + 10 * 60 * 1000 });
+
   res.set('Content-Type', 'text/html; charset=utf-8');
-  res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+  res.set('X-Cache-Status', 'MISS');
   res.status(200).send(html);
 });
 

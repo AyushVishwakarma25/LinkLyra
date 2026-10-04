@@ -8,25 +8,106 @@ import {
   increment,
   serverTimestamp,
   limit,
+  writeBatch,
+  where,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import {
   auth,
   db,
-  sanitizeForFirestore,
+  functions,
   handleFirestoreError,
   OperationType,
-  FirestoreAnalyticsEvent,
 } from './app';
 import {
   parseUserAgent,
   getVisitorId,
   isBot,
   shouldRecordPageView,
+  analyticsStreamEngine,
+  TelemetryEvent,
+  formatCountryLabel,
 } from '../analytics';
 import { SpecializedAnalyticsSummary } from '../../types';
 
+// Wire up the high-throughput analytics stream engine dispatcher
+if (typeof window !== 'undefined') {
+  analyticsStreamEngine.setDispatcher(async (events: TelemetryEvent[]) => {
+    if (!events || events.length === 0) return;
+
+    // 1. Primary Strategy: Try Cloud Functions high-throughput batch callable
+    try {
+      const ingestFn = httpsCallable(functions, 'ingestAnalyticsBatchCallable');
+      await ingestFn({ events });
+      return;
+    } catch {
+      // If callable fails (e.g. offline, local dev emulator without functions), proceed to fallback
+    }
+
+    // 2. Secondary Strategy: Direct atomic batch write to Firestore (O(1) commit instead of N separate operations)
+    try {
+      const batch = writeBatch(db);
+      const rollups = new Map<string, { views: number; clicks: number; devices: Record<string, number>; linkClicks: Record<string, number> }>();
+      const linkClicksMap = new Map<string, { pageId: string; linkId: string; count: number }>();
+
+      for (const ev of events) {
+        if (!ev || !ev.pageId) continue;
+        const dateKey = new Date(ev.timestamp).toISOString().split('T')[0];
+        const key = `${ev.pageId}::${dateKey}`;
+        let r = rollups.get(key);
+        if (!r) {
+          r = { views: 0, clicks: 0, devices: {}, linkClicks: {} };
+          rollups.set(key, r);
+        }
+
+        if (ev.type === 'page_view') {
+          r.views += 1;
+        } else if (ev.type === 'link_click') {
+          r.clicks += 1;
+          if (ev.linkId) {
+            r.linkClicks[ev.linkId] = (r.linkClicks[ev.linkId] || 0) + 1;
+            const lKey = `${ev.pageId}::${ev.linkId}`;
+            const ex = linkClicksMap.get(lKey);
+            if (ex) ex.count += 1;
+            else linkClicksMap.set(lKey, { pageId: ev.pageId, linkId: ev.linkId, count: 1 });
+          }
+        }
+        r.devices[ev.device] = (r.devices[ev.device] || 0) + 1;
+      }
+
+      for (const [key, r] of rollups.entries()) {
+        const [pageId, dateKey] = key.split('::');
+        const statsRef = doc(db, 'pages', pageId, 'stats', dateKey);
+        const updates: Record<string, any> = {
+          date: dateKey,
+          updatedAt: serverTimestamp(),
+        };
+        if (r.views > 0) updates.views = increment(r.views);
+        if (r.clicks > 0) updates.clicks = increment(r.clicks);
+        for (const [dev, c] of Object.entries(r.devices)) {
+          updates[`devices.${dev}`] = increment(c);
+        }
+        for (const [lId, c] of Object.entries(r.linkClicks)) {
+          updates[`linkClicks.${lId}`] = increment(c);
+        }
+        batch.set(statsRef, updates, { merge: true });
+      }
+
+      for (const linkEntry of linkClicksMap.values()) {
+        const linkRef = doc(db, 'pages', linkEntry.pageId, 'links', linkEntry.linkId);
+        batch.set(linkRef, { clickCount: increment(linkEntry.count) }, { merge: true });
+      }
+
+      await batch.commit();
+    } catch (fallbackErr) {
+      console.warn('[analytics] Direct batch write notice:', fallbackErr);
+      throw fallbackErr;
+    }
+  });
+}
+
 export const analyticsService = {
-  // Record page view event in canonical subcollection: pages/{pageId}/analytics
+  // Record page view event via high-throughput stream buffer
   // STRICT: Only genuine external visitor events are tracked.
   // Studio live previews and owner testing are strictly excluded.
   async recordView(pageId: string): Promise<void> {
@@ -45,31 +126,26 @@ export const analyticsService = {
       return;
     }
 
-    const eventId = `ev_view_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const visitorId = getVisitorId();
     const uaInfo = typeof navigator !== 'undefined' ? parseUserAgent(navigator.userAgent) : { device: 'desktop' as const, browser: 'unknown' };
     const referrer = typeof document !== 'undefined' ? document.referrer : '';
 
-    const payload: FirestoreAnalyticsEvent = {
+    const event: TelemetryEvent = {
       type: 'page_view',
+      pageId,
       linkId: null,
       visitorId,
-      country: 'Global',
       device: uaInfo.device,
       browser: uaInfo.browser,
       referrer,
-      timestamp: serverTimestamp(),
+      country: 'GLOBAL',
+      timestamp: Date.now(),
     };
 
-    try {
-      const eventRef = doc(db, 'pages', pageId, 'analytics', eventId);
-      await setDoc(eventRef, sanitizeForFirestore(payload));
-    } catch {
-      // Fire-and-forget metric recording: suppress user-facing errors
-    }
+    analyticsStreamEngine.enqueue(event);
   },
 
-  // Record link click event in canonical subcollection: pages/{pageId}/analytics
+  // Record link click event via high-throughput stream buffer
   // STRICT: Only genuine external visitor clicks are tracked.
   // Studio live previews and owner clicks are strictly excluded.
   async recordClick(pageId: string, linkId: string): Promise<void> {
@@ -84,43 +160,50 @@ export const analyticsService = {
       return;
     }
 
-    const eventId = `ev_click_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const visitorId = getVisitorId();
     const uaInfo = typeof navigator !== 'undefined' ? parseUserAgent(navigator.userAgent) : { device: 'desktop' as const, browser: 'unknown' };
     const referrer = typeof document !== 'undefined' ? document.referrer : '';
 
-    const payload: FirestoreAnalyticsEvent = {
+    const event: TelemetryEvent = {
       type: 'link_click',
+      pageId,
       linkId,
       visitorId,
-      country: 'Global',
       device: uaInfo.device,
       browser: uaInfo.browser,
       referrer,
-      timestamp: serverTimestamp(),
+      country: 'GLOBAL',
+      timestamp: Date.now(),
     };
 
-    try {
-      // 1. Record event in analytics subcollection
-      const eventRef = doc(db, 'pages', pageId, 'analytics', eventId);
-      await setDoc(eventRef, sanitizeForFirestore(payload));
-
-      // 2. Atomically increment link clickCount for verified visitor interactions
-      const linkRef = doc(db, 'pages', pageId, 'links', linkId);
-      await setDoc(
-        linkRef,
-        {
-          clickCount: increment(1),
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.warn('[analytics] recordClick notice:', err);
-    }
+    analyticsStreamEngine.enqueue(event);
   },
 
-  // Query aggregated rollups from pages/{pageId}/stats/{yyyy-mm-dd}
-  // with fallback to direct aggregation from pages/{pageId}/analytics
+  // Record custom conversion events (leads, bookings, valuations)
+  async recordConversion(pageId: string, conversionType: string, linkId?: string | null): Promise<void> {
+    if (!pageId || !conversionType) return;
+    if (auth.currentUser && auth.currentUser.uid === pageId) return;
+    if (typeof navigator !== 'undefined' && isBot(navigator.userAgent)) return;
+
+    const visitorId = getVisitorId();
+    const uaInfo = typeof navigator !== 'undefined' ? parseUserAgent(navigator.userAgent) : { device: 'desktop' as const, browser: 'unknown' };
+    const referrer = typeof document !== 'undefined' ? document.referrer : '';
+
+    analyticsStreamEngine.enqueue({
+      type: conversionType,
+      pageId,
+      linkId: linkId || null,
+      visitorId,
+      device: uaInfo.device,
+      browser: uaInfo.browser,
+      referrer,
+      country: 'GLOBAL',
+      timestamp: Date.now(),
+    });
+  },
+
+  // Query aggregated rollups from pre-computed daily buckets in pages/{pageId}/stats
+  // with O(days) efficiency, zero document write contention, and automatic legacy fallback.
   async getAnalyticsSummary(pageId: string, days = 30): Promise<SpecializedAnalyticsSummary> {
     const targetPageId = pageId || auth.currentUser?.uid;
     const defaultSummary: SpecializedAnalyticsSummary = {
@@ -142,6 +225,7 @@ export const analyticsService = {
       deviceCounts: { mobile: 0, desktop: 0, tablet: 0 },
       browserCounts: {},
       referrerCounts: {},
+      locationCounts: {},
       linkClickCounts: {},
       topLinks: [],
       dailyStats: [],
@@ -150,7 +234,7 @@ export const analyticsService = {
     if (!targetPageId) return defaultSummary;
 
     try {
-      // 1. Check if the page has an analyticsResetAt timestamp cutoff
+      // 1. Fetch page metadata for reset cutoff and card display labels
       let resetCutoffMs = 0;
       try {
         const pageDocSnap = await getDoc(doc(db, 'pages', targetPageId));
@@ -171,7 +255,26 @@ export const analyticsService = {
 
       const daysCutoffMs = Date.now() - (days * 24 * 60 * 60 * 1000);
       const effectiveCutoffMs = Math.max(daysCutoffMs, resetCutoffMs);
+      const startDateStr = new Date(effectiveCutoffMs).toISOString().split('T')[0];
 
+      // Fetch card details (titles, urls, colors) for top links display
+      const linkDetails: Record<string, { title: string; url: string; color: string }> = {};
+      try {
+        const linksRef = collection(db, 'pages', targetPageId, 'links');
+        const linksSnap = await getDocs(linksRef);
+        linksSnap.forEach((lDoc) => {
+          const lData = lDoc.data();
+          linkDetails[lDoc.id] = {
+            title: lData.title || '',
+            url: lData.url || lData.link_url || '',
+            color: lData.color || 'purple',
+          };
+        });
+      } catch {
+        // ignore
+      }
+
+      // 2. Primary Read Model: Pre-Aggregated Daily Rollups from pages/{targetPageId}/stats
       let totalViews = 0;
       let totalClicks = 0;
       let propertyViews = 0;
@@ -187,118 +290,159 @@ export const analyticsService = {
       const deviceCounts: Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
       const browserCounts: Record<string, number> = {};
       const referrerCounts: Record<string, number> = {};
+      const rawCountryCounts: Record<string, number> = {};
       const linkClickCounts: Record<string, number> = {};
       const dailyMap: Record<string, { views: number; clicks: number }> = {};
 
-      // 2. Query verified raw visitor analytics events from pages/{targetPageId}/analytics
-      // This is the SINGLE SOURCE OF TRUTH for genuine external audience interactions.
-      try {
-        const analyticsRef = collection(db, 'pages', targetPageId, 'analytics');
-        const rawSnap = await getDocs(query(analyticsRef, limit(1000)));
+      const statsRef = collection(db, 'pages', targetPageId, 'stats');
+      const statsQuery = query(statsRef, where('date', '>=', startDateStr));
+      const statsSnap = await getDocs(statsQuery);
 
-        rawSnap.forEach((d) => {
-          const data = d.data();
-          const eventType = data.type;
+      if (!statsSnap.empty) {
+        statsSnap.forEach((docSnap) => {
+          const sData = docSnap.data();
+          const dKey = sData.date || docSnap.id;
+          const v = Number(sData.views || 0);
+          const c = Number(sData.clicks || 0);
 
-          let eventTs = 0;
-          let dateKey = '';
-          try {
-            const ts = data.timestamp
-              ? typeof data.timestamp.toMillis === 'function'
-                ? data.timestamp.toMillis()
-                : typeof data.timestamp.toDate === 'function'
-                ? data.timestamp.toDate().getTime()
-                : new Date(data.timestamp).getTime()
-              : Date.now();
-            eventTs = ts;
-            dateKey = new Date(ts).toISOString().split('T')[0];
-          } catch {
-            eventTs = Date.now();
-            dateKey = new Date().toISOString().split('T')[0];
+          totalViews += v;
+          totalClicks += c;
+
+          if (!dailyMap[dKey]) dailyMap[dKey] = { views: 0, clicks: 0 };
+          dailyMap[dKey].views += v;
+          dailyMap[dKey].clicks += c;
+
+          // Conversions & event types
+          if (sData.eventTypes && typeof sData.eventTypes === 'object') {
+            propertyViews += Number(sData.eventTypes.property_view || 0);
+            showingRequests += Number(sData.eventTypes.showing_request || 0);
+            homeValuations += Number(sData.eventTypes.home_valuation || 0);
+            brandInquiries += Number(sData.eventTypes.brand_inquiry || 0);
+            mediaKitDownloads += Number(sData.eventTypes.media_kit_download || 0);
+            packageBookings += Number(sData.eventTypes.package_booking || 0);
+            generalContacts += Number(sData.eventTypes.general_contact || 0);
+            musicBookings += Number(sData.eventTypes.music_booking || 0);
+            podcastSponsorships += Number(sData.eventTypes.podcast_sponsorship || 0);
           }
 
-          // Strictly filter out any interactions prior to the date range or reset timestamp
-          if (effectiveCutoffMs > 0 && eventTs < effectiveCutoffMs) {
-            return;
-          }
-
-          if (!dailyMap[dateKey]) {
-            dailyMap[dateKey] = { views: 0, clicks: 0 };
-          }
-
-          if (eventType === 'page_view') {
-            totalViews += 1;
-            dailyMap[dateKey].views += 1;
-          } else if (eventType === 'link_click') {
-            totalClicks += 1;
-            dailyMap[dateKey].clicks += 1;
-            if (data.linkId && typeof data.linkId === 'string') {
-              const cleanLinkId = data.linkId;
-              linkClickCounts[cleanLinkId] = (linkClickCounts[cleanLinkId] || 0) + 1;
-            }
-          } else if (eventType === 'property_view') {
-            propertyViews += 1;
-          } else if (eventType === 'showing_request') {
-            showingRequests += 1;
-          } else if (eventType === 'home_valuation') {
-            homeValuations += 1;
-          } else if (eventType === 'brand_inquiry') {
-            brandInquiries += 1;
-          } else if (eventType === 'media_kit_download') {
-            mediaKitDownloads += 1;
-          } else if (eventType === 'package_booking') {
-            packageBookings += 1;
-          } else if (eventType === 'general_contact') {
-            generalContacts += 1;
-          } else if (eventType === 'music_booking') {
-            musicBookings += 1;
-          } else if (eventType === 'podcast_sponsorship') {
-            podcastSponsorships += 1;
-          }
-
-          // Device breakdown
-          if (data.device && typeof data.device === 'string') {
-            const dev = data.device.toLowerCase();
-            if (dev === 'mobile' || dev === 'desktop' || dev === 'tablet') {
-              deviceCounts[dev] = (deviceCounts[dev] || 0) + 1;
-            }
-          }
-          // Browser breakdown
-          if (data.browser && typeof data.browser === 'string') {
-            browserCounts[data.browser] = (browserCounts[data.browser] || 0) + 1;
-          }
-          // Referrer breakdown
-          if (data.referrer && typeof data.referrer === 'string') {
-            let ref = data.referrer;
-            try {
-              if (ref.startsWith('http')) {
-                ref = new URL(ref).hostname.replace(/^www\./, '');
+          // Devices
+          if (sData.devices && typeof sData.devices === 'object') {
+            for (const [dev, count] of Object.entries(sData.devices)) {
+              const dLower = dev.toLowerCase();
+              if (dLower === 'mobile' || dLower === 'desktop' || dLower === 'tablet') {
+                deviceCounts[dLower] = (deviceCounts[dLower] || 0) + Number(count || 0);
               }
-            } catch {}
-            const cleanRef = ref.slice(0, 60) || 'direct';
-            referrerCounts[cleanRef] = (referrerCounts[cleanRef] || 0) + 1;
+            }
+          }
+
+          // Browsers
+          if (sData.browsers && typeof sData.browsers === 'object') {
+            for (const [br, count] of Object.entries(sData.browsers)) {
+              browserCounts[br] = (browserCounts[br] || 0) + Number(count || 0);
+            }
+          }
+
+          // Referrers
+          if (sData.referrers && typeof sData.referrers === 'object') {
+            for (const [ref, count] of Object.entries(sData.referrers)) {
+              referrerCounts[ref] = (referrerCounts[ref] || 0) + Number(count || 0);
+            }
+          }
+
+          // Countries
+          if (sData.countries && typeof sData.countries === 'object') {
+            for (const [country, count] of Object.entries(sData.countries)) {
+              rawCountryCounts[country] = (rawCountryCounts[country] || 0) + Number(count || 0);
+            }
+          }
+
+          // Link Clicks
+          if (sData.linkClicks && typeof sData.linkClicks === 'object') {
+            for (const [lId, count] of Object.entries(sData.linkClicks)) {
+              linkClickCounts[lId] = (linkClickCounts[lId] || 0) + Number(count || 0);
+            }
           }
         });
-      } catch (rawErr) {
-        console.warn('[analytics] Direct raw analytics notice:', rawErr);
+      } else {
+        // 3. Fallback Model: Read from pages/{targetPageId}/analytics if daily rollups not yet present
+        try {
+          const rawRef = collection(db, 'pages', targetPageId, 'analytics');
+          const rawSnap = await getDocs(query(rawRef, limit(1000)));
+
+          rawSnap.forEach((d) => {
+            const data = d.data();
+            const eventType = data.type;
+            let eventTs = 0;
+            let dateKey = '';
+            try {
+              const ts = data.timestamp
+                ? typeof data.timestamp.toMillis === 'function'
+                  ? data.timestamp.toMillis()
+                  : typeof data.timestamp.toDate === 'function'
+                  ? data.timestamp.toDate().getTime()
+                  : new Date(data.timestamp).getTime()
+                : Date.now();
+              eventTs = ts;
+              dateKey = new Date(ts).toISOString().split('T')[0];
+            } catch {
+              eventTs = Date.now();
+              dateKey = new Date().toISOString().split('T')[0];
+            }
+
+            if (effectiveCutoffMs > 0 && eventTs < effectiveCutoffMs) return;
+
+            if (!dailyMap[dateKey]) dailyMap[dateKey] = { views: 0, clicks: 0 };
+
+            if (eventType === 'page_view') {
+              totalViews += 1;
+              dailyMap[dateKey].views += 1;
+            } else if (eventType === 'link_click') {
+              totalClicks += 1;
+              dailyMap[dateKey].clicks += 1;
+              if (data.linkId && typeof data.linkId === 'string') {
+                linkClickCounts[data.linkId] = (linkClickCounts[data.linkId] || 0) + 1;
+              }
+            } else if (eventType === 'property_view') propertyViews += 1;
+            else if (eventType === 'showing_request') showingRequests += 1;
+            else if (eventType === 'home_valuation') homeValuations += 1;
+            else if (eventType === 'brand_inquiry') brandInquiries += 1;
+            else if (eventType === 'media_kit_download') mediaKitDownloads += 1;
+            else if (eventType === 'package_booking') packageBookings += 1;
+            else if (eventType === 'general_contact') generalContacts += 1;
+            else if (eventType === 'music_booking') musicBookings += 1;
+            else if (eventType === 'podcast_sponsorship') podcastSponsorships += 1;
+
+            if (data.device) {
+              const dev = String(data.device).toLowerCase();
+              if (dev === 'mobile' || dev === 'desktop' || dev === 'tablet') {
+                deviceCounts[dev] = (deviceCounts[dev] || 0) + 1;
+              }
+            }
+            if (data.browser) {
+              browserCounts[String(data.browser)] = (browserCounts[String(data.browser)] || 0) + 1;
+            }
+            if (data.referrer) {
+              let ref = String(data.referrer);
+              try {
+                if (ref.startsWith('http')) ref = new URL(ref).hostname.replace(/^www\./, '');
+              } catch {}
+              referrerCounts[ref.slice(0, 60) || 'direct'] = (referrerCounts[ref.slice(0, 60) || 'direct'] || 0) + 1;
+            }
+            if (data.country) {
+              rawCountryCounts[String(data.country)] = (rawCountryCounts[String(data.country)] || 0) + 1;
+            }
+          });
+        } catch {
+          // ignore fallback error
+        }
       }
 
-      // 3. Fetch card metadata (titles, urls, colors) strictly for display labels.
-      // We NEVER inject unverified link clickCount fields into visitor analytics.
-      const linkDetails: Record<string, { title: string; url: string; color: string }> = {};
-      try {
-        const linksRef = collection(db, 'pages', targetPageId, 'links');
-        const linksSnap = await getDocs(linksRef);
-        linksSnap.forEach((lDoc) => {
-          const lData = lDoc.data();
-          linkDetails[lDoc.id] = {
-            title: lData.title || '',
-            url: lData.url || lData.link_url || '',
-            color: lData.color || 'purple',
-          };
-        });
-      } catch {
-        // ignore
+      // Format location counts with friendly names and national flags
+      const formattedLocationCounts: Record<string, number> = {};
+      for (const [code, count] of Object.entries(rawCountryCounts)) {
+        const { label, flag } = formatCountryLabel(code);
+        const displayKey = `${flag} ${label}`;
+        formattedLocationCounts[displayKey] = (formattedLocationCounts[displayKey] || 0) + count;
       }
 
       const dailyStats = Object.entries(dailyMap)
@@ -341,14 +485,23 @@ export const analyticsService = {
         deviceCounts,
         browserCounts,
         referrerCounts,
+        locationCounts: formattedLocationCounts,
         linkClickCounts,
         topLinks,
         dailyStats,
       };
     } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, `pages/${targetPageId}/analytics`);
+      handleFirestoreError(err, OperationType.LIST, `pages/${targetPageId}/stats`);
       return defaultSummary;
     }
+  },
+
+  async getSpecializedAnalyticsSummary(pageId: string): Promise<SpecializedAnalyticsSummary> {
+    return this.getAnalyticsSummary(pageId, 30);
+  },
+
+  async getRecentEvents(pageId: string, limitCount = 50): Promise<any[]> {
+    return [];
   },
 
   // Reset all past test metrics so author starts with 100% clean 0 visitor metrics
@@ -371,29 +524,6 @@ export const analyticsService = {
     } catch (err) {
       console.error('[analytics] resetAnalytics error:', err);
       throw err;
-    }
-  },
-
-  async getSpecializedAnalyticsSummary(pageId: string): Promise<SpecializedAnalyticsSummary> {
-    return this.getAnalyticsSummary(pageId, 30);
-  },
-
-  async getRecentEvents(pageId: string, maxEvents = 50): Promise<FirestoreAnalyticsEvent[]> {
-    const targetPageId = pageId || auth.currentUser?.uid;
-    if (!targetPageId) return [];
-
-    try {
-      const ref = collection(db, 'pages', targetPageId, 'analytics');
-      const snap = await getDocs(query(ref, limit(maxEvents)));
-
-      const events: FirestoreAnalyticsEvent[] = [];
-      snap.forEach((d) => {
-        events.push(d.data() as FirestoreAnalyticsEvent);
-      });
-      return events;
-    } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, `pages/${targetPageId}/analytics`);
-      return [];
     }
   },
 };

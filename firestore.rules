@@ -18,6 +18,21 @@ service cloud.firestore {
       );
     }
 
+    // Cryptographic JWT Custom Claim Entitlements (Zero-Database Read)
+    function isProToken() {
+      return signedIn() && (
+        request.auth.token.plan in ['pro', 'business', 'agency'] ||
+        request.auth.token.pro == true
+      );
+    }
+
+    function isBusinessToken() {
+      return signedIn() && (
+        request.auth.token.plan in ['business', 'agency'] ||
+        request.auth.token.business == true
+      );
+    }
+
     // =========================================================================
     // USERS (and Subcollections: subscriptions, payments, credit_transactions)
     // =========================================================================

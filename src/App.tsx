@@ -35,9 +35,9 @@ import { usePlan } from './hooks/usePlan';
 import { checkUserOnboardingEligibility } from './lib/onboardingService';
 import { resolveRoute, getRouteTarget } from './lib/routing';
 import { safeOpenUrl } from './lib/url';
-import { User } from 'firebase/auth';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { ConfirmProvider } from './components/ConfirmDialog';
+import { useStudioStore } from './store/useStudioStore';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -68,84 +68,50 @@ function createFreshUserProfile(user: User, claimedHandle?: string | null): User
 }
 
 function StudioApp() {
-  const initialRoute = resolveRoute();
-  const initialIsDirectPublic = initialRoute === 'profile' || initialRoute === 'domain' || initialRoute === '404';
-  const explicitStudio = initialRoute === 'studio';
-  const initialRouteTarget = getRouteTarget();
-
-  const [routeTarget] = useState<string | null>(initialRouteTarget);
-
-  // Primary App View: 'landing' | 'studio' | 'preview_only' | 'public' | 'terms' | 'privacy' | 'contact'
-  const [appMode, setAppMode] = useState<'landing' | 'studio' | 'preview_only' | 'public' | 'terms' | 'privacy' | 'contact'>(() => {
-    if (initialRoute === 'terms') return 'terms';
-    if (initialRoute === 'privacy') return 'privacy';
-    if (initialRoute === 'contact') return 'contact';
-    if (initialIsDirectPublic) return 'public';
-    if (explicitStudio) return 'studio';
-    return 'landing';
-  });
-
-  // Active sidebar tab (Links, Profile, Theme, Analytics, Share, Leads, Billing)
-  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTabKey>('links');
-
-  // Firebase Auth state
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [lastFailedAction, setLastFailedAction] = useState<(() => void) | null>(null);
   const toast = useToast();
-  const [pendingClaimedHandle, setPendingClaimedHandle] = useState<string | null>(null);
-
-  // Account Settings Modal State
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [accountModalInitialTab, setAccountModalInitialTab] = useState<AccountSubTab>('profile');
-
-  const handleOpenAccountSettings = (tab: AccountSubTab = 'profile') => {
-    setAccountModalInitialTab(tab);
-    setIsAccountModalOpen(true);
-  };
-
-  // Creator Profile State
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Error reading localStorage', e);
-    }
-
-    return DEFAULT_STARTER_PROFILE;
-  });
-
   const { plan: hookPlan } = usePlan();
 
-  useEffect(() => {
-    if (hookPlan) {
-      setProfile((prev) => (prev.plan !== hookPlan ? { ...prev, plan: hookPlan } : prev));
-    }
-  }, [hookPlan]);
-
-  // Card editor modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCard, setEditingCard] = useState<ProfileCardData | null>(null);
-
-  // Pro Upgrade modal state
-  const [isProModalOpen, setIsProModalOpen] = useState(false);
-  const [proLockedFeature, setProLockedFeature] = useState<string>('LinkLyra Pro');
-
-  const handleOpenProModal = (featureName?: string) => {
-    setProLockedFeature(featureName || 'LinkLyra Pro');
-    setIsProModalOpen(true);
-  };
-
-  const handleUpgradeToPro = (_plan?: any) => {
-    // Plan is granted and verified on the server; usePlan hook will automatically update state.
-  };
+  const {
+    appMode,
+    setAppMode,
+    routeTarget,
+    activeSidebarTab,
+    setActiveSidebarTab,
+    currentUser,
+    isAuthChecking,
+    pendingClaimedHandle,
+    setPendingClaimedHandle,
+    profile,
+    setProfile,
+    isModalOpen,
+    setIsModalOpen,
+    editingCard,
+    setEditingCard,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    isOnboardingOpen,
+    setIsOnboardingOpen,
+    isAccountModalOpen,
+    setIsAccountModalOpen,
+    accountModalInitialTab,
+    setAccountModalInitialTab,
+    isProModalOpen,
+    setIsProModalOpen,
+    proLockedFeature,
+    setProLockedFeature,
+    loadUserData,
+    saveCard,
+    deleteCard,
+    toggleCardActive,
+    reorderCards,
+    moveCard,
+    addSection,
+    deleteSection,
+    updateProfile,
+    manualSave,
+    resetLinks,
+    signOut,
+  } = useStudioStore();
 
   // Email verification banner state
   const [emailBannerDismissed, setEmailBannerDismissed] = useState(false);
@@ -164,119 +130,25 @@ function StudioApp() {
     }
   };
 
-  // Sync profile changes to user-scoped localStorage
+  // Sync plan from verified custom claims
   useEffect(() => {
-    if (currentUser) {
-      try {
-        localStorage.setItem(`${STORAGE_KEY}_${currentUser.uid}`, JSON.stringify(profile));
-      } catch (e) {
-        console.error('Error writing to localStorage', e);
-      }
+    if (hookPlan) {
+      setProfile((prev) => (prev.plan !== hookPlan ? { ...prev, plan: hookPlan } : prev));
     }
-  }, [profile, currentUser]);
+  }, [hookPlan, setProfile]);
 
-  // Subscribe to Firebase Auth changes & load user's Firestore data
+  // Subscribe to Firebase Auth changes & load user's Firestore data into Zustand store
   useEffect(() => {
     const unsubscribe = profileService.onAuthStateChange(async (user) => {
-      setCurrentUser(user);
       if (user) {
-        setIsSyncing(true);
-        try {
-          const dbProf = await profileService.getProfile(user.uid);
-          const dbLinks = await profileService.getLinks(user.uid);
-          const dbSections = await profileService.getSections(user.uid);
-
-          const eligibility = await checkUserOnboardingEligibility(user.uid, dbProf, dbLinks?.length || 0);
-
-          if (dbProf) {
-            const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
-            const resolvedAvatar =
-              dbProf.avatar_url && !dbProf.avatar_url.includes('unsplash.com')
-                ? dbProf.avatar_url
-                : user.photoURL || dbProf.avatar_url || '';
-
-            // If user has a photo from Google Auth / user.photoURL that isn't yet persisted in Firestore pages doc, auto-sync it
-            if (user.photoURL && (!dbProf.avatar_url || dbProf.avatar_url.includes('unsplash.com'))) {
-              profileService.updateProfile(user.uid, { avatar_url: user.photoURL }).catch(() => {});
-            }
-            
-            setProfile({
-              id: dbProf.id,
-              name: dbProf.full_name || 'My Page',
-              headline: dbProf.bio || '',
-              avatarUrl: resolvedAvatar,
-              username: dbProf.username || `creator_${user.uid.slice(0, 5)}`,
-              businessPhone: dbProf.business_phone,
-              theme: dbProf.theme || 'warm',
-              fontFamily: dbProf.font_family,
-              buttonStyle: dbProf.button_style,
-              backgroundType: dbProf.background_type,
-              backgroundValue: dbProf.background_value,
-              cardStyle: dbProf.card_style || 'fill',
-              wallpaperMode: dbProf.wallpaper_mode || 'color',
-              wallpaperTint: dbProf.wallpaper_tint ?? 20,
-              cardBgColor: dbProf.card_bg_color,
-              cardTextColor: dbProf.card_text_color,
-              buttonColor: dbProf.button_color,
-              stickers: dbProf.stickers || [],
-              footerSettings: dbProf.footer_settings,
-              socials: dbProf.socials || {},
-              plan: isAgency ? 'agency' : (dbProf.plan || 'free'),
-              customDomain: dbProf.custom_domain || '',
-              accountSettings: dbProf.accountSettings,
-              sections: dbSections || [],
-              cards: (dbLinks || []).map(linkToCard),
-            });
-
-            if (eligibility.needsOnboarding) {
-              setIsOnboardingOpen(true);
-            }
-          } else {
-            // Fresh new user! No Firestore profile exists yet.
-            // Check if user has specific cached state for their UID:
-            const userKey = `${STORAGE_KEY}_${user.uid}`;
-            let userScopedData: UserProfile | null = null;
-            try {
-              const saved = localStorage.getItem(userKey);
-              if (saved) userScopedData = JSON.parse(saved);
-            } catch (_) {}
-
-            if (userScopedData && userScopedData.id === user.uid) {
-              setProfile(userScopedData);
-              if (eligibility.needsOnboarding) {
-                setIsOnboardingOpen(true);
-              }
-            } else {
-              // Brand new account: wipe any prior state, initialize clean and launch onboarding!
-              const freshProfile = createFreshUserProfile(user, pendingClaimedHandle);
-              setProfile(freshProfile);
-              setIsOnboardingOpen(true);
-            }
-          }
-        } catch (err: any) {
-          console.warn('Notice syncing from Cloud Firestore (operating in offline/cached mode):', err?.message || err);
-          // Graceful fallback to user-scoped local cache if network is offline/slow
-          const userKey = `${STORAGE_KEY}_${user.uid}`;
-          try {
-            const saved = localStorage.getItem(userKey);
-            if (saved) {
-              const userScopedData = JSON.parse(saved);
-              if (userScopedData && userScopedData.id === user.uid) {
-                setProfile(userScopedData);
-              }
-            }
-          } catch (_) {}
-        } finally {
-          setIsSyncing(false);
-          setIsAuthChecking(false);
-        }
+        await loadUserData(user, pendingClaimedHandle);
       } else {
-        setIsAuthChecking(false);
+        useStudioStore.setState({ currentUser: null, isAuthChecking: false });
       }
     });
 
     return () => unsubscribe();
-  }, [pendingClaimedHandle]);
+  }, [pendingClaimedHandle, loadUserData]);
 
   // Guard dashboard: only authenticated users are allowed to access studio / dashboard
   useEffect(() => {
@@ -284,9 +156,23 @@ function StudioApp() {
       setAppMode('landing');
       setIsAuthModalOpen(true);
     }
-  }, [appMode, currentUser, isAuthChecking]);
+  }, [appMode, currentUser, isAuthChecking, setAppMode, setIsAuthModalOpen]);
 
-  // Handlers for Link management
+  // Account Settings Modal State
+  const handleOpenAccountSettings = (tab: AccountSubTab = 'profile') => {
+    setAccountModalInitialTab(tab);
+    setIsAccountModalOpen(true);
+  };
+
+  const handleOpenProModal = (featureName?: string) => {
+    setProLockedFeature(featureName || 'LinkLyra Pro');
+    setIsProModalOpen(true);
+  };
+
+  const handleUpgradeToPro = (_plan?: any) => {
+    // Plan is granted and verified on the server; usePlan hook will automatically update state.
+  };
+
   const handleAddCard = () => {
     setEditingCard(null);
     setIsModalOpen(true);
@@ -297,461 +183,52 @@ function StudioApp() {
     setIsModalOpen(true);
   };
 
-  const handleSaveCard = async (savedCard: ProfileCardData) => {
-    const prevProfile = profile;
-    const isEditing = Boolean(editingCard);
+  const handleSaveCard = (card: ProfileCardData) =>
+    saveCard(card, (_err, retry) => toast.error('Failed to save card.', { label: 'Retry', onClick: retry }));
 
-    if (isEditing) {
-      // Update existing
-      setProfile((prev) => ({
-        ...prev,
-        cards: prev.cards.map((c) => (c.id === savedCard.id ? savedCard : c)),
-      }));
+  const handleDeleteCard = (id: string) =>
+    deleteCard(id, (_err, retry) => toast.error('Failed to delete card.', { label: 'Retry', onClick: retry }));
 
-      if (currentUser) {
-        setIsSyncing(true);
-        setSaveStatus('saving');
-        try {
-          const targetIndex = profile.cards.findIndex((c) => c.id === savedCard.id);
-          const linkDoc = cardToLinkDoc(savedCard, targetIndex >= 0 ? targetIndex : 0, currentUser.uid);
-          await profileService.updateLink(savedCard.id, linkDoc);
-          setSaveStatus('saved');
-        } catch (err) {
-          console.error('Error updating link:', err);
-          setProfile(prevProfile);
-          setSaveStatus('error');
-          const retry = () => handleSaveCard(savedCard);
-          setLastFailedAction(() => retry);
-          toast.error('Failed to update card.', { label: 'Retry', onClick: retry });
-        } finally {
-          setIsSyncing(false);
-        }
-      }
-    } else {
-      // Add new card
-      const tempId = savedCard.id || `card_${Date.now()}`;
-      const tempCard = { ...savedCard, id: tempId };
-      setProfile((prev) => ({
-        ...prev,
-        cards: [...prev.cards, tempCard],
-      }));
+  const handleToggleCardActive = (id: string) =>
+    toggleCardActive(id, (_err, retry) => toast.error('Failed to toggle card visibility.', { label: 'Retry', onClick: retry }));
 
-      if (currentUser) {
-        setIsSyncing(true);
-        setSaveStatus('saving');
-        try {
-          const linkDoc = cardToLinkDoc(savedCard, profile.cards.length, currentUser.uid);
-          const newDoc = await profileService.addLink(currentUser.uid, linkDoc);
-          setProfile((prev) => ({
-            ...prev,
-            cards: prev.cards.map((c) => (c.id === tempId ? { ...c, id: newDoc.id } : c)),
-          }));
-          setSaveStatus('saved');
-        } catch (err) {
-          console.error('Error adding link:', err);
-          setProfile(prevProfile);
-          setSaveStatus('error');
-          const retry = () => handleSaveCard(savedCard);
-          setLastFailedAction(() => retry);
-          toast.error('Failed to add card.', { label: 'Retry', onClick: retry });
-        } finally {
-          setIsSyncing(false);
-        }
-      }
-    }
-  };
+  const handleReorderCards = (newCards: ProfileCardData[]) =>
+    reorderCards(newCards, (_err, retry) => toast.error('Failed to save card order.', { label: 'Retry', onClick: retry }));
 
-  const handleDeleteCard = async (id: string) => {
-    const prevProfile = profile;
-    setProfile((prev) => ({
-      ...prev,
-      cards: prev.cards.filter((c) => c.id !== id),
-    }));
+  const handleMoveCard = (index: number, direction: 'up' | 'down') =>
+    moveCard(index, direction, (_err, retry) => toast.error('Failed to move card.', { label: 'Retry', onClick: retry }));
 
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        await profileService.deleteLink(id);
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Error deleting link:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleDeleteCard(id);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to delete card.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
+  const handleAddSection = (title: string) =>
+    addSection(title, (_err, retry) => toast.error('Failed to add section.', { label: 'Retry', onClick: retry }));
 
-  const handleToggleCardActive = async (id: string) => {
-    const prevProfile = profile;
-    const targetCard = profile.cards.find((c) => c.id === id);
-    const newStatus = targetCard ? targetCard.isActive === false : false;
+  const handleDeleteSection = (sectionId: string) =>
+    deleteSection(sectionId, (_err, retry) => toast.error('Failed to delete section.', { label: 'Retry', onClick: retry }));
 
-    setProfile((prev) => ({
-      ...prev,
-      cards: prev.cards.map((c) =>
-        c.id === id ? { ...c, isActive: newStatus } : c
-      ),
-    }));
+  const handleUpdateProfile = (updated: Partial<UserProfile>) =>
+    updateProfile(updated, (_err, retry) => toast.error('Failed to save profile changes.', { label: 'Retry', onClick: retry }));
 
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        await profileService.updateLink(id, { is_active: newStatus });
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Error toggling link active:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleToggleCardActive(id);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to toggle card visibility.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
+  const handleManualSave = () =>
+    manualSave(
+      () => toast.success('All changes saved successfully'),
+      (_err, retry) => toast.error('Failed to save changes.', { label: 'Retry', onClick: retry })
+    );
 
-  const handleReorderCards = async (newCards: ProfileCardData[]) => {
-    const prevProfile = profile;
-    setProfile((prev) => ({
-      ...prev,
-      cards: newCards,
-    }));
-
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        await profileService.reorderLinks(
-          currentUser.uid,
-          newCards.map((c) => c.id)
-        );
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Error reordering links:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleReorderCards(newCards);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to save card order.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const handleMoveCard = async (index: number, direction: 'up' | 'down') => {
-    const newCards = [...profile.cards];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newCards.length) return;
-
-    const temp = newCards[index];
-    newCards[index] = newCards[targetIndex];
-    newCards[targetIndex] = temp;
-
-    await handleReorderCards(newCards);
-  };
-
-  const handleAddSection = async (title: string) => {
-    const prevProfile = profile;
-    const tempId = `sec_${Date.now()}`;
-    const newSec = {
-      id: tempId,
-      title,
-      position: (profile.sections || []).length,
-      is_visible: true,
-    };
-
-    setProfile((prev) => ({
-      ...prev,
-      sections: [...(prev.sections || []), newSec],
-    }));
-
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        const doc = await profileService.addSection(currentUser.uid, {
-          title,
-          position: (profile.sections || []).length,
-          is_visible: true,
-        });
-        setProfile((prev) => ({
-          ...prev,
-          sections: (prev.sections || []).map((s) => (s.id === tempId ? { ...s, id: doc.id } : s)),
-        }));
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Failed to add section to cloud:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleAddSection(title);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to add section.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const handleDeleteSection = async (sectionId: string) => {
-    const prevProfile = profile;
-    setProfile((prev) => ({
-      ...prev,
-      sections: (prev.sections || []).filter((s) => s.id !== sectionId),
-      cards: prev.cards.map((c) =>
-        c.sectionId === sectionId ? { ...c, sectionId: undefined } : c
-      ),
-    }));
-
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        await profileService.deleteSection(sectionId);
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Failed to delete section:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleDeleteSection(sectionId);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to delete section.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const handleUpdateProfile = async (updated: Partial<UserProfile>) => {
-    const prevProfile = profile;
-    setProfile((prev) => ({
-      ...prev,
-      ...updated,
-    }));
-
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        const updates: Partial<DbProfile> = {};
-        if (updated.name !== undefined) updates.full_name = updated.name;
-        if (updated.headline !== undefined) updates.bio = updated.headline;
-        if (updated.avatarUrl !== undefined) updates.avatar_url = updated.avatarUrl;
-        if (updated.username !== undefined) updates.username = updated.username;
-        if (updated.businessPhone !== undefined) updates.business_phone = updated.businessPhone;
-        if (updated.theme !== undefined) updates.theme = updated.theme;
-        if (updated.fontFamily !== undefined) updates.font_family = updated.fontFamily;
-        if (updated.buttonStyle !== undefined) updates.button_style = updated.buttonStyle;
-        if (updated.backgroundType !== undefined) updates.background_type = updated.backgroundType;
-        if (updated.backgroundValue !== undefined) updates.background_value = updated.backgroundValue;
-        if (updated.cardStyle !== undefined) updates.card_style = updated.cardStyle;
-        if (updated.wallpaperMode !== undefined) updates.wallpaper_mode = updated.wallpaperMode;
-        if (updated.wallpaperTint !== undefined) updates.wallpaper_tint = updated.wallpaperTint;
-        if (updated.cardBgColor !== undefined) updates.card_bg_color = updated.cardBgColor;
-        if (updated.cardTextColor !== undefined) updates.card_text_color = updated.cardTextColor;
-        if (updated.buttonColor !== undefined) updates.button_color = updated.buttonColor;
-        if (updated.stickers !== undefined) updates.stickers = updated.stickers;
-        if (updated.footerSettings !== undefined) updates.footer_settings = updated.footerSettings;
-        if (updated.socials !== undefined) updates.socials = updated.socials;
-        if (updated.customDomain !== undefined) updates.custom_domain = updated.customDomain;
-        if (updated.accountSettings !== undefined) updates.accountSettings = updated.accountSettings;
-
-        await profileService.updateProfile(currentUser.uid, updates);
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Failed to update profile:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleUpdateProfile(updated);
-        setLastFailedAction(() => retry);
-        toast.error('Failed to save profile changes.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const handleManualSave = async () => {
-    const prevProfile = profile;
-    setSaveStatus('saving');
-    setIsSyncing(true);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-      if (currentUser) {
-        const updates: Partial<DbProfile> = {
-          full_name: profile.name,
-          bio: profile.headline,
-          avatar_url: profile.avatarUrl,
-          username: profile.username,
-          business_phone: profile.businessPhone,
-          theme: profile.theme,
-          font_family: profile.fontFamily,
-          button_style: profile.buttonStyle,
-          background_type: profile.backgroundType,
-          background_value: profile.backgroundValue,
-          card_style: profile.cardStyle,
-          wallpaper_mode: profile.wallpaperMode,
-          wallpaper_tint: profile.wallpaperTint,
-          card_bg_color: profile.cardBgColor,
-          card_text_color: profile.cardTextColor,
-          button_color: profile.buttonColor,
-          stickers: profile.stickers,
-          footer_settings: profile.footerSettings,
-          socials: profile.socials,
-          custom_domain: profile.customDomain,
-          accountSettings: profile.accountSettings,
-        };
-        await profileService.updateProfile(currentUser.uid, updates);
-      }
-      setSaveStatus('saved');
-      toast.success('All changes saved successfully');
-    } catch (err) {
-      console.error('Error in manual save:', err);
-      setProfile(prevProfile);
-      setSaveStatus('error');
-      const retry = () => handleManualSave();
-      setLastFailedAction(() => retry);
-      toast.error('Failed to save changes.', { label: 'Retry', onClick: retry });
-      throw err;
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const handleResetLinks = () =>
+    resetLinks((_err, retry) => toast.error('Failed to reset links.', { label: 'Retry', onClick: retry }));
 
   const handleCardClick = (card: ProfileCardData) => {
-    // In studio builder preview, do NOT mutate click counts or record analytics.
-    // Only navigate to the target URL if it's a valid link.
     if (card.linkUrl && card.linkUrl !== '#' && card.linkUrl !== 'https://') {
       safeOpenUrl(card.linkUrl);
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await profileService.signOut();
-      setCurrentUser(null);
-      setProfile(DEFAULT_STARTER_PROFILE);
-      setIsOnboardingOpen(false);
-      setIsAccountModalOpen(false);
-      setIsAuthModalOpen(false);
-      setAppMode('landing');
-    } catch (e) {
-      console.error('Sign out error:', e);
-    }
-  };
+  const handleSignOut = () => signOut();
 
-  const handleAuthSuccess = async (user: User | null) => {
-    setCurrentUser(user);
+  const handleAuthSuccess = async (user: any) => {
     setIsAuthModalOpen(false);
     if (!user) return;
-
     setAppMode('studio');
-    setIsSyncing(true);
-    try {
-      const [dbProf, dbLinks, dbSections] = await Promise.all([
-        profileService.getProfile(user.uid),
-        profileService.getLinks(user.uid),
-        profileService.getSections(user.uid),
-      ]);
-
-      const eligibility = await checkUserOnboardingEligibility(user.uid, dbProf, dbLinks?.length || 0);
-
-      if (dbProf) {
-        const isAgency = dbProf.plan === 'agency' || dbProf.role === 'agency';
-        const resolvedAvatar =
-          dbProf.avatar_url && !dbProf.avatar_url.includes('unsplash.com')
-            ? dbProf.avatar_url
-            : user.photoURL || dbProf.avatar_url || '';
-
-        if (user.photoURL && (!dbProf.avatar_url || dbProf.avatar_url.includes('unsplash.com'))) {
-          profileService.updateProfile(user.uid, { avatar_url: user.photoURL }).catch(() => {});
-        }
-
-        setProfile({
-          id: dbProf.id,
-          name: dbProf.full_name || 'My Page',
-          headline: dbProf.bio || '',
-          avatarUrl: resolvedAvatar,
-          username: dbProf.username || `creator_${user.uid.slice(0, 5)}`,
-          businessPhone: dbProf.business_phone,
-          theme: dbProf.theme || 'warm',
-          fontFamily: dbProf.font_family,
-          buttonStyle: dbProf.button_style,
-          backgroundType: dbProf.background_type,
-          backgroundValue: dbProf.background_value,
-          socials: dbProf.socials || {},
-          plan: isAgency ? 'agency' : (dbProf.plan || 'free'),
-          customDomain: dbProf.custom_domain || '',
-          accountSettings: dbProf.accountSettings,
-          sections: dbSections || [],
-          cards: (dbLinks || []).map(linkToCard),
-        });
-
-        if (eligibility.needsOnboarding) {
-          setIsOnboardingOpen(true);
-        }
-      } else {
-        // Fresh user without Firestore profile: initialize clean profile for this user and open onboarding!
-        const freshProfile = createFreshUserProfile(user, pendingClaimedHandle);
-        setProfile(freshProfile);
-        setIsOnboardingOpen(true);
-      }
-    } catch (e) {
-      console.error('Error loading user profile after auth success:', e);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleResetLinks = async () => {
-    const prevProfile = profile;
-    setProfile((prev) => ({
-      ...prev,
-      cards: DEFAULT_STARTER_PROFILE.cards,
-    }));
-    if (currentUser) {
-      setIsSyncing(true);
-      setSaveStatus('saving');
-      try {
-        const existing = await profileService.getLinks(currentUser.uid);
-        for (const l of existing) {
-          await profileService.deleteLink(l.id);
-        }
-        for (let i = 0; i < DEFAULT_STARTER_PROFILE.cards.length; i++) {
-          const c = DEFAULT_STARTER_PROFILE.cards[i];
-          await profileService.addLink(currentUser.uid, {
-            title: c.title,
-            subtitle: c.subtitle || '',
-            link_url: c.linkUrl,
-            color: c.color,
-            logo_url: c.logoSrc || '',
-            badge_text: c.badgeText || '',
-            expanded: c.expanded,
-            is_active: c.isActive,
-            template_type: c.templateType,
-            display_order: i,
-          });
-        }
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Reset links error:', err);
-        setProfile(prevProfile);
-        setSaveStatus('error');
-        const retry = () => handleResetLinks();
-        setLastFailedAction(() => retry);
-        toast.error('Failed to reset links.', { label: 'Retry', onClick: retry });
-      } finally {
-        setIsSyncing(false);
-      }
-    }
+    await loadUserData(user, pendingClaimedHandle);
   };
 
   // If in landing page view

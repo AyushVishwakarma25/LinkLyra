@@ -236,10 +236,43 @@ export const pagesService = {
     return Boolean(res.data.whiteLabel);
   },
 
-  async claimCustomDomain(domain: string): Promise<{ success: boolean; domain: string }> {
-    const claimDomainFn = httpsCallable<{ domain: string }, { success: boolean; domain: string }>(
+  async checkCustomDomainStatus(domain: string): Promise<{
+    domain: string;
+    isConfigured: boolean;
+    strategy: 'cname' | 'apex_a' | 'txt_challenge' | null;
+    detectedCnames: string[];
+    detectedIps: string[];
+    detectedTxt: string[];
+    expectedCname: string;
+    expectedIps: string[];
+    challengeToken: string;
+    challengeRecordName: string;
+    message: string;
+  }> {
+    const checkFn = httpsCallable<
+      { domain: string },
+      {
+        domain: string;
+        isConfigured: boolean;
+        strategy: 'cname' | 'apex_a' | 'txt_challenge' | null;
+        detectedCnames: string[];
+        detectedIps: string[];
+        detectedTxt: string[];
+        expectedCname: string;
+        expectedIps: string[];
+        challengeToken: string;
+        challengeRecordName: string;
+        message: string;
+      }
+    >(functions, 'checkCustomDomainStatus');
+    const result = await checkFn({ domain });
+    return result.data;
+  },
+
+  async claimCustomDomain(domain: string): Promise<{ success: boolean; domain: string; strategy?: string }> {
+    const claimDomainFn = httpsCallable<{ domain: string }, { success: boolean; domain: string; strategy?: string }>(
       functions,
-      'claimCustomDomain'
+      'verifyCustomDomain'
     );
     const result = await claimDomainFn({ domain });
     return result.data;

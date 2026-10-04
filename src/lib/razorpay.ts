@@ -1,5 +1,5 @@
 import { PlanPricingConfig, SubscriptionPlanType, BillingCycle } from '../types';
-import { functions } from './firebase';
+import { functions, auth } from './firebase';
 import { httpsCallable } from 'firebase/functions';
 
 declare global {
@@ -251,6 +251,13 @@ export async function initiateRazorpaySubscriptionCheckout({
 
           if (!verifyRes.data.success) {
             throw new Error(verifyRes.data.message || 'Payment verification failed on server.');
+          }
+
+          // Force refresh local JWT to immediately load server-granted Custom Claims
+          if (auth?.currentUser) {
+            try {
+              await auth.currentUser.getIdToken(true);
+            } catch {}
           }
 
           onSuccess({
